@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Ventrail local backups / scratch (never commit)
+Ventrail/_backup_*.zip
+Ventrail/_to_delete/
