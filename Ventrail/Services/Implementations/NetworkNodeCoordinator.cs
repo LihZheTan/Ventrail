@@ -5,10 +5,6 @@ using Ventrail.Services.Contracts;
 
 namespace Ventrail.Services.Implementations;
 
-/// <summary>
-/// P2P networking (libp2p / IPFS). Stub created in Week 1 from the class diagram (Fig 3.8).
-/// Real implementation: CP2 Weeks 10-12 (Fig 3.5 and 3.6).
-/// </summary>
 public class NetworkNodeCoordinator : INetworkNodeCoordinator
 {
     public int LocalPort { get; private set; } = 4001;   // libp2p's common default port

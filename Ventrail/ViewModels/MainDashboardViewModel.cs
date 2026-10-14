@@ -11,31 +11,55 @@ using Ventrail.Services.Contracts;
 namespace Ventrail.ViewModels;
 
 /// <summary>
-/// Central controller from the class diagram (Fig 3.8). It turns button clicks into
-/// RepositoryManager calls and exposes data the three-pane window binds to.
+/// Central controller from the class diagram (Fig 3.8). It turns UI actions into service calls
+/// and exposes the data the window binds to. It never touches UI controls directly (MVVM).
 ///
-/// All Git work runs inside Task.Run so the window never freezes while scanning
-/// or committing large folders (section 3.3.1 of the proposal).
+/// Every dependency is an interface handed in through the constructor, so App.xaml.cs decides
+/// whether the real services or the demo/mock ones are used. The ViewModel can't tell the difference.
+///
+/// Git work runs inside Task.Run so the window never freezes (proposal section 3.3.1).
 /// </summary>
 public partial class MainDashboardViewModel : ObservableObject
 {
-    private readonly IRepositoryManager _repo;
+    // The four arrows leaving MainDashboardViewModel in Fig 3.8.
+    private readonly IRepositoryManager _repo;             // "Manages Git Core"
+    private readonly IIntelligentStorageEngine _ai;        // "Calls ML.NET"
+    private readonly INetworkNodeCoordinator _network;     // "Manages P2P Network"
+    private readonly ISpecializedFileHandler _fileHandler; // "Interfaces with external libraries"
 
-    public MainDashboardViewModel(IRepositoryManager repositoryManager)
+    public MainDashboardViewModel(
+        IRepositoryManager repositoryManager,
+        IIntelligentStorageEngine storageEngine,
+        INetworkNodeCoordinator networkCoordinator,
+        ISpecializedFileHandler fileHandler,
+        bool isDemoMode = false)
     {
         _repo = repositoryManager;
+        _ai = storageEngine;
+        _network = networkCoordinator;
+        _fileHandler = fileHandler;
+        IsDemoMode = isDemoMode;
         AuthorName = Environment.UserName;
     }
 
     // ---------- state bound by the UI ----------
 
+    public bool IsDemoMode { get; }
+
+    // Class diagram: List<FileAsset> StagedFiles -> all changes, each with an IsStaged flag.
     public ObservableCollection<FileAsset> Changes { get; } = new();
     public ObservableCollection<CommitNode> History { get; } = new();
     public ObservableCollection<FileAsset> CommitFiles { get; } = new();   // files in the selected version
 
+    // Class diagram: List<PeerNode> ActivePeers (filled in Weeks 10-12).
+    public ObservableCollection<PeerNode> ActivePeers { get; } = new();
+
+    // Class diagram: String CurrentDirectory.
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(StageAllCommand), nameof(CommitCommand))]
-    private string _repoPath = string.Empty;
+    [NotifyPropertyChangedFor(nameof(HasRepo))]
+    [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(StageAllCommand),
+                                nameof(CommitCommand), nameof(ShareRepositoryCommand))]
+    private string _currentDirectory = string.Empty;
 
     [ObservableProperty] private string _branchName = string.Empty;
 
@@ -45,9 +69,11 @@ public partial class MainDashboardViewModel : ObservableObject
 
     [ObservableProperty] private string _authorName = string.Empty;
     [ObservableProperty] private string _statusText = "Select a folder to start tracking.";
+    [ObservableProperty] private string _recommendationText = "Select a changed file to see suggestions.";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(StageAllCommand), nameof(CommitCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(StageAllCommand),
+                                nameof(CommitCommand), nameof(ShareRepositoryCommand))]
     private bool _isBusy;
 
     [ObservableProperty] private FileAsset? _selectedFile;
@@ -57,7 +83,16 @@ public partial class MainDashboardViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(RestoreSelectedFileCommand))]
     private FileAsset? _selectedCommitFile;
 
-    // Generated hook: runs whenever the user picks a version in the History tab.
+    public int StagedCount => Changes.Count(c => c.IsStaged);
+    public bool HasRepo => !string.IsNullOrEmpty(CurrentDirectory);
+
+    // ---------- reactions to selection changes (generated "On...Changed" hooks) ----------
+
+    partial void OnSelectedFileChanged(FileAsset? value)
+    {
+        if (value != null) CheckFileRecommendation(value.FilePath);
+    }
+
     partial void OnSelectedCommitChanged(CommitNode? value)
     {
         CommitFiles.Clear();
@@ -73,29 +108,44 @@ public partial class MainDashboardViewModel : ObservableObject
         }
     }
 
-    public int StagedCount => Changes.Count(c => c.IsStaged);
-    public bool HasRepo => !string.IsNullOrEmpty(RepoPath);
+    // ---------- class diagram operations ----------
 
-    // ---------- commands ----------
+    /// <summary>Class diagram: InitializeDashboard(). Opens/creates the repository and loads everything.</summary>
+    public Task InitializeDashboardAsync(string folderPath) => RunBusyAsync("Opening folder...", async () =>
+    {
+        bool ok = await Task.Run(() => _repo.InitRepository(folderPath));
+        if (!ok) { StatusText = "That folder could not be opened."; return; }
+
+        CurrentDirectory = _repo.RepoPath;
+        await ReloadAsync();
+        StatusText = History.Count == 0
+            ? "New tracking started. Stage your files and save your first version."
+            : $"Loaded {History.Count} saved versions.";
+    });
+
+    /// <summary>Class diagram: CheckFileRecommendation(String filePath). Real AI arrives in Weeks 8-9.</summary>
+    public void CheckFileRecommendation(string filePath)
+    {
+        var file = Changes.FirstOrDefault(f => f.FilePath == filePath);
+        try
+        {
+            string type = _ai.AnalyzeFileFormat(filePath);
+            RecommendationText = _ai.GenerateRecommendation(type, file?.SizeInBytes ?? 0);
+        }
+        catch (NotImplementedException)
+        {
+            RecommendationText = "AI suggestions will appear here once the ML.NET engine is added (Weeks 8-9).";
+        }
+    }
+
+    // ---------- commands (buttons) ----------
 
     [RelayCommand]
     private async Task OpenFolderAsync()
     {
         var dialog = new OpenFolderDialog { Title = "Choose a folder for Ventrail to track" };
         if (dialog.ShowDialog() != true) return;
-
-        await RunBusyAsync("Opening folder...", async () =>
-        {
-            bool ok = await Task.Run(() => _repo.InitRepository(dialog.FolderName));
-            if (!ok) { StatusText = "That folder could not be opened."; return; }
-
-            RepoPath = _repo.RepoPath;
-            OnPropertyChanged(nameof(HasRepo));
-            await ReloadAsync();
-            StatusText = History.Count == 0
-                ? "New tracking started. Stage your files and save your first version."
-                : $"Loaded {History.Count} saved versions.";
-        });
+        await InitializeDashboardAsync(dialog.FolderName);
     }
 
     private bool CanUseRepo() => HasRepo && !IsBusy;
@@ -110,7 +160,7 @@ public partial class MainDashboardViewModel : ObservableObject
         await ReloadAsync();
     });
 
-    // Bound to each file's checkbox: ticked = goes into the next version.
+    // Class diagram: StageSelectedFile(String filePath). Bound to each file's checkbox.
     [RelayCommand]
     private Task ToggleStageAsync(FileAsset? file) => file is null ? Task.CompletedTask :
         RunBusyAsync(file.IsStaged ? "Staging..." : "Unstaging...", async () =>
@@ -123,6 +173,7 @@ public partial class MainDashboardViewModel : ObservableObject
 
     private bool CanCommit() => CanUseRepo() && !string.IsNullOrWhiteSpace(CommitMessage);
 
+    // Class diagram: CommitStagedFiles(String message).
     [RelayCommand(CanExecute = nameof(CanCommit))]
     private Task CommitAsync() => RunBusyAsync("Saving version...", async () =>
     {
@@ -135,6 +186,23 @@ public partial class MainDashboardViewModel : ObservableObject
         CommitMessage = string.Empty;
         await ReloadAsync();
         StatusText = $"Version saved ({History.FirstOrDefault()?.ShortHash}).";
+    });
+
+    // Class diagram: ShareRepository(String peerId). Real P2P arrives in Weeks 10-12.
+    [RelayCommand(CanExecute = nameof(CanUseRepo))]
+    private Task ShareRepositoryAsync() => RunBusyAsync("Looking for peers...", async () =>
+    {
+        try
+        {
+            var peers = await Task.Run(_network.DiscoverPeers);
+            ActivePeers.Clear();
+            foreach (var p in peers) ActivePeers.Add(p);
+            StatusText = $"Found {ActivePeers.Count} peer(s).";
+        }
+        catch (NotImplementedException)
+        {
+            StatusText = "Peer-to-peer sharing is coming in Weeks 10-12.";
+        }
     });
 
     private bool CanRestore() => SelectedCommit is not null && SelectedCommitFile is not null;

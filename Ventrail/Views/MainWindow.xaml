@@ -1,4 +1,4 @@
-<Window x:Class="Ventrail.MainWindow"
+﻿<Window x:Class="Ventrail.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -72,10 +72,14 @@
             <!-- ===== LEFT: navigation / context ===== -->
             <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,12,0">
                 <StackPanel>
-                    <TextBlock Text="VENTRAIL" FontSize="18" FontWeight="Bold" Foreground="#111827" Margin="0,0,0,16"/>
+                    <TextBlock Text="VENTRAIL" FontSize="18" FontWeight="Bold" Foreground="#111827" Margin="0,0,0,4"/>
+                    <Border Background="#FEF3C7" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Margin="0,0,0,12"
+                            Visibility="{Binding IsDemoMode, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="DEMO DATA" FontSize="10" FontWeight="SemiBold" Foreground="#92400E"/>
+                    </Border>
 
                     <TextBlock Text="TRACKED FOLDER" Style="{StaticResource PaneTitle}"/>
-                    <TextBlock Text="{Binding RepoPath, TargetNullValue='None selected', FallbackValue='None selected'}"
+                    <TextBlock Text="{Binding CurrentDirectory, TargetNullValue='None selected', FallbackValue='None selected'}"
                                TextWrapping="Wrap" Foreground="#111827" Margin="0,0,0,8"/>
                     <Button Content="Open or create folder..." Command="{Binding OpenFolderCommand}"/>
 
@@ -83,6 +87,16 @@
                     <TextBlock Text="{Binding BranchName}" Foreground="#111827" Margin="0,0,0,16"/>
 
                     <Button Content="Refresh changes" Command="{Binding RefreshCommand}"/>
+
+                    <TextBlock Text="PEERS" Style="{StaticResource PaneTitle}" Margin="0,16,0,6"/>
+                    <Button Content="Share via P2P..." Command="{Binding ShareRepositoryCommand}"/>
+                    <ItemsControl ItemsSource="{Binding ActivePeers}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding PeerId}" Foreground="#374151" TextTrimming="CharacterEllipsis"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Border>
 
@@ -183,7 +197,7 @@
 
                     <TextBlock Text="AI INSIGHTS" Style="{StaticResource PaneTitle}" Margin="0,16,0,6"/>
                     <Border Background="#F3F4F6" CornerRadius="6" Padding="10">
-                        <TextBlock Text="ML.NET suggestions will appear here (CP2 weeks 8-9)."
+                        <TextBlock Text="{Binding RecommendationText}"
                                    TextWrapping="Wrap" Foreground="#6B7280"/>
                     </Border>
                 </StackPanel>

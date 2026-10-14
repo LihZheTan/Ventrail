@@ -1,18 +1,15 @@
 using System.Windows;
-using Ventrail.Services.Implementations;
-using Ventrail.ViewModels;
 
-namespace Ventrail
+namespace Ventrail.Views;
+
+/// <summary>
+/// View only. No logic lives here (MVVM): the window gets its ViewModel from App.xaml.cs
+/// through DataContext, and everything on screen comes from data binding.
+/// </summary>
+public partial class MainWindow : Window
 {
-    /// <summary>
-    /// View only: no logic lives here (MVVM). It just connects the window to its ViewModel.
-    /// </summary>
-    public partial class MainWindow : Window
+    public MainWindow()
     {
-        public MainWindow()
-        {
-            InitializeComponent();
-            DataContext = new MainDashboardViewModel(new RepositoryManager());
-        }
+        InitializeComponent();
     }
 }

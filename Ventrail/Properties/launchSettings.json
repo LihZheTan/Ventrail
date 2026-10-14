@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "Ventrail": {
+      "commandName": "Project"
+    },
+    "Ventrail (Demo data)": {
+      "commandName": "Project",
+      "commandLineArgs": "--demo"
+    }
+  }
+}

@@ -3,10 +3,6 @@ using System.Collections.Generic;
 
 namespace Ventrail.Models;
 
-/// <summary>
-/// One snapshot (node) in the repository's history DAG.
-/// Built from a LibGit2Sharp Commit by RepositoryManager.
-/// </summary>
 public class CommitNode
 {
     public string Hash { get; set; } = string.Empty;          // full SHA-1, e.g. "3f2a9c..."

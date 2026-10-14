@@ -32,4 +32,52 @@
 ---
 
 ## Week 2 – MVVM & Data Binding
+**Done**
+- **Composition root** in `App.xaml.cs`: the only place concrete classes are created. Removed
+  `StartupUri` from `App.xaml`; the app now builds the ViewModel, injects the four services
+  through its constructor, and sets it as the window's `DataContext`.
+- **Views folder**: `MainWindow` moved to `Views/` (namespace `Ventrail.Views`). The code-behind
+  only calls `InitializeComponent()`; no logic lives in the View.
+- **ViewModel aligned with Fig 3.8**: constructor takes `IRepositoryManager`,
+  `IIntelligentStorageEngine`, `INetworkNodeCoordinator` and `ISpecializedFileHandler`
+  (the four arrows in the diagram). Added `ActivePeers`, `CurrentDirectory`,
+  `InitializeDashboardAsync`, `ShareRepositoryCommand`, `CheckFileRecommendation`.
+  Calls to stubbed services fail gracefully with a friendly "coming in Week X" message.
+- **Dummy models**: `Services/Mock/MockRepositoryManager.cs` is an in-memory fake repository
+  (a student's thesis folder with 3 past versions and 5 changes).
+- **Launch profiles** (`Properties/launchSettings.json`): "Ventrail" (real Git) and
+  "Ventrail (Demo data)" (`--demo`, uses the mock and shows a DEMO DATA badge).
+- **Data binding** in the View: folder, branch, changes list with staging checkboxes, history,
+  files-in-version list, commit box, status bar with busy indicator, peers list, AI insights text.
+
+**Testing**
+- Headless test of the ViewModel against both the mock and the real `RepositoryManager`:
+  open → tick file → commit (button disabled until a message is typed) → history updates →
+  select version → files listed → restore → AI panel placeholder → share placeholder. All passed.
+
+**Class diagram → code mapping (MainDashboardViewModel)**
+
+| Fig 3.8 | Code |
+|---|---|
+| `String CurrentDirectory` | `CurrentDirectory` |
+| `List<FileAsset> StagedFiles` | `Changes` (each `FileAsset` has `IsStaged`) |
+| `List<PeerNode> ActivePeers` | `ActivePeers` |
+| `InitializeDashboard()` | `InitializeDashboardAsync(path)` |
+| `StageSelectedFile(filePath)` | `ToggleStageCommand` |
+| `CommitStagedFiles(message)` | `CommitCommand` (uses `CommitMessage`) |
+| `ShareRepository(peerId)` | `ShareRepositoryCommand` |
+| `CheckFileRecommendation(filePath)` | `CheckFileRecommendation(filePath)` |
+
+**Decisions**
+- Manual constructor injection instead of a DI container (Microsoft.Extensions.DependencyInjection):
+  only 4 services, so a container adds a package and complexity without real benefit.
+- `ObservableCollection` + CommunityToolkit `[ObservableProperty]`/`[RelayCommand]` source
+  generators for binding, which removes INotifyPropertyChanged boilerplate.
+
+**Issues / notes**
+- None.
+
+---
+
+## Week 3 – Core GUI Construction
 _(to fill in)_
