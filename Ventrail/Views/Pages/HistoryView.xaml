@@ -1,0 +1,105 @@
+<UserControl x:Class="Ventrail.Views.Pages.HistoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Ventrail.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:MainDashboardViewModel}"
+             d:DesignHeight="640" d:DesignWidth="1100">
+
+    <!-- Version history (DAG) on the left, details of the selected version on the right. -->
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" MinWidth="380"/>
+            <ColumnDefinition Width="330"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ===================== Version list ===================== -->
+        <DockPanel Grid.Column="0" Margin="26,22,26,20">
+            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+                <TextBlock Text="History" Style="{StaticResource PageTitle}"/>
+                <TextBlock Style="{StaticResource SubtleText}" Margin="0,2,0,0">
+                    <Run Text="{Binding History.Count, Mode=OneWay}"/> saved versions on
+                    <Run Text="{Binding BranchName, Mode=OneWay}"/>
+                </TextBlock>
+            </StackPanel>
+
+            <Grid>
+                <TextBlock Text="No versions saved yet. Commit some changes to start your history."
+                           Style="{StaticResource SubtleText}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Visibility="{Binding HasHistory, Converter={StaticResource InverseBoolToVis}}"/>
+
+                <ListBox ItemsSource="{Binding History}" SelectedItem="{Binding SelectedCommit}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel>
+                                <!-- Commit node marker (a full DAG graph is planned later) -->
+                                <Grid Width="18" Margin="0,0,12,0" VerticalAlignment="Center">
+                                    <Ellipse Width="12" Height="12" Fill="{StaticResource AccentBrush}"/>
+                                    <Ellipse Width="6" Height="6" Fill="{StaticResource CardBrush}"/>
+                                </Grid>
+                                <Border DockPanel.Dock="Right" Style="{StaticResource Pill}" Margin="12,0,0,0">
+                                    <TextBlock Text="{Binding ShortHash}" FontFamily="Consolas" FontSize="12"
+                                               Foreground="{StaticResource SubtleTextBrush}"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Message}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Style="{StaticResource SubtleText}" FontSize="12">
+                                        <Run Text="{Binding Author, Mode=OneWay}"/> ·
+                                        <Run Text="{Binding DisplayTime, Mode=OneWay}"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </DockPanel>
+
+        <!-- ===================== Version details ===================== -->
+        <Border Grid.Column="1" Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource LineBrush}" BorderThickness="1,0,0,0" Padding="20,22,20,20">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="Version Details" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+                <TextBlock DockPanel.Dock="Top" Text="Select a version on the left to see what it contains."
+                           Style="{StaticResource SubtleText}"
+                           Visibility="{Binding HasSelectedCommit, Converter={StaticResource InverseBoolToVis}}"/>
+
+                <DockPanel Visibility="{Binding HasSelectedCommit, Converter={StaticResource BoolToVis}}">
+                    <StackPanel DockPanel.Dock="Top">
+                        <TextBlock Text="{Binding SelectedCommit.Message}" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"/>
+                        <TextBlock Style="{StaticResource SubtleText}" Margin="0,4,0,0">
+                            <Run Text="{Binding SelectedCommit.Author, Mode=OneWay}"/> ·
+                            <Run Text="{Binding SelectedCommit.DisplayTime, Mode=OneWay}"/>
+                        </TextBlock>
+                        <TextBlock Text="{Binding SelectedCommit.Hash}" FontFamily="Consolas" FontSize="11"
+                                   Style="{StaticResource SubtleText}" Margin="0,6,0,18"/>
+                        <TextBlock Text="FILES IN THIS VERSION" Style="{StaticResource PaneTitle}"/>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+                        <Button Content="Restore Selected File" Style="{StaticResource AccentButton}" Padding="0,9"
+                                Command="{Binding RestoreSelectedFileCommand}"
+                                ToolTip="Bring this file back exactly as it was in this version"/>
+                        <TextBlock Text="Restoring never deletes history. The old file comes back as a new change you can save."
+                                   Style="{StaticResource SubtleText}" FontSize="11" Margin="0,8,0,0"/>
+                    </StackPanel>
+
+                    <ListBox ItemsSource="{Binding CommitFiles}" SelectedItem="{Binding SelectedCommitFile}"
+                             ItemContainerStyle="{StaticResource CompactListItem}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel>
+                                    <Ellipse Style="{StaticResource StatusDot}" Margin="0,0,10,0"/>
+                                    <TextBlock Text="{Binding FilePath}" TextTrimming="CharacterEllipsis"/>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

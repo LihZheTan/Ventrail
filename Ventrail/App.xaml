@@ -4,6 +4,11 @@
              xmlns:local="clr-namespace:Ventrail">
     <!-- No StartupUri: App.xaml.cs builds the window and its ViewModel itself (composition root). -->
     <Application.Resources>
-
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Dark theme shared by every window and page (Week 3). -->
+                <ResourceDictionary Source="Themes/Theme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

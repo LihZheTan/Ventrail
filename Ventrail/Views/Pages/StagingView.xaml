@@ -1,0 +1,205 @@
+<UserControl x:Class="Ventrail.Views.Pages.StagingView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Ventrail.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:MainDashboardViewModel}"
+             d:DesignHeight="640" d:DesignWidth="1100">
+
+    <!--
+        Main dashboard, 3 panes (proposal section 3.3.2 Information Architecture):
+        LEFT   = navigation context (workspace tree + branch)
+        CENTRE = staging area (the main action)
+        RIGHT  = file inspector + AI insights
+    -->
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="*" MinWidth="380"/>
+            <ColumnDefinition Width="300"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ===================== LEFT: workspace ===================== -->
+        <Border Grid.Column="0" Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,1,0" Padding="14,18,10,14">
+            <DockPanel>
+                <!-- Branch (bottom) -->
+                <StackPanel DockPanel.Dock="Bottom">
+                    <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,10,0,14"/>
+                    <TextBlock Text="BRANCHES" Style="{StaticResource PaneTitle}"/>
+                    <Border Background="{StaticResource CardBrush}" CornerRadius="6" Padding="10,7">
+                        <StackPanel Orientation="Horizontal">
+                            <Border Width="3" Height="16" CornerRadius="2" Background="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
+                            <TextBlock Text="{Binding BranchName}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="Only the current branch is shown for now." Style="{StaticResource SubtleText}"
+                               FontSize="11" Margin="0,6,0,0"/>
+                </StackPanel>
+
+                <!-- Workspace tree (top) -->
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <Button DockPanel.Dock="Right" Command="{Binding RefreshCommand}" ToolTip="Refresh"
+                            Padding="6,3" Background="Transparent" BorderThickness="0">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" FontSize="12"/>
+                    </Button>
+                    <StackPanel>
+                        <TextBlock Text="WORKSPACE" Style="{StaticResource PaneTitle}" Margin="0,0,0,2"/>
+                        <TextBlock Text="{Binding RepoName}" FontWeight="SemiBold" FontSize="14"
+                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding CurrentDirectory}"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <TreeView ItemsSource="{Binding WorkspaceTree}" Margin="-4,4,0,0">
+                    <TreeView.ItemTemplate>
+                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="{Binding Icon}" FontSize="13"
+                                           Foreground="{StaticResource ModifiedBrush}" Margin="0,0,7,0"/>
+                                <TextBlock Text="{Binding Name}" ToolTip="{Binding RelativePath}"/>
+                            </StackPanel>
+                        </HierarchicalDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+            </DockPanel>
+        </Border>
+
+        <!-- ===================== CENTRE: staging area ===================== -->
+        <DockPanel Grid.Column="1" Margin="26,22,26,20">
+
+            <!-- Header -->
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+                <Button DockPanel.Dock="Right" Content="Stage All" Style="{StaticResource AccentButton}"
+                        Command="{Binding StageAllCommand}" VerticalAlignment="Center"/>
+                <StackPanel>
+                    <TextBlock Text="Staging Area" Style="{StaticResource PageTitle}"/>
+                    <TextBlock Style="{StaticResource SubtleText}" Margin="0,2,0,0">
+                        <Run Text="{Binding Changes.Count, Mode=OneWay}"/> changed ·
+                        <Run Text="{Binding StagedCount, Mode=OneWay}"/> ticked for the next version
+                    </TextBlock>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Commit box (bottom) -->
+            <StackPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
+                <Grid>
+                    <TextBox x:Name="CommitBox" Text="{Binding CommitMessage, UpdateSourceTrigger=PropertyChanged}"
+                             Height="64" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"/>
+                    <!-- Placeholder text, shown while the box is empty -->
+                    <TextBlock Text="Describe what changed in this version..." IsHitTestVisible="False"
+                               Foreground="{StaticResource SubtleTextBrush}" Margin="11,8,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Text, ElementName=CommitBox}" Value="">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+                <DockPanel Margin="0,10,0,10">
+                    <TextBlock Text="Author" Style="{StaticResource SubtleText}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox Text="{Binding AuthorName}" Width="200" HorizontalAlignment="Left"/>
+                </DockPanel>
+                <Button Content="Commit Changes" Style="{StaticResource AccentButton}" Padding="0,11" FontSize="14"
+                        Command="{Binding CommitCommand}"
+                        ToolTip="Save the ticked files as a new version"/>
+            </StackPanel>
+
+            <!-- Changed files -->
+            <Grid>
+                <TextBlock Text="No changes. Everything in this folder is saved."
+                           Style="{StaticResource SubtleText}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Visibility="{Binding HasChanges, Converter={StaticResource InverseBoolToVis}}"/>
+
+                <ListBox ItemsSource="{Binding Changes}" SelectedItem="{Binding SelectedFile}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel>
+                                <Ellipse Style="{StaticResource StatusDot}" Margin="0,0,12,0"/>
+                                <CheckBox DockPanel.Dock="Right" VerticalAlignment="Center" Margin="14,0,0,0"
+                                          IsChecked="{Binding IsStaged, Mode=TwoWay}"
+                                          Command="{Binding DataContext.ToggleStageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                          CommandParameter="{Binding}"
+                                          ToolTip="Include in the next version"/>
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding TrackStatus}" Style="{StaticResource StatusText}"
+                                           Width="64" TextAlignment="Right"/>
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding DisplaySize}" Style="{StaticResource SubtleText}"
+                                           FontSize="12" VerticalAlignment="Center" Margin="12,0,12,0"/>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding FilePath}" Style="{StaticResource SubtleText}" FontSize="11"
+                                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </DockPanel>
+
+        <!-- ===================== RIGHT: inspector ===================== -->
+        <Border Grid.Column="2" Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource LineBrush}" BorderThickness="1,0,0,0" Padding="20,22,20,20">
+            <StackPanel>
+                <TextBlock Text="File Inspector" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+                <TextBlock Text="Select a file in the staging area to inspect it."
+                           Style="{StaticResource SubtleText}" Margin="0,0,0,16"
+                           Visibility="{Binding HasSelectedFile, Converter={StaticResource InverseBoolToVis}}"/>
+
+                <Grid Visibility="{Binding HasSelectedFile, Converter={StaticResource BoolToVis}}" Margin="0,0,0,18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="File name" Style="{StaticResource SubtleText}" Margin="0,0,0,10"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedFile.FileName}" TextWrapping="Wrap"/>
+
+                    <TextBlock Grid.Row="1" Text="Location" Style="{StaticResource SubtleText}" Margin="0,0,0,10"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedFile.FilePath}" TextWrapping="Wrap"/>
+
+                    <TextBlock Grid.Row="2" Text="Size" Style="{StaticResource SubtleText}" Margin="0,0,0,10"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedFile.DisplaySize}"/>
+
+                    <TextBlock Grid.Row="3" Text="Type" Style="{StaticResource SubtleText}" Margin="0,0,0,10"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedFile.FileType}"/>
+
+                    <TextBlock Grid.Row="4" Text="Status" Style="{StaticResource SubtleText}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="1" DataContext="{Binding SelectedFile}"
+                               Text="{Binding TrackStatus}" Style="{StaticResource StatusText}"
+                               HorizontalAlignment="Left"/>
+                </Grid>
+
+                <!-- AI card -->
+                <Border Style="{StaticResource GlowCard}" Padding="14">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE946;" Foreground="{StaticResource AccentBrush}"
+                                       Margin="0,0,8,0"/>
+                            <TextBlock Text="AI Recommendations" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE82F;" Foreground="{StaticResource ModifiedBrush}"
+                                       VerticalAlignment="Top" Margin="0,2,8,0"/>
+                            <TextBlock Text="{Binding RecommendationText}" Style="{StaticResource SubtleText}"/>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -7,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Ventrail.Models;
 using Ventrail.Services.Contracts;
+using Ventrail.Services.Implementations;
 
 namespace Ventrail.ViewModels;
 
@@ -54,9 +56,15 @@ public partial class MainDashboardViewModel : ObservableObject
     // Class diagram: List<PeerNode> ActivePeers (filled in Weeks 10-12).
     public ObservableCollection<PeerNode> ActivePeers { get; } = new();
 
+    // Folder tree for the left pane of the Staging page.
+    public ObservableCollection<FolderNode> WorkspaceTree { get; } = new();
+
+    // Which page the navigation rail is showing (Week 3).
+    [ObservableProperty] private AppPage _currentPage = AppPage.Welcome;
+
     // Class diagram: String CurrentDirectory.
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasRepo))]
+    [NotifyPropertyChangedFor(nameof(HasRepo), nameof(RepoName))]
     [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(StageAllCommand),
                                 nameof(CommitCommand), nameof(ShareRepositoryCommand))]
     private string _currentDirectory = string.Empty;
@@ -76,8 +84,12 @@ public partial class MainDashboardViewModel : ObservableObject
                                 nameof(CommitCommand), nameof(ShareRepositoryCommand))]
     private bool _isBusy;
 
-    [ObservableProperty] private FileAsset? _selectedFile;
-    [ObservableProperty] private CommitNode? _selectedCommit;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedFile))]
+    private FileAsset? _selectedFile;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedCommit))]
+    private CommitNode? _selectedCommit;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RestoreSelectedFileCommand))]
@@ -85,6 +97,16 @@ public partial class MainDashboardViewModel : ObservableObject
 
     public int StagedCount => Changes.Count(c => c.IsStaged);
     public bool HasRepo => !string.IsNullOrEmpty(CurrentDirectory);
+    public bool HasSelectedFile => SelectedFile is not null;
+    public bool HasChanges => Changes.Count > 0;
+    public bool HasHistory => History.Count > 0;
+    public bool HasPeers => ActivePeers.Count > 0;
+    public string LatestVersionHash => History.FirstOrDefault()?.ShortHash ?? "none yet";
+    public bool HasSelectedCommit => SelectedCommit is not null;
+
+    // Folder name only, e.g. "Thesis" (used in headers and the Network page).
+    public string RepoName => string.IsNullOrEmpty(CurrentDirectory) ? string.Empty
+        : Path.GetFileName(CurrentDirectory.TrimEnd('\\', '/'));
 
     // ---------- reactions to selection changes (generated "On...Changed" hooks) ----------
 
@@ -118,6 +140,8 @@ public partial class MainDashboardViewModel : ObservableObject
 
         CurrentDirectory = _repo.RepoPath;
         await ReloadAsync();
+        await RefreshTreeAsync();
+        CurrentPage = AppPage.Staging;
         StatusText = History.Count == 0
             ? "New tracking started. Stage your files and save your first version."
             : $"Loaded {History.Count} saved versions.";
@@ -151,7 +175,22 @@ public partial class MainDashboardViewModel : ObservableObject
     private bool CanUseRepo() => HasRepo && !IsBusy;
 
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
-    private Task RefreshAsync() => RunBusyAsync("Scanning for changes...", ReloadAsync);
+    private Task RefreshAsync() => RunBusyAsync("Scanning for changes...", async () =>
+    {
+        await ReloadAsync();
+        await RefreshTreeAsync();
+    });
+
+    // Page navigation from buttons inside pages (the rail uses radio buttons bound to CurrentPage).
+    [RelayCommand]
+    private void NavigateToStaging() => CurrentPage = AppPage.Staging;
+
+    [RelayCommand]
+    private void NavigateToHistory() => CurrentPage = AppPage.History;
+
+    // Left rail "Exit" button.
+    [RelayCommand]
+    private void Exit() => System.Windows.Application.Current?.Shutdown();
 
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
     private Task StageAllAsync() => RunBusyAsync("Staging all changes...", async () =>
@@ -197,6 +236,7 @@ public partial class MainDashboardViewModel : ObservableObject
             var peers = await Task.Run(_network.DiscoverPeers);
             ActivePeers.Clear();
             foreach (var p in peers) ActivePeers.Add(p);
+            OnPropertyChanged(nameof(HasPeers));
             StatusText = $"Found {ActivePeers.Count} peer(s).";
         }
         catch (NotImplementedException)
@@ -231,7 +271,23 @@ public partial class MainDashboardViewModel : ObservableObject
 
         BranchName = branch;
         OnPropertyChanged(nameof(StagedCount));
+        OnPropertyChanged(nameof(HasChanges));
+        OnPropertyChanged(nameof(HasHistory));
+        OnPropertyChanged(nameof(LatestVersionHash));
         if (!IsBusy) StatusText = $"{Changes.Count} changed file(s), {StagedCount} staged.";
+    }
+
+    // Rebuilt only on open/refresh (not after every stage) so the user's expanded folders stay open.
+    private async Task RefreshTreeAsync()
+    {
+        string root = CurrentDirectory;
+        var paths = Changes.Select(c => c.FilePath).ToList();
+        var nodes = await Task.Run(() => Directory.Exists(root)
+            ? FolderTreeBuilder.FromDirectory(root)
+            : FolderTreeBuilder.FromPaths(paths));   // demo mode: folder isn't on disk
+
+        WorkspaceTree.Clear();
+        foreach (var n in nodes) WorkspaceTree.Add(n);
     }
 
     // Wraps every operation: busy flag on, friendly error message instead of a crash.

@@ -80,4 +80,36 @@
 ---
 
 ## Week 3 – Core GUI Construction
+**Done**
+- **Dark theme** in `Themes/Theme.xaml`, merged in `App.xaml`: colours, text styles, buttons
+  (default / accent / outline / rail), text boxes, list rows, tree, tooltips, status colours.
+  Matches the mockups in proposal section 3.7; every colour can be changed from this one file.
+- **App shell** (`Views/MainWindow.xaml`): left navigation rail (Home, Changes, History, P2P,
+  Open folder; Profile, Settings, Exit at the bottom), page area, status bar with busy indicator.
+  Navigation uses radio buttons bound to `CurrentPage` (`ViewModels/AppPage.cs`) through
+  `EnumToBoolConverter`, so the ViewModel stays in control of which page is shown.
+- **Pages** (`Views/Pages/`), all sharing the main ViewModel:
+  - `WelcomeView`: logo, Open / Create repository, "Continue with ..." when a folder is open,
+    Recent Repositories placeholder.
+  - `StagingView`: the 3-pane dashboard (section 3.3.2). Left = workspace tree + branch,
+    centre = staging list with colour-coded status and commit box, right = File Inspector + AI card.
+  - `HistoryView`: version list + version details with files and Restore.
+  - `NetworkView`: firewall, share and peers layout (static until Weeks 10-12).
+- **Workspace tree**: `FolderTreeBuilder` (depth 3, max 400 entries, skips `.git`), rebuilt only on
+  open/refresh so expanded folders stay open while staging.
+- Empty states for no changes, no history, no selection and no peers.
+
+**Decisions**
+- Pages are `UserControl`s inside one window, switched by `CurrentPage`, instead of separate windows:
+  simpler navigation and one shared state.
+- Icons use the built-in Windows icon font (Segoe Fluent Icons / Segoe MDL2 Assets): no image files needed.
+- Commit progress screen and Session Summary are left for Week 5 (loading and error states).
+
+**Issues / notes**
+- Week 2 commit only contained the file moves (they had been staged by `git mv`); fixed with a
+  follow-up commit containing the rest of Week 2.
+
+---
+
+## Week 4 – Interactive UI Components
 _(to fill in)_

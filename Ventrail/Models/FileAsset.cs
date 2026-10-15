@@ -13,6 +13,16 @@ public class FileAsset
     // True when the change is in the staging index and will go into the next commit.
     public bool IsStaged { get; set; }
 
+    // Friendly type for the File Inspector, e.g. "DOCX file".
+    public string FileType
+    {
+        get
+        {
+            string ext = System.IO.Path.GetExtension(FileName).TrimStart('.');
+            return string.IsNullOrEmpty(ext) ? "File" : $"{ext.ToUpperInvariant()} file";
+        }
+    }
+
     public string DisplaySize => SizeInBytes switch
     {
         < 1024 => $"{SizeInBytes} B",

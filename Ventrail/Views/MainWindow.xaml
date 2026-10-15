@@ -1,207 +1,85 @@
-﻿<Window x:Class="Ventrail.Views.MainWindow"
+<Window x:Class="Ventrail.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Ventrail.ViewModels"
+        xmlns:pages="clr-namespace:Ventrail.Views.Pages"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainDashboardViewModel}"
-        Title="Ventrail" Height="680" Width="1150" MinWidth="900" MinHeight="500"
-        Background="#F6F7F9" FontFamily="Segoe UI" FontSize="13">
+        Title="Ventrail" Height="720" Width="1200" MinWidth="960" MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource WindowBrush}"
+        Foreground="{StaticResource TextBrush}"
+        FontFamily="Segoe UI" FontSize="13">
 
-    <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-
-        <Style x:Key="PaneTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#6B7280"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
-        </Style>
-
-        <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#E5E7EB"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="14"/>
-        </Style>
-
-        <Style TargetType="Button">
-            <Setter Property="Padding" Value="12,6"/>
-            <Setter Property="Margin" Value="0,0,0,8"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-
-        <!-- Colour-coded status badge (section 3.3.3: visual indicators) -->
-        <Style x:Key="StatusBadge" TargetType="Border">
-            <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="Padding" Value="6,1"/>
-            <Setter Property="Background" Value="#DBEAFE"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding TrackStatus}" Value="Added">
-                    <Setter Property="Background" Value="#DCFCE7"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding TrackStatus}" Value="Deleted">
-                    <Setter Property="Background" Value="#FEE2E2"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding TrackStatus}" Value="Conflict">
-                    <Setter Property="Background" Value="#FEF3C7"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-    </Window.Resources>
-
+    <!--
+        App shell (Week 3): navigation rail on the left, the current page on the right,
+        status bar along the bottom. Pages live in Views/Pages and share this window's ViewModel.
+    -->
     <DockPanel>
-        <!-- Status bar: always tells the user what is happening -->
-        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="12,6">
-            <StackPanel Orientation="Horizontal">
-                <ProgressBar IsIndeterminate="True" Width="80" Height="6" Margin="0,0,10,0"
-                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
-                <TextBlock Text="{Binding StatusText}" Foreground="#374151"/>
-            </StackPanel>
+
+        <!-- ===== Status bar ===== -->
+        <Border DockPanel.Dock="Bottom" Background="{StaticResource RailBrush}"
+                BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="14,6">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Style="{StaticResource SubtleText}" FontSize="12">
+                    <Run Text="{Binding BranchName, Mode=OneWay}"/>
+                </TextBlock>
+                <StackPanel Orientation="Horizontal">
+                    <ProgressBar IsIndeterminate="True" Width="80" Height="4" Margin="0,0,10,0"
+                                 Foreground="{StaticResource AccentBrush}" Background="{StaticResource CardBrush}"
+                                 BorderThickness="0"
+                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
+                    <TextBlock Text="{Binding StatusText}" Style="{StaticResource SubtleText}" FontSize="12"/>
+                </StackPanel>
+            </DockPanel>
         </Border>
 
-        <Grid Margin="12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="230"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="280"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- ===== LEFT: navigation / context ===== -->
-            <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,12,0">
-                <StackPanel>
-                    <TextBlock Text="VENTRAIL" FontSize="18" FontWeight="Bold" Foreground="#111827" Margin="0,0,0,4"/>
-                    <Border Background="#FEF3C7" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Margin="0,0,0,12"
-                            Visibility="{Binding IsDemoMode, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="DEMO DATA" FontSize="10" FontWeight="SemiBold" Foreground="#92400E"/>
-                    </Border>
-
-                    <TextBlock Text="TRACKED FOLDER" Style="{StaticResource PaneTitle}"/>
-                    <TextBlock Text="{Binding CurrentDirectory, TargetNullValue='None selected', FallbackValue='None selected'}"
-                               TextWrapping="Wrap" Foreground="#111827" Margin="0,0,0,8"/>
-                    <Button Content="Open or create folder..." Command="{Binding OpenFolderCommand}"/>
-
-                    <TextBlock Text="BRANCH" Style="{StaticResource PaneTitle}" Margin="0,12,0,6"/>
-                    <TextBlock Text="{Binding BranchName}" Foreground="#111827" Margin="0,0,0,16"/>
-
-                    <Button Content="Refresh changes" Command="{Binding RefreshCommand}"/>
-
-                    <TextBlock Text="PEERS" Style="{StaticResource PaneTitle}" Margin="0,16,0,6"/>
-                    <Button Content="Share via P2P..." Command="{Binding ShareRepositoryCommand}"/>
-                    <ItemsControl ItemsSource="{Binding ActivePeers}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding PeerId}" Foreground="#374151" TextTrimming="CharacterEllipsis"/>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+        <!-- ===== Navigation rail ===== -->
+        <Border DockPanel.Dock="Left" Width="56" Background="{StaticResource RailBrush}"
+                BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <!-- Bottom group -->
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,8">
+                    <Button Style="{StaticResource RailButton}" Content="&#xE77B;" IsEnabled="False"
+                            ToolTip="Profile (coming later)" ToolTipService.ShowOnDisabled="True"/>
+                    <Button Style="{StaticResource RailButton}" Content="&#xE713;" IsEnabled="False"
+                            ToolTip="Settings (coming later)" ToolTipService.ShowOnDisabled="True"/>
+                    <Button Style="{StaticResource RailButton}" Content="&#xE7E8;"
+                            Command="{Binding ExitCommand}" ToolTip="Exit Ventrail"/>
                 </StackPanel>
-            </Border>
 
-            <!-- ===== CENTRE: staging area + history ===== -->
-            <Border Grid.Column="1" Style="{StaticResource Card}" Padding="0">
-                <TabControl BorderThickness="0" Background="Transparent" Padding="14">
-                    <TabItem Header="  Changes  ">
-                        <DockPanel>
-                            <!-- Commit box -->
-                            <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
-                                <TextBlock Text="DESCRIBE THIS VERSION" Style="{StaticResource PaneTitle}"/>
-                                <TextBox Text="{Binding CommitMessage, UpdateSourceTrigger=PropertyChanged}"
-                                         Height="60" TextWrapping="Wrap" AcceptsReturn="True" Padding="6"
-                                         VerticalScrollBarVisibility="Auto"/>
-                                <DockPanel Margin="0,8,0,0">
-                                    <TextBlock Text="Author:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <TextBox Text="{Binding AuthorName}" Width="160" Padding="4,2"/>
-                                    <Button Content="Save version (Commit)" Command="{Binding CommitCommand}"
-                                            HorizontalAlignment="Right" Margin="0" FontWeight="SemiBold"/>
-                                </DockPanel>
-                            </StackPanel>
-
-                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                                <TextBlock VerticalAlignment="Center" Foreground="#6B7280">
-                                    <Run Text="{Binding Changes.Count, Mode=OneWay}"/> changed ·
-                                    <Run Text="{Binding StagedCount, Mode=OneWay}"/> staged
-                                </TextBlock>
-                                <Button Content="Stage all" Command="{Binding StageAllCommand}"
-                                        HorizontalAlignment="Right" Margin="0"/>
-                            </DockPanel>
-
-                            <!-- Changed files: tick = include in the next version -->
-                            <ListView ItemsSource="{Binding Changes}" SelectedItem="{Binding SelectedFile}"
-                                      BorderBrush="#E5E7EB">
-                                <ListView.ItemTemplate>
-                                    <DataTemplate>
-                                        <DockPanel Margin="2,3">
-                                            <CheckBox IsChecked="{Binding IsStaged, Mode=TwoWay}" VerticalAlignment="Center"
-                                                      Command="{Binding DataContext.ToggleStageCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                      CommandParameter="{Binding}" Margin="0,0,8,0"/>
-                                            <Border Style="{StaticResource StatusBadge}" Margin="0,0,8,0" Width="70">
-                                                <TextBlock Text="{Binding TrackStatus}" FontSize="11" HorizontalAlignment="Center"/>
-                                            </Border>
-                                            <TextBlock Text="{Binding DisplaySize}" DockPanel.Dock="Right" Foreground="#9CA3AF" Margin="8,0,0,0"/>
-                                            <TextBlock Text="{Binding FilePath}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                        </DockPanel>
-                                    </DataTemplate>
-                                </ListView.ItemTemplate>
-                            </ListView>
-                        </DockPanel>
-                    </TabItem>
-
-                    <TabItem Header="  History  ">
-                        <ListView ItemsSource="{Binding History}" SelectedItem="{Binding SelectedCommit}" BorderBrush="#E5E7EB">
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <DockPanel Margin="2,4">
-                                        <!-- simple node marker; a drawn DAG graph can replace this later -->
-                                        <Ellipse Width="10" Height="10" Fill="#2563EB" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding ShortHash}" FontFamily="Consolas" Foreground="#6B7280"
-                                                   DockPanel.Dock="Right" Margin="8,0,0,0"/>
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Message}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Foreground="#6B7280" FontSize="11">
-                                                <Run Text="{Binding Author, Mode=OneWay}"/> · <Run Text="{Binding DisplayTime, Mode=OneWay}"/>
-                                            </TextBlock>
-                                        </StackPanel>
-                                    </DockPanel>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                    </TabItem>
-                </TabControl>
-            </Border>
-
-            <!-- ===== RIGHT: inspector / insights ===== -->
-            <Border Grid.Column="2" Style="{StaticResource Card}" Margin="12,0,0,0">
-                <StackPanel>
-                    <TextBlock Text="SELECTED FILE" Style="{StaticResource PaneTitle}"/>
-                    <TextBlock Text="{Binding SelectedFile.FileName, FallbackValue='Nothing selected'}"
-                               FontWeight="SemiBold" TextWrapping="Wrap"/>
-                    <TextBlock Text="{Binding SelectedFile.FilePath}" Foreground="#6B7280" TextWrapping="Wrap"/>
-                    <TextBlock Margin="0,4,0,16" Foreground="#6B7280">
-                        <Run Text="{Binding SelectedFile.TrackStatus, Mode=OneWay}"/> · <Run Text="{Binding SelectedFile.DisplaySize, Mode=OneWay}"/>
-                    </TextBlock>
-
-                    <TextBlock Text="SELECTED VERSION" Style="{StaticResource PaneTitle}"/>
-                    <TextBlock Text="{Binding SelectedCommit.Message, FallbackValue='Pick one in the History tab'}"
-                               TextWrapping="Wrap" FontWeight="SemiBold"/>
-                    <TextBlock Text="{Binding SelectedCommit.Hash}" FontFamily="Consolas" FontSize="10"
-                               Foreground="#6B7280" TextWrapping="Wrap" Margin="0,2,0,8"/>
-
-                    <TextBlock Text="FILES IN THIS VERSION" Style="{StaticResource PaneTitle}"/>
-                    <ListBox ItemsSource="{Binding CommitFiles}" SelectedItem="{Binding SelectedCommitFile}"
-                             DisplayMemberPath="FilePath" MaxHeight="160" BorderBrush="#E5E7EB" Margin="0,0,0,8"/>
-                    <Button Content="Restore this file to that version"
-                            Command="{Binding RestoreSelectedFileCommand}"/>
-
-                    <TextBlock Text="AI INSIGHTS" Style="{StaticResource PaneTitle}" Margin="0,16,0,6"/>
-                    <Border Background="#F3F4F6" CornerRadius="6" Padding="10">
-                        <TextBlock Text="{Binding RecommendationText}"
-                                   TextWrapping="Wrap" Foreground="#6B7280"/>
-                    </Border>
+                <!-- Page buttons: checking one sets CurrentPage in the ViewModel -->
+                <StackPanel Margin="0,10,0,0">
+                    <RadioButton Style="{StaticResource NavRailButton}" GroupName="Nav" Content="&#xE80F;"
+                                 ToolTip="Home"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.Welcome}}"/>
+                    <RadioButton Style="{StaticResource NavRailButton}" GroupName="Nav" Content="&#xE8A5;"
+                                 ToolTip="Changes (staging area)" IsEnabled="{Binding HasRepo}"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.Staging}}"/>
+                    <RadioButton Style="{StaticResource NavRailButton}" GroupName="Nav" Content="&#xE81C;"
+                                 ToolTip="History" IsEnabled="{Binding HasRepo}"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.History}}"/>
+                    <RadioButton Style="{StaticResource NavRailButton}" GroupName="Nav" Content="&#xE72D;"
+                                 ToolTip="Peer-to-peer sharing" IsEnabled="{Binding HasRepo}"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.Network}}"/>
+                    <Button Style="{StaticResource RailButton}" Content="&#xE838;"
+                            Command="{Binding OpenFolderCommand}" ToolTip="Open another folder"/>
                 </StackPanel>
-            </Border>
+            </DockPanel>
+        </Border>
+
+        <!-- ===== Pages (only the current one is visible) ===== -->
+        <Grid>
+            <pages:WelcomeView
+                Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter={x:Static vm:AppPage.Welcome}}"/>
+            <pages:StagingView
+                Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter={x:Static vm:AppPage.Staging}}"/>
+            <pages:HistoryView
+                Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter={x:Static vm:AppPage.History}}"/>
+            <pages:NetworkView
+                Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter={x:Static vm:AppPage.Network}}"/>
         </Grid>
     </DockPanel>
 </Window>
