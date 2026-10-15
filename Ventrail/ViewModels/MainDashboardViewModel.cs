@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -141,22 +142,42 @@ public partial class MainDashboardViewModel : ObservableObject
     // ---------- class diagram operations ----------
 
     /// <summary>Class diagram: InitializeDashboard(). Opens/creates the repository and loads everything.</summary>
-    public Task InitializeDashboardAsync(string folderPath) => RunBusyAsync("Opening folder...", async () =>
+    public async Task InitializeDashboardAsync(string folderPath)
     {
-        bool ok = await Task.Run(() => _repo.InitRepository(folderPath));
-        if (!ok) { StatusText = "That folder could not be opened."; return; }
+        IsLoadingRepository = true;   // spinner overlay (Week 5)
+        try
+        {
+            await RunBusyAsync("Opening folder...", async () =>
+            {
+                bool ok = await Background(() => _repo.InitRepository(folderPath));
+                if (!ok)
+                {
+                    StatusText = "That folder could not be opened.";
+                    ShowToast($"Could not open \"{folderPath}\". Check that the folder still exists.", ToastKind.Error);
+                    return;
+                }
 
-        CurrentDirectory = _repo.RepoPath;
-        await ReloadAsync();
-        await RefreshTreeAsync();
-        CurrentPage = AppPage.Staging;
+                CurrentDirectory = _repo.RepoPath;
+                await ReloadAsync();
+                await RefreshTreeAsync();
+                CurrentPage = AppPage.Staging;
 
-        _recent.Add(CurrentDirectory);
-        LoadRecentRepositories();
-        StatusText = History.Count == 0
-            ? "New tracking started. Stage your files and save your first version."
-            : $"Loaded {History.Count} saved versions.";
-    });
+                _recent.Add(CurrentDirectory);
+                LoadRecentRepositories();
+
+                bool isNew = History.Count == 0;
+                LogActivity(isNew ? $"Started tracking {CurrentDirectory}" : $"Opened {CurrentDirectory}");
+                StatusText = isNew
+                    ? "New tracking started. Stage your files and save your first version."
+                    : $"Loaded {History.Count} saved versions.";
+                ShowToast(isNew ? $"Ventrail is now tracking {RepoName}" : $"Opened {RepoName}", ToastKind.Success, 3);
+            });
+        }
+        finally
+        {
+            IsLoadingRepository = false;
+        }
+    }
 
     /// <summary>Class diagram: CheckFileRecommendation(String filePath). Real AI arrives in Weeks 8-9.</summary>
     public void CheckFileRecommendation(string filePath)
@@ -204,15 +225,12 @@ public partial class MainDashboardViewModel : ObservableObject
     [RelayCommand]
     private void NavigateToHistory() => CurrentPage = AppPage.History;
 
-    // Left rail "Exit" button.
-    [RelayCommand]
-    private void Exit() => System.Windows.Application.Current?.Shutdown();
-
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
     private Task StageAllAsync() => RunBusyAsync("Staging all changes...", async () =>
     {
-        await Task.Run(_repo.StageAll);
+        await Background(_repo.StageAll);
         await ReloadAsync();
+        LogActivity($"{StagedCount} file(s) staged");
     });
 
     // Class diagram: StageSelectedFile(String filePath). Bound to each file's checkbox.
@@ -221,42 +239,107 @@ public partial class MainDashboardViewModel : ObservableObject
         RunBusyAsync(file.IsStaged ? "Staging..." : "Unstaging...", async () =>
         {
             // The checkbox has already flipped IsStaged through two-way binding.
-            if (file.IsStaged) await Task.Run(() => _repo.Stage(file.FilePath));
-            else await Task.Run(() => _repo.Unstage(file.FilePath));
+            if (file.IsStaged) await Background(() => _repo.Stage(file.FilePath));
+            else await Background(() => _repo.Unstage(file.FilePath));
             await ReloadAsync();
         });
 
     private bool CanCommit() => CanUseRepo() && !string.IsNullOrWhiteSpace(CommitMessage);
 
     // Class diagram: CommitStagedFiles(String message).
+    // Week 5: shows the "Committing Changes..." progress screen from the proposal mockup.
     [RelayCommand(CanExecute = nameof(CanCommit))]
     private Task CommitAsync() => RunBusyAsync("Saving version...", async () =>
     {
-        if (StagedCount == 0) { StatusText = "Tick at least one file before saving a version."; return; }
+        var staged = Changes.Where(c => c.IsStaged).ToList();
+        if (staged.Count == 0)
+        {
+            ShowToast("Tick at least one file before saving a version.");
+            return;
+        }
 
-        string message = CommitMessage, author = AuthorName;
-        bool ok = await Task.Run(() => _repo.Commit(message, author));
-        if (!ok) { StatusText = "Nothing was saved: no staged changes."; return; }
+        string message = CommitMessage, author = AuthorName, root = CurrentDirectory;
+        CommitProgress = 0;
+        IsCommitting = true;
+        try
+        {
+            // Fig 3.4: metadata scan of every staged file before the snapshot is written.
+            // (Weeks 8-9 plug the ML.NET advisor into this loop.)
+            for (int i = 0; i < staged.Count; i++)
+            {
+                var file = staged[i];
+                CommitProgressText = $"Checking {file.FileName} ({i + 1} of {staged.Count})...";
+                CommitProgress = 80.0 * i / staged.Count;
+                await Background(() =>
+                {
+                    string full = Path.Combine(root, file.FilePath);
+                    if (File.Exists(full)) _ = new FileInfo(full).Length;
+                });
+                if (staged.Count <= 20) await Task.Delay(60);   // small commits: let each step be seen
+            }
 
-        CommitMessage = string.Empty;
-        await ReloadAsync();
-        StatusText = $"Version saved ({History.FirstOrDefault()?.ShortHash}).";
+            CommitProgress = 85;
+            CommitProgressText = "Writing the new version to history...";
+            bool ok = await Background(() => _repo.Commit(message, author));
+            if (!ok)
+            {
+                ShowToast("Nothing was saved: there were no staged changes.");
+                return;
+            }
+
+            CommitProgress = 100;
+            CommitProgressText = "Done";
+            CommitMessage = string.Empty;
+            await ReloadAsync();
+
+            string hash = History.FirstOrDefault()?.ShortHash ?? string.Empty;
+            SessionCommits++;
+            SessionFilesSaved += staged.Count;
+            LogActivity($"Version {hash} saved with {staged.Count} file(s): \"{message}\"");
+            StatusText = $"Version saved ({hash}).";
+            await Task.Delay(350);
+            ShowToast($"Version {hash} saved successfully", ToastKind.Success);
+        }
+        finally
+        {
+            IsCommitting = false;
+        }
     });
 
     // Class diagram: ShareRepository(String peerId). Real P2P arrives in Weeks 10-12.
+    // Week 5: the firewall permission prompt from Fig 3.5 (denied = abort, allowed = continue).
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
-    private Task ShareRepositoryAsync() => RunBusyAsync("Looking for peers...", async () =>
+    private Task ShareRepositoryAsync() => RunBusyAsync("Checking network permissions...", async () =>
     {
+        bool allowed = await AskAsync(
+            "Allow peer-to-peer sharing?",
+            "To share versions directly with other computers, Windows Firewall must let Ventrail use " +
+            "port 4001 (TCP) and port 4002 (UDP).\n\nNothing is uploaded to the cloud. Windows may ask you " +
+            "to confirm, and you can switch sharing off again at any time.",
+            "Allow", "Not now", "\uEA18");
+
+        if (!allowed)
+        {
+            LogActivity("Sharing cancelled: firewall permission not given");
+            ShowToast("Sharing cancelled. Ventrail needs firewall permission to share.");
+            StatusText = "Sharing cancelled.";
+            return;
+        }
+
         try
         {
-            var peers = await Task.Run(_network.DiscoverPeers);
+            await Background(_network.StartListening);
+            var peers = await Background(_network.DiscoverPeers);
             ActivePeers.Clear();
             foreach (var p in peers) ActivePeers.Add(p);
             OnPropertyChanged(nameof(HasPeers));
             StatusText = $"Found {ActivePeers.Count} peer(s).";
+            LogActivity($"Peer discovery found {ActivePeers.Count} peer(s)");
         }
         catch (NotImplementedException)
         {
+            LogActivity("Share requested (peer-to-peer arrives in Weeks 10-12)");
+            ShowToast("Firewall setup and peer discovery arrive in Weeks 10-12.");
             StatusText = "Peer-to-peer sharing is coming in Weeks 10-12.";
         }
     });
@@ -267,16 +350,26 @@ public partial class MainDashboardViewModel : ObservableObject
     private Task RestoreSelectedFileAsync() => RunBusyAsync("Restoring file...", async () =>
     {
         string path = SelectedCommitFile!.FilePath, hash = SelectedCommit!.Hash;
-        await Task.Run(() => _repo.RestoreFileFromCommit(path, hash));
+
+        if (!await AskAsync(
+                "Restore this file?",
+                $"\"{path}\" will be replaced with the copy from version {hash[..7]}.\n\n" +
+                "Your history is not changed: the current version is still saved, and you can restore it the same way.",
+                "Restore", "Cancel", "\uE777"))
+            return;
+
+        await Background(() => _repo.RestoreFileFromCommit(path, hash));
         await ReloadAsync();
+        LogActivity($"Restored {path} from version {hash[..7]}");
         StatusText = $"Restored {path} from version {hash[..7]}. Save a version to keep it.";
+        ShowToast($"Restored {System.IO.Path.GetFileName(path)}. Save a version to keep it.", ToastKind.Success);
     });
 
     // ---------- helpers ----------
 
     private async Task ReloadAsync()
     {
-        var (files, history, branch) = await Task.Run(() =>
+        var (files, history, branch) = await Background(() =>
             (_repo.ScanWorkingDirectory(), _repo.GetCommitHistory(), _repo.GetCurrentBranchName()));
 
         // Remember what was selected so a reload (e.g. after ticking a box) doesn't clear the inspector.
@@ -320,13 +413,30 @@ public partial class MainDashboardViewModel : ObservableObject
     {
         string root = CurrentDirectory;
         var paths = Changes.Select(c => c.FilePath).ToList();
-        var nodes = await Task.Run(() => Directory.Exists(root)
+        var nodes = await Background(() => Directory.Exists(root)
             ? FolderTreeBuilder.FromDirectory(root)
             : FolderTreeBuilder.FromPaths(paths));   // demo mode: folder isn't on disk
 
         WorkspaceTree.Clear();
         foreach (var n in nodes) WorkspaceTree.Add(n);
     }
+
+    // Runs work on a background thread (like Task.Run) so the window never freezes, but catches any
+    // error ON that thread and re-throws it here, where RunBusyAsync handles it. Same behaviour as
+    // Task.Run, except Visual Studio's debugger no longer pauses with "Exception User-Unhandled" for
+    // errors we already handle (placeholder services, disk errors, the demo "!fail" hook).
+    private static async Task<T> Background<T>(Func<T> work)
+    {
+        var (result, error) = await Task.Run(() =>
+        {
+            try { return (work(), (ExceptionDispatchInfo?)null); }
+            catch (Exception ex) { return (default(T)!, ExceptionDispatchInfo.Capture(ex)); }
+        });
+        error?.Throw();   // keeps the original stack trace
+        return result;
+    }
+
+    private static Task Background(Action work) => Background(() => { work(); return true; });
 
     // Wraps every operation: busy flag on, friendly error message instead of a crash.
     private async Task RunBusyAsync(string message, Func<Task> work)
@@ -341,7 +451,10 @@ public partial class MainDashboardViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            // Week 5: errors become a red toast + a log entry instead of a crash or silent failure.
             StatusText = $"Something went wrong: {ex.Message}";
+            ShowToast($"Something went wrong: {ex.Message}", ToastKind.Error);
+            LogActivity($"Error: {ex.Message}");
         }
         finally
         {

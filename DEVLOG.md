@@ -152,4 +152,55 @@
 ---
 
 ## Week 5 – UI States (errors, firewall prompts, loading)
+**Done**
+- **Loading state**: spinner overlay ("Opening folder and scanning files...") while a folder is
+  opened and scanned (`Views/Controls/Spinner.xaml`, `IsLoadingRepository`).
+- **Commit progress screen** (proposal mockup, Fig 3.4): full-screen "Committing Changes..." with a
+  glowing progress bar and percentage. Progress is real: each staged file's metadata is checked
+  ("Checking X (2 of 5)..."), then "Writing the new version to history...". The ML.NET advisor will
+  plug into this loop in Weeks 8-9.
+- **Toast notifications**: bottom-right, green success / red error / blue info, auto-hide
+  (errors stay longer), dismiss button, fade-in.
+- **Error state**: every failure inside `RunBusyAsync` now shows a red toast, updates the status bar
+  and is written to the activity log instead of failing silently.
+- **Reusable confirm dialog** (`AskAsync`, Esc = cancel), used for:
+  - the **firewall permission prompt** before sharing (Fig 3.5: "Not now" aborts, "Allow" continues
+    to firewall setup / peer discovery, which arrive in Weeks 10-12);
+  - confirming **Restore** of a file;
+  - **exiting with ticked files that are not saved yet**.
+- **Session Summary page** (Fig 3.7 + mockup): versions saved, files saved, P2P transfers and data
+  shared (last two become real in Week 12), session activity log, Continue Workflow / Exit Application.
+  The rail's Exit button now opens this page first.
+- Feedback code lives in `MainDashboardViewModel.Feedback.cs` (partial class) to keep the main
+  ViewModel focused on version control.
+
+**Testing**
+- Headless ViewModel test: loading flag during open, commit progress steps for 5 files, success toast,
+  firewall dialog denied and allowed, restore confirm, simulated failure (red toast, overlay closes),
+  exit confirm, Continue Workflow, activity log contents.
+- Demo-only test hook: in demo mode, a commit message starting with `!fail` simulates a disk error so
+  the error state can be shown in a presentation.
+- Built in Visual Studio: first build failed (`x:Int32` is not available in this XAML namespace in the
+  Summary page); replaced with a `HasActivity` property; rebuild succeeded.
+
+- Click-through test in Visual Studio (demo mode): commit progress screen (seen at 48%, "Checking
+  old_ideas.txt (4 of 5)"), success toast, firewall dialog (Not now / Allow), restore dialog and
+  toast, Session Summary with activity log, exit warning with a ticked file, `!fail` error toast,
+  checkbox toggled with Tab + Space.
+- **Bug found and fixed:** when running under the debugger, errors thrown inside `Task.Run`
+  (placeholder services, disk errors) made Visual Studio pause with "Exception User-Unhandled",
+  even though the app handles them. Added a `Background(...)` helper that catches the error on the
+  background thread and re-throws it on the UI thread where `RunBusyAsync` handles it. Same
+  behaviour for users; no more false pauses during demos. Re-tested Allow and `!fail`: no pause.
+
+**Decisions**
+- In-app dialogs and toasts instead of Windows MessageBox: they match the dark theme, can't hide behind
+  the window, and keep the ViewModel testable (dialogs are awaited through `AskAsync`).
+
+**Issues / notes**
+- Week 5 completes the clickable GUI prototype; Weeks 6-7 move on to the Git core.
+
+---
+
+## Week 6 – Git Core Integration (scanning, initialisation, cataloguing)
 _(to fill in)_

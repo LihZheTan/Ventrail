@@ -6,5 +6,6 @@ public enum AppPage
     Welcome,
     Staging,
     History,
-    Network
+    Network,
+    Summary     // Session Summary, shown from the Exit button (Week 5)
 }

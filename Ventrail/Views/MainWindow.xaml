@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Ventrail.ViewModels"
         xmlns:pages="clr-namespace:Ventrail.Views.Pages"
+        xmlns:controls="clr-namespace:Ventrail.Views.Controls"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainDashboardViewModel}"
         Title="Ventrail" Height="720" Width="1200" MinWidth="720" MinHeight="520"
@@ -21,8 +22,11 @@
     <Window.InputBindings>
         <KeyBinding Key="F5" Command="{Binding RefreshCommand}"/>
         <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFolderCommand}"/>
+        <KeyBinding Key="Escape" Command="{Binding CancelDialogCommand}"/>
     </Window.InputBindings>
 
+    <!-- Root grid: the normal app (DockPanel) with Week 5 overlays layered on top of it. -->
+    <Grid>
     <DockPanel>
 
         <!-- ===== Status bar ===== -->
@@ -53,7 +57,7 @@
                     <Button Style="{StaticResource RailButton}" Content="&#xE713;" IsEnabled="False"
                             ToolTip="Settings (coming later)" ToolTipService.ShowOnDisabled="True"/>
                     <Button Style="{StaticResource RailButton}" Content="&#xE7E8;"
-                            Command="{Binding ExitCommand}" ToolTip="Exit Ventrail"/>
+                            Command="{Binding ShowSessionSummaryCommand}" ToolTip="Exit (shows the session summary first)"/>
                 </StackPanel>
 
                 <!-- Page buttons: checking one sets CurrentPage in the ViewModel -->
@@ -86,6 +90,117 @@
                 Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter={x:Static vm:AppPage.History}}"/>
             <pages:NetworkView
                 Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter={x:Static vm:AppPage.Network}}"/>
+            <pages:SummaryView
+                Visibility="{Binding CurrentPage, Converter={StaticResource EnumToVis}, ConverterParameter={x:Static vm:AppPage.Summary}}"/>
         </Grid>
     </DockPanel>
+
+    <!-- ===================== Week 5 overlays ===================== -->
+
+    <!-- Loading: opening and scanning a folder -->
+    <Grid Background="{StaticResource BackdropBrush}"
+          Visibility="{Binding IsLoadingRepository, Converter={StaticResource BoolToVis}}">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <controls:Spinner/>
+            <TextBlock Text="Opening folder and scanning files..." Margin="0,16,0,0" HorizontalAlignment="Center"/>
+            <TextBlock Text="Large folders can take a moment." Style="{StaticResource SubtleText}"
+                       FontSize="12" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+        </StackPanel>
+    </Grid>
+
+    <!-- Commit progress screen (proposal mockup, Fig 3.4) -->
+    <Grid Background="{StaticResource WindowBrush}"
+          Visibility="{Binding IsCommitting, Converter={StaticResource BoolToVis}}">
+        <StackPanel Margin="60,40" VerticalAlignment="Top">
+            <TextBlock Text="Committing Changes..." FontSize="26" FontWeight="SemiBold" Margin="0,0,0,18"/>
+            <Grid>
+                <ProgressBar Style="{StaticResource GlowProgressBar}" Value="{Binding CommitProgress, Mode=OneWay}"/>
+                <TextBlock Text="{Binding CommitProgress, StringFormat={}{0:0}%}" HorizontalAlignment="Right"
+                           VerticalAlignment="Center" Margin="0,0,14,0" FontWeight="SemiBold"/>
+            </Grid>
+            <TextBlock Text="{Binding CommitProgressText}" Margin="0,16,0,0" FontSize="15"/>
+            <TextBlock Text="Your files are being saved as a new version. Please don't close Ventrail."
+                       Style="{StaticResource SubtleText}" Margin="0,6,0,0"/>
+        </StackPanel>
+    </Grid>
+
+    <!-- Confirm dialog: firewall permission, restore, exit (Esc = cancel) -->
+    <Grid Background="{StaticResource BackdropBrush}"
+          Visibility="{Binding IsDialogOpen, Converter={StaticResource BoolToVis}}">
+        <Border Style="{StaticResource GlowCard}" Background="{StaticResource PanelBrush}"
+                MaxWidth="480" Margin="24" Padding="24,22"
+                HorizontalAlignment="Center" VerticalAlignment="Center">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                    <Border Width="34" Height="34" CornerRadius="17" Background="{StaticResource AccentTintBrush}" Margin="0,0,12,0">
+                        <TextBlock Style="{StaticResource Icon}" Text="{Binding DialogIcon}" FontSize="16"
+                                   Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="{Binding DialogTitle}" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+                <TextBlock Text="{Binding DialogMessage}" Style="{StaticResource SubtleText}" FontSize="13.5"
+                           LineHeight="20" Margin="0,0,0,22"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="{Binding DialogCancelText}" Command="{Binding CancelDialogCommand}"
+                            MinWidth="96" Margin="0,0,10,0" IsCancel="True"/>
+                    <Button Content="{Binding DialogConfirmText}" Command="{Binding ConfirmDialogCommand}"
+                            Style="{StaticResource AccentButton}" MinWidth="96"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+
+    <!-- Toast notification (bottom-right, hides itself) -->
+    <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,44"
+            MaxWidth="420" CornerRadius="8" Background="{StaticResource CardBrush}"
+            BorderThickness="1" BorderBrush="{StaticResource LineBrush}">
+        <Border.Effect>
+            <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="4" Opacity="0.5"/>
+        </Border.Effect>
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsToastVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <DataTrigger.EnterActions>
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.2"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </DataTrigger.EnterActions>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
+        <DockPanel Margin="14,12,8,12">
+            <Button DockPanel.Dock="Right" Command="{Binding DismissToastCommand}" ToolTip="Dismiss"
+                    Background="Transparent" BorderThickness="0" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Top">
+                <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="10" Foreground="{StaticResource SubtleTextBrush}"/>
+            </Button>
+            <!-- Icon + colour change with ToastKind -->
+            <TextBlock FontFamily="{StaticResource IconFont}" FontSize="16" VerticalAlignment="Center" Margin="0,0,12,0">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Text" Value="&#xE946;"/>
+                        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ToastKind}" Value="Success">
+                                <Setter Property="Text" Value="&#xE930;"/>
+                                <Setter Property="Foreground" Value="{StaticResource AddedBrush}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding ToastKind}" Value="Error">
+                                <Setter Property="Text" Value="&#xE783;"/>
+                                <Setter Property="Foreground" Value="{StaticResource DeletedBrush}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Text="{Binding ToastMessage}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+        </DockPanel>
+    </Border>
+    </Grid>
 </Window>

@@ -60,6 +60,11 @@ public class MockRepositoryManager : IRepositoryManager
 
     public bool Commit(string message, string author)
     {
+        // Demo-only test hook: a message starting with "!fail" simulates a disk error,
+        // so the error state (red toast + activity log) can be shown in a presentation.
+        if (message.TrimStart().StartsWith("!fail", StringComparison.OrdinalIgnoreCase))
+            throw new System.IO.IOException("Simulated disk error (demo mode)");
+
         var staged = _workingChanges.Where(f => f.IsStaged).ToList();
         if (staged.Count == 0 || string.IsNullOrWhiteSpace(message)) return false;
 

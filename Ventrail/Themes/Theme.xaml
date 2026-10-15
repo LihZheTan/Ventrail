@@ -290,6 +290,33 @@
         </Setter>
     </Style>
 
+    <!-- ===================== Progress (Week 5) ===================== -->
+    <!-- Glowing progress bar for the commit screen (proposal mockup). -->
+    <Style x:Key="GlowProgressBar" TargetType="ProgressBar">
+        <Setter Property="Height" Value="30"/>
+        <Setter Property="Minimum" Value="0"/>
+        <Setter Property="Maximum" Value="100"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Border CornerRadius="6" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                            Background="{StaticResource InputBrush}" Padding="3">
+                        <Border.Effect>
+                            <DropShadowEffect Color="{StaticResource AccentColor}" BlurRadius="16" ShadowDepth="0" Opacity="0.5"/>
+                        </Border.Effect>
+                        <Grid x:Name="PART_Track">
+                            <Border x:Name="PART_Indicator" HorizontalAlignment="Left" CornerRadius="4"
+                                    Background="{StaticResource AccentBrush}"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Dark see-through layer behind dialogs and loading overlays. -->
+    <SolidColorBrush x:Key="BackdropBrush" Color="#C0060A12"/>
+
     <!-- ===================== Inputs ===================== -->
     <Style TargetType="TextBox">
         <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
