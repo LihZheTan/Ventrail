@@ -21,6 +21,13 @@
     <SolidColorBrush x:Key="AddedBrush"      Color="#3FB950"/>
     <SolidColorBrush x:Key="ModifiedBrush"   Color="#E3B341"/>
     <SolidColorBrush x:Key="DeletedBrush"    Color="#F85149"/>
+    <SolidColorBrush x:Key="MergeBrush"      Color="#A371F7"/>
+    <SolidColorBrush x:Key="TimelineBrush"   Color="#35507A"/>
+    <!-- Faint tints behind status badges -->
+    <SolidColorBrush x:Key="AddedTintBrush"    Color="#263FB950"/>
+    <SolidColorBrush x:Key="ModifiedTintBrush" Color="#26E3B341"/>
+    <SolidColorBrush x:Key="DeletedTintBrush"  Color="#26F85149"/>
+    <SolidColorBrush x:Key="AccentTintBrush"   Color="#263D9BF0"/>
     <Color x:Key="AccentColor">#3D9BF0</Color>
 
     <!-- Built-in Windows icon font (Windows 11 name first, Windows 10 fallback). -->
@@ -31,6 +38,7 @@
     <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
     <conv:EnumToVisibilityConverter x:Key="EnumToVis"/>
     <conv:EnumToBoolConverter x:Key="EnumToBool"/>
+    <conv:WidthBelowConverter x:Key="WidthBelow"/>
 
     <!-- ===================== Text ===================== -->
     <Style x:Key="PageTitle" TargetType="TextBlock">
@@ -96,6 +104,47 @@
             </DataTrigger>
             <DataTrigger Binding="{Binding TrackStatus}" Value="Renamed">
                 <Setter Property="Fill" Value="{StaticResource AccentBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Round status badge with an icon (+ added, pencil modified, - deleted), Week 4. -->
+    <Style x:Key="StatusBadge" TargetType="Border">
+        <Setter Property="Width" Value="24"/>
+        <Setter Property="Height" Value="24"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Background" Value="{StaticResource ModifiedTintBrush}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding TrackStatus}" Value="Added">
+                <Setter Property="Background" Value="{StaticResource AddedTintBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding TrackStatus}" Value="Deleted">
+                <Setter Property="Background" Value="{StaticResource DeletedTintBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding TrackStatus}" Value="Conflict">
+                <Setter Property="Background" Value="{StaticResource DeletedTintBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding TrackStatus}" Value="Renamed">
+                <Setter Property="Background" Value="{StaticResource AccentTintBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="StatusGlyph" TargetType="TextBlock" BasedOn="{StaticResource StatusText}">
+        <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="Text" Value="&#xE70F;"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding TrackStatus}" Value="Added">
+                <Setter Property="Text" Value="&#xE710;"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding TrackStatus}" Value="Deleted">
+                <Setter Property="Text" Value="&#xE738;"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding TrackStatus}" Value="Conflict">
+                <Setter Property="Text" Value="&#xE7BA;"/>
             </DataTrigger>
         </Style.Triggers>
     </Style>
@@ -270,9 +319,92 @@
         </Setter>
     </Style>
 
+    <!-- Rounded dark checkbox that fills blue with a white tick when checked (Week 4). -->
     <Style TargetType="CheckBox">
         <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
         <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <StackPanel Orientation="Horizontal" Background="Transparent">
+                        <Border x:Name="Box" Width="18" Height="18" CornerRadius="4" BorderThickness="1.5"
+                                BorderBrush="{StaticResource SubtleTextBrush}" Background="Transparent"
+                                VerticalAlignment="Center">
+                            <TextBlock x:Name="Tick" Text="&#xE73E;" FontFamily="{StaticResource IconFont}" FontSize="11"
+                                       Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Visibility="Collapsed"/>
+                        </Border>
+                        <ContentPresenter x:Name="Label" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="HasContent" Value="False">
+                            <Setter TargetName="Label" Property="Margin" Value="0"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Box" Property="Background" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===================== Scrollbars (slim, dark) ===================== -->
+    <Style x:Key="ScrollThumb" TargetType="Thumb">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="Bar" CornerRadius="3" Background="{StaticResource LineBrush}"/>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bar" Property="Background" Value="{StaticResource SubtleTextBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="Bar" Property="Background" Value="{StaticResource SubtleTextBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <ControlTemplate x:Key="VerticalScrollBarTemplate" TargetType="ScrollBar">
+        <Track x:Name="PART_Track" IsDirectionReversed="True">
+            <Track.Thumb>
+                <Thumb Style="{StaticResource ScrollThumb}" Margin="1,2"/>
+            </Track.Thumb>
+        </Track>
+    </ControlTemplate>
+
+    <ControlTemplate x:Key="HorizontalScrollBarTemplate" TargetType="ScrollBar">
+        <Track x:Name="PART_Track" IsDirectionReversed="False">
+            <Track.Thumb>
+                <Thumb Style="{StaticResource ScrollThumb}" Margin="2,1"/>
+            </Track.Thumb>
+        </Track>
+    </ControlTemplate>
+
+    <Style TargetType="ScrollBar">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Width" Value="8"/>
+        <Setter Property="Template" Value="{StaticResource VerticalScrollBarTemplate}"/>
+        <Style.Triggers>
+            <Trigger Property="Orientation" Value="Horizontal">
+                <Setter Property="Width" Value="Auto"/>
+                <Setter Property="Height" Value="8"/>
+                <Setter Property="Template" Value="{StaticResource HorizontalScrollBarTemplate}"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <!-- ===================== Lists ===================== -->
@@ -312,6 +444,19 @@
     <Style x:Key="CompactListItem" TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
         <Setter Property="Padding" Value="10,6"/>
         <Setter Property="Margin" Value="0,0,0,4"/>
+    </Style>
+
+    <!-- History timeline rows: no card around the whole row, the card is drawn inside the template. -->
+    <Style x:Key="TimelineItem" TargetType="ListBoxItem">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style TargetType="TreeView">

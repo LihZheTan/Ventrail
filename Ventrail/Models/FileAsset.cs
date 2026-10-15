@@ -23,6 +23,18 @@ public class FileAsset
         }
     }
 
+    // Icon glyph (Segoe Fluent / MDL2) for the kind of file, shown in the staging list.
+    public string TypeGlyph => System.IO.Path.GetExtension(FileName).ToLowerInvariant() switch
+    {
+        ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".tif" or ".tiff" or ".svs" or ".psd" => "\uEB9F", // picture
+        ".mp4" or ".mov" or ".avi" or ".mkv" => "\uE714",                                                    // video
+        ".mp3" or ".wav" or ".flac" => "\uE8D6",                                                              // audio
+        ".cs" or ".py" or ".js" or ".ts" or ".java" or ".cpp" or ".json" or ".xml" or ".xaml" => "\uE943",  // code
+        ".zip" or ".7z" or ".rar" or ".tar" or ".gz" => "\uE7B8",                                           // archive
+        ".docx" or ".doc" or ".pdf" or ".txt" or ".md" or ".xlsx" or ".csv" or ".pptx" => "\uE8A5",          // document
+        _ => "\uE7C3"                                                                                        // other
+    };
+
     public string DisplaySize => SizeInBytes switch
     {
         < 1024 => $"{SizeInBytes} B",

@@ -7,7 +7,7 @@
         xmlns:pages="clr-namespace:Ventrail.Views.Pages"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainDashboardViewModel}"
-        Title="Ventrail" Height="720" Width="1200" MinWidth="960" MinHeight="560"
+        Title="Ventrail" Height="720" Width="1200" MinWidth="720" MinHeight="520"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource WindowBrush}"
         Foreground="{StaticResource TextBrush}"
@@ -17,6 +17,12 @@
         App shell (Week 3): navigation rail on the left, the current page on the right,
         status bar along the bottom. Pages live in Views/Pages and share this window's ViewModel.
     -->
+    <!-- Keyboard shortcuts (Week 4) -->
+    <Window.InputBindings>
+        <KeyBinding Key="F5" Command="{Binding RefreshCommand}"/>
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFolderCommand}"/>
+    </Window.InputBindings>
+
     <DockPanel>
 
         <!-- ===== Status bar ===== -->
@@ -65,7 +71,7 @@
                                  ToolTip="Peer-to-peer sharing" IsEnabled="{Binding HasRepo}"
                                  IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.Network}}"/>
                     <Button Style="{StaticResource RailButton}" Content="&#xE838;"
-                            Command="{Binding OpenFolderCommand}" ToolTip="Open another folder"/>
+                            Command="{Binding OpenFolderCommand}" ToolTip="Open another folder (Ctrl+O)"/>
                 </StackPanel>
             </DockPanel>
         </Border>

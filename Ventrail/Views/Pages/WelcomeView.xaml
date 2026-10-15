@@ -10,7 +10,7 @@
 
     <!-- Welcome screen (proposal Fig: launch screen). -->
     <Grid>
-        <TextBlock Text="v0.3 · CP2 Week 3" Style="{StaticResource SubtleText}" FontSize="11"
+        <TextBlock Text="v0.4 · CP2 Week 4" Style="{StaticResource SubtleText}" FontSize="11"
                    HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,18,12"/>
 
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="460">
@@ -47,14 +47,33 @@
             </StackPanel>
 
             <TextBlock Text="Recent Repositories" FontWeight="SemiBold" Margin="0,36,0,8"/>
-            <Border Style="{StaticResource Card}" Padding="14,12">
+
+            <Border Style="{StaticResource Card}" Padding="14,12"
+                    Visibility="{Binding HasRecentRepositories, Converter={StaticResource InverseBoolToVis}}">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Style="{StaticResource Icon}" Text="&#xE8B7;" Foreground="{StaticResource SubtleTextBrush}"
                                Margin="0,0,10,0"/>
-                    <TextBlock Style="{StaticResource SubtleText}"
-                               Text="Folders you open will be listed here (coming in Week 4)."/>
+                    <TextBlock Style="{StaticResource SubtleText}" Text="Folders you open will be listed here."/>
                 </StackPanel>
             </Border>
+
+            <!-- Each recent folder is a button: one click reopens it (Week 4) -->
+            <ItemsControl ItemsSource="{Binding RecentRepositories}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Command="{Binding DataContext.OpenRecentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}" HorizontalContentAlignment="Left"
+                                Background="Transparent" BorderThickness="0" Padding="10,7" Margin="0,0,0,2"
+                                ToolTip="Open this folder">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE8B7;" Foreground="{StaticResource ModifiedBrush}"
+                                           Margin="0,0,10,0"/>
+                                <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" MaxWidth="400"/>
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </StackPanel>
     </Grid>
 </UserControl>

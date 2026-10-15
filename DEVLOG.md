@@ -112,4 +112,44 @@
 ---
 
 ## Week 4 – Interactive UI Components
+**Done**
+- **Checkboxes**: custom dark rounded checkbox that fills blue with a white tick (`Theme.xaml`).
+- **Status indicators**: round badge per changed file (+ added, pencil modified, - deleted,
+  warning for conflicts) plus a file-type icon (`FileAsset.TypeGlyph`: picture, video, audio,
+  code, archive, document).
+- **Visual commit history**: History page is now a timeline. A vertical line joins versions
+  (the Git DAG), the newest node glows and has a "Latest" tag, merges are purple with a
+  "Merge" tag, times are relative ("3 days ago", exact time on hover).
+  `CommitNode` gained `RelativeTime`, `IsMerge`, `IsLatest`, `IsOldest`.
+- **Responsive layout** (`WidthBelowConverter` + DataTriggers on the page width):
+  Staging hides the workspace tree below 940px and the inspector below 760px;
+  History narrows the details pane below 860px; Network stacks into one column below 820px.
+  Window minimum size lowered to 720x520.
+- **Slim dark scrollbars** used everywhere.
+- **Recent Repositories** on the Welcome page: `IRecentRepositoryStore`, saved locally to
+  `%AppData%\Ventrail\recent-repositories.json` (max 6, hides deleted folders, never crashes on a
+  damaged file); demo mode uses an in-memory list. One click reopens a folder.
+- **Keyboard shortcuts**: F5 refresh, Ctrl+O open folder, Ctrl+Enter commit from the message box.
+- **Bug fix**: selected file / version / file-in-version are kept after a reload, so ticking a
+  checkbox no longer clears the File Inspector.
+
+**Testing**
+- Headless ViewModel tests: timeline flags, type icons, selection kept after staging and refresh,
+  recent-folder store round trip, damaged JSON file.
+- Built and run in Visual Studio (demo mode): checked every page at full width and at ~800px,
+  ticked files, committed with Ctrl+Enter, checked the new version at the top of the timeline.
+- Timeline line colour made brighter after the first run (was too faint on the dark background).
+
+**Decisions**
+- Responsiveness done with DataTriggers bound to the page width instead of code-behind
+  SizeChanged handlers, keeping the Views free of logic.
+- Recent folders stored as plain JSON in the user's AppData: local only, no registry, no cloud.
+
+**Issues / notes**
+- At very narrow widths the File Inspector (and its AI card) is hidden; acceptable because the
+  minimum width keeps the main staging list usable.
+
+---
+
+## Week 5 – UI States (errors, firewall prompts, loading)
 _(to fill in)_

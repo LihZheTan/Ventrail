@@ -11,8 +11,8 @@
     <!-- Version history (DAG) on the left, details of the selected version on the right. -->
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" MinWidth="380"/>
-            <ColumnDefinition Width="330"/>
+            <ColumnDefinition Width="*" MinWidth="340"/>
+            <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
 
         <!-- ===================== Version list ===================== -->
@@ -30,27 +30,116 @@
                            Style="{StaticResource SubtleText}" HorizontalAlignment="Center" VerticalAlignment="Center"
                            Visibility="{Binding HasHistory, Converter={StaticResource InverseBoolToVis}}"/>
 
-                <ListBox ItemsSource="{Binding History}" SelectedItem="{Binding SelectedCommit}">
+                <!--
+                    Visual commit history (Week 4): a vertical line joins the versions like Git's DAG.
+                    Newest at the top (glowing node), merges in purple, oldest at the bottom.
+                -->
+                <ListBox ItemsSource="{Binding History}" SelectedItem="{Binding SelectedCommit}"
+                         ItemContainerStyle="{StaticResource TimelineItem}">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <DockPanel>
-                                <!-- Commit node marker (a full DAG graph is planned later) -->
-                                <Grid Width="18" Margin="0,0,12,0" VerticalAlignment="Center">
-                                    <Ellipse Width="12" Height="12" Fill="{StaticResource AccentBrush}"/>
-                                    <Ellipse Width="6" Height="6" Fill="{StaticResource CardBrush}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="34"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Line + node -->
+                                <Grid Grid.Column="0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <!-- line above the node (hidden on the newest version) -->
+                                    <Rectangle Grid.Row="0" Width="2" Fill="{StaticResource TimelineBrush}" HorizontalAlignment="Center">
+                                        <Rectangle.Style>
+                                            <Style TargetType="Rectangle">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsLatest}" Value="True">
+                                                        <Setter Property="Visibility" Value="Hidden"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Rectangle.Style>
+                                    </Rectangle>
+                                    <!-- line below the node (hidden on the oldest version) -->
+                                    <Rectangle Grid.Row="1" Width="2" Fill="{StaticResource TimelineBrush}" HorizontalAlignment="Center">
+                                        <Rectangle.Style>
+                                            <Style TargetType="Rectangle">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsOldest}" Value="True">
+                                                        <Setter Property="Visibility" Value="Hidden"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Rectangle.Style>
+                                    </Rectangle>
+                                    <!-- the node itself -->
+                                    <Ellipse Grid.RowSpan="2" Width="14" Height="14" StrokeThickness="2.5"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Ellipse.Style>
+                                            <Style TargetType="Ellipse">
+                                                <Setter Property="Fill" Value="{StaticResource WindowBrush}"/>
+                                                <Setter Property="Stroke" Value="{StaticResource AccentBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMerge}" Value="True">
+                                                        <Setter Property="Stroke" Value="{StaticResource MergeBrush}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsLatest}" Value="True">
+                                                        <Setter Property="Fill" Value="{StaticResource AccentBrush}"/>
+                                                        <Setter Property="Effect">
+                                                            <Setter.Value>
+                                                                <DropShadowEffect Color="{StaticResource AccentColor}" BlurRadius="12" ShadowDepth="0" Opacity="0.9"/>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Ellipse.Style>
+                                    </Ellipse>
                                 </Grid>
-                                <Border DockPanel.Dock="Right" Style="{StaticResource Pill}" Margin="12,0,0,0">
-                                    <TextBlock Text="{Binding ShortHash}" FontFamily="Consolas" FontSize="12"
-                                               Foreground="{StaticResource SubtleTextBrush}"/>
+
+                                <!-- Version card -->
+                                <Border Grid.Column="1" Background="{StaticResource CardBrush}" CornerRadius="8"
+                                        BorderThickness="1" Padding="14,10" Margin="0,4">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="BorderBrush" Value="Transparent"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="{StaticResource LineBrush}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                                            <Border Style="{StaticResource Pill}" Background="{StaticResource AccentTintBrush}" Margin="0,0,6,0"
+                                                    Visibility="{Binding IsLatest, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="Latest" FontSize="11" Foreground="{StaticResource AccentBrush}"/>
+                                            </Border>
+                                            <Border Style="{StaticResource Pill}" Margin="0,0,6,0"
+                                                    Visibility="{Binding IsMerge, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="Merge" FontSize="11" Foreground="{StaticResource MergeBrush}"/>
+                                            </Border>
+                                            <Border Style="{StaticResource Pill}">
+                                                <TextBlock Text="{Binding ShortHash}" FontFamily="Consolas" FontSize="12"
+                                                           Foreground="{StaticResource SubtleTextBrush}"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Message}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Style="{StaticResource SubtleText}" FontSize="12" ToolTip="{Binding DisplayTime}">
+                                                <Run Text="{Binding Author, Mode=OneWay}"/> ·
+                                                <Run Text="{Binding RelativeTime, Mode=OneWay}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DockPanel>
                                 </Border>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Message}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Style="{StaticResource SubtleText}" FontSize="12">
-                                        <Run Text="{Binding Author, Mode=OneWay}"/> ·
-                                        <Run Text="{Binding DisplayTime, Mode=OneWay}"/>
-                                    </TextBlock>
-                                </StackPanel>
-                            </DockPanel>
+                            </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
@@ -60,6 +149,17 @@
         <!-- ===================== Version details ===================== -->
         <Border Grid.Column="1" Background="{StaticResource PanelBrush}"
                 BorderBrush="{StaticResource LineBrush}" BorderThickness="1,0,0,0" Padding="20,22,20,20">
+            <Border.Style>
+                <!-- Responsive (Week 4): the details pane gets narrower on small windows -->
+                <Style TargetType="Border">
+                    <Setter Property="Width" Value="330"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource WidthBelow}, ConverterParameter=860}" Value="True">
+                            <Setter Property="Width" Value="260"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <DockPanel>
                 <TextBlock DockPanel.Dock="Top" Text="Version Details" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,16"/>
 

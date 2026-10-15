@@ -25,15 +25,32 @@
             <TextBlock Text="Peer-to-Peer Network" Style="{StaticResource PageTitle}"/>
         </DockPanel>
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="20"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <!-- Responsive (Week 4): two columns normally, one column when the window is narrow -->
+        <UniformGrid VerticalAlignment="Top">
+            <UniformGrid.Style>
+                <Style TargetType="UniformGrid">
+                    <Setter Property="Columns" Value="2"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource WidthBelow}, ConverterParameter=820}" Value="True">
+                            <Setter Property="Columns" Value="1"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </UniformGrid.Style>
 
             <!-- ===================== Left column ===================== -->
-            <StackPanel Grid.Column="0">
+            <StackPanel VerticalAlignment="Top">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Margin" Value="0,0,10,0"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource WidthBelow}, ConverterParameter=820}" Value="True">
+                                <Setter Property="Margin" Value="0,0,0,18"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
 
                 <!-- Firewall -->
                 <Border Style="{StaticResource Card}" Padding="0" Margin="0,0,0,18">
@@ -91,7 +108,17 @@
             </StackPanel>
 
             <!-- ===================== Right column: peers ===================== -->
-            <DockPanel Grid.Column="2">
+            <DockPanel VerticalAlignment="Top">
+                <DockPanel.Style>
+                    <Style TargetType="DockPanel">
+                        <Setter Property="Margin" Value="10,0,0,0"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource WidthBelow}, ConverterParameter=820}" Value="True">
+                                <Setter Property="Margin" Value="0"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DockPanel.Style>
                 <TextBlock DockPanel.Dock="Top" Text="Discovered Peers" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
 
                 <Border DockPanel.Dock="Top" Style="{StaticResource Card}"
@@ -118,6 +145,7 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </DockPanel>
-        </Grid>
+        </UniformGrid>
+        </ScrollViewer>
     </DockPanel>
 </UserControl>

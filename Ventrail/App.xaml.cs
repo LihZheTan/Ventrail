@@ -27,8 +27,11 @@ public partial class App : Application
         IIntelligentStorageEngine storageEngine = new IntelligentStorageEngine();   // stub until Weeks 8-9
         INetworkNodeCoordinator network = new NetworkNodeCoordinator();             // stub until Weeks 10-12
         ISpecializedFileHandler fileHandler = new SpecializedFileHandler();         // optional feature
+        IRecentRepositoryStore recentStore = demoMode
+            ? new InMemoryRecentRepositoryStore()                                    // demo: never touches disk
+            : new JsonRecentRepositoryStore();
 
-        var viewModel = new MainDashboardViewModel(repository, storageEngine, network, fileHandler, demoMode);
+        var viewModel = new MainDashboardViewModel(repository, storageEngine, network, fileHandler, recentStore, demoMode);
         var window = new MainWindow { DataContext = viewModel };
         window.Show();
 

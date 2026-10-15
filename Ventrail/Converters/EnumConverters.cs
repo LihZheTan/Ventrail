@@ -34,3 +34,18 @@ public class InverseBoolToVisibilityConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }
+
+/// <summary>
+/// True when a width (e.g. a page's ActualWidth) is below the number in ConverterParameter.
+/// Used by DataTriggers to make layouts responsive to the window size (Week 4).
+/// </summary>
+public class WidthBelowConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is double width && width > 0 &&
+        double.TryParse(parameter?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double limit) &&
+        width < limit;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}

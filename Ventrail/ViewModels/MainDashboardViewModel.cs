@@ -28,20 +28,24 @@ public partial class MainDashboardViewModel : ObservableObject
     private readonly IIntelligentStorageEngine _ai;        // "Calls ML.NET"
     private readonly INetworkNodeCoordinator _network;     // "Manages P2P Network"
     private readonly ISpecializedFileHandler _fileHandler; // "Interfaces with external libraries"
+    private readonly IRecentRepositoryStore _recent;       // Welcome page "Recent Repositories" (Week 4)
 
     public MainDashboardViewModel(
         IRepositoryManager repositoryManager,
         IIntelligentStorageEngine storageEngine,
         INetworkNodeCoordinator networkCoordinator,
         ISpecializedFileHandler fileHandler,
+        IRecentRepositoryStore recentStore,
         bool isDemoMode = false)
     {
         _repo = repositoryManager;
         _ai = storageEngine;
         _network = networkCoordinator;
         _fileHandler = fileHandler;
+        _recent = recentStore;
         IsDemoMode = isDemoMode;
         AuthorName = Environment.UserName;
+        LoadRecentRepositories();
     }
 
     // ---------- state bound by the UI ----------
@@ -55,6 +59,10 @@ public partial class MainDashboardViewModel : ObservableObject
 
     // Class diagram: List<PeerNode> ActivePeers (filled in Weeks 10-12).
     public ObservableCollection<PeerNode> ActivePeers { get; } = new();
+
+    // Recently opened folders, newest first (Welcome page).
+    public ObservableCollection<string> RecentRepositories { get; } = new();
+    public bool HasRecentRepositories => RecentRepositories.Count > 0;
 
     // Folder tree for the left pane of the Staging page.
     public ObservableCollection<FolderNode> WorkspaceTree { get; } = new();
@@ -142,6 +150,9 @@ public partial class MainDashboardViewModel : ObservableObject
         await ReloadAsync();
         await RefreshTreeAsync();
         CurrentPage = AppPage.Staging;
+
+        _recent.Add(CurrentDirectory);
+        LoadRecentRepositories();
         StatusText = History.Count == 0
             ? "New tracking started. Stage your files and save your first version."
             : $"Loaded {History.Count} saved versions.";
@@ -171,6 +182,11 @@ public partial class MainDashboardViewModel : ObservableObject
         if (dialog.ShowDialog() != true) return;
         await InitializeDashboardAsync(dialog.FolderName);
     }
+
+    // Clicking a folder in "Recent Repositories" on the Welcome page.
+    [RelayCommand]
+    private Task OpenRecentAsync(string? folderPath) =>
+        string.IsNullOrEmpty(folderPath) ? Task.CompletedTask : InitializeDashboardAsync(folderPath);
 
     private bool CanUseRepo() => HasRepo && !IsBusy;
 
@@ -263,11 +279,26 @@ public partial class MainDashboardViewModel : ObservableObject
         var (files, history, branch) = await Task.Run(() =>
             (_repo.ScanWorkingDirectory(), _repo.GetCommitHistory(), _repo.GetCurrentBranchName()));
 
+        // Remember what was selected so a reload (e.g. after ticking a box) doesn't clear the inspector.
+        string? selectedPath = SelectedFile?.FilePath;
+        string? selectedHash = SelectedCommit?.Hash;
+        string? selectedCommitFile = SelectedCommitFile?.FilePath;
+
         Changes.Clear();
         foreach (var f in files) Changes.Add(f);
 
+        // Mark the ends of the timeline so the connecting line stops at the first and last version.
+        for (int i = 0; i < history.Count; i++)
+        {
+            history[i].IsLatest = i == 0;
+            history[i].IsOldest = i == history.Count - 1;
+        }
         History.Clear();
         foreach (var c in history) History.Add(c);
+
+        SelectedFile = Changes.FirstOrDefault(f => f.FilePath == selectedPath);
+        SelectedCommit = History.FirstOrDefault(c => c.Hash == selectedHash);
+        SelectedCommitFile = CommitFiles.FirstOrDefault(f => f.FilePath == selectedCommitFile);
 
         BranchName = branch;
         OnPropertyChanged(nameof(StagedCount));
@@ -275,6 +306,13 @@ public partial class MainDashboardViewModel : ObservableObject
         OnPropertyChanged(nameof(HasHistory));
         OnPropertyChanged(nameof(LatestVersionHash));
         if (!IsBusy) StatusText = $"{Changes.Count} changed file(s), {StagedCount} staged.";
+    }
+
+    private void LoadRecentRepositories()
+    {
+        RecentRepositories.Clear();
+        foreach (var path in _recent.Load()) RecentRepositories.Add(path);
+        OnPropertyChanged(nameof(HasRecentRepositories));
     }
 
     // Rebuilt only on open/refresh (not after every stage) so the user's expanded folders stay open.
