@@ -258,6 +258,26 @@ public partial class MainDashboardViewModel : ObservableObject
             return;
         }
 
+        // Week 6: every version keeps a full copy of each file, so warn before large files go in.
+        var large = staged.Where(f => f.IsLarge).ToList();
+        if (large.Count > 0)
+        {
+            string names = string.Join("\n", large.Take(4).Select(f => $"  • {f.FileName} ({f.DisplaySize})"));
+            if (large.Count > 4) names += $"\n  • ...and {large.Count - 4} more";
+            string total = new FileAsset { SizeInBytes = large.Sum(f => f.SizeInBytes) }.DisplaySize;
+            bool saveAnyway = await AskAsync(
+                "Save large files?",
+                $"{large.Count} of the ticked files {(large.Count == 1 ? "is" : "are")} large:\n{names}\n\n" +
+                $"Each saved version keeps a full copy, so this folder's history will grow by about {total}. " +
+                "You can untick them and save the rest instead.",
+                "Save anyway", "Go back", "");
+            if (!saveAnyway)
+            {
+                LogActivity($"Save cancelled: {large.Count} large file(s) ticked");
+                return;
+            }
+        }
+
         string message = CommitMessage, author = AuthorName, root = CurrentDirectory;
         CommitProgress = 0;
         IsCommitting = true;
@@ -452,8 +472,10 @@ public partial class MainDashboardViewModel : ObservableObject
         catch (Exception ex)
         {
             // Week 5: errors become a red toast + a log entry instead of a crash or silent failure.
-            StatusText = $"Something went wrong: {ex.Message}";
-            ShowToast($"Something went wrong: {ex.Message}", ToastKind.Error);
+            // Week 6: VentrailException messages are already plain language, so show them as-is.
+            string text = ex is VentrailException ? ex.Message : $"Something went wrong: {ex.Message}";
+            StatusText = text;
+            ShowToast(text, ToastKind.Error);
             LogActivity($"Error: {ex.Message}");
         }
         finally

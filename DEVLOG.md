@@ -203,4 +203,68 @@
 ---
 
 ## Week 6 – Git Core Integration (scanning, initialisation, cataloguing)
-_(to fill in)_
+
+**What was done**
+- The basic Git operations (init/open, scan, stage, commit, history, restore) already worked from
+  earlier weeks, so Week 6 focused on making them safe for real folders and real users.
+- **Default `.gitignore` for new repositories** (Fig 3.2). It skips Windows/macOS system files
+  (`Thumbs.db`, `desktop.ini`, `.DS_Store`), Office and LibreOffice lock/temp files (`~$*`, `*.tmp`,
+  `.~lock.*#`) and build/tool folders (`bin/`, `obj/`, `.vs/`, `node_modules/`, `__pycache__/`).
+  If the folder already has a `.gitignore`, Ventrail leaves it alone.
+- **Folders that are too broad are refused.** Ventrail won't create a repository in a whole drive
+  (`C:\`), the Windows or Program Files folders, AppData, or the user's whole profile folder. These
+  would mean scanning, and saving into history, hundreds of thousands of files. The user is told to
+  pick a project folder inside it instead. Existing repositories still open as before.
+- **Plain-language errors.** Every `RepositoryManager` method now runs through a `Use(...)` helper
+  that opens the repository and turns low-level errors into a `VentrailException` with a
+  plain-language message, which the UI shows as-is (no "Something went wrong:" prefix):
+  - folder moved, deleted or on an unplugged drive;
+  - `.git/index.lock` left by another Git tool or a crashed save;
+  - Windows permission denied;
+  - file open/locked in another program (Word, Excel...);
+  - bare repositories (no working files).
+- **Git ownership check turned off** (`GlobalSettings.SetOwnerValidation(false)`). Without this,
+  folders on USB/exFAT drives or copied from another PC fail with a confusing "not owned by current
+  user" error. Ventrail never runs hooks or external Git commands, so the attack this check guards
+  against doesn't apply.
+- **Large files** (cataloguing, and a first step on the proposal's storage-bloat problem):
+  - `FileAsset.IsLarge`: 50 MB or more;
+  - an amber "Large" badge in the staging list;
+  - a "Save large files?" confirm dialog before saving, which lists the files and the total size
+    the history will grow by ("Save anyway" / "Go back").
+  - The fixed 50 MB rule is a placeholder for the ML.NET heavy/light classifier in Weeks 8-9.
+- **Scan is more robust:** reading a file's size can no longer fail the whole scan (locked or
+  just-deleted files report 0 B).
+
+**Testing**
+- Headless test console app (outside the repo) that drives the real `RepositoryManager` against
+  temporary folders on Windows. 23/23 checks passed:
+  - init writes `.gitignore`, and `~$` / `Thumbs.db` files are not listed;
+  - an existing `.gitignore` is kept;
+  - commit and history;
+  - opening a subfolder opens the parent repository, with no nested `.git`;
+  - `C:\` and the user profile folder are refused with a friendly message;
+  - a missing folder returns false;
+  - a 60 MB file is flagged as large;
+  - a file locked by another process: the scan still works, and Stage and Restore give friendly
+    messages;
+  - `index.lock` gives a friendly message;
+  - a sub-folder with access denied (via `icacls`) is skipped without an error;
+  - a repository folder deleted while open gives a friendly message;
+  - a normal restore works for a CRLF text file and a binary file.
+- Demo build run: the "Large" badge shows on `scan_sample.svs` (2.24 GB).
+- **Bug found and fixed:** restoring a file that another program has open did nothing and reported
+  no error, so the app showed "Restored" when the file had not changed. `RestoreFileFromCommit` now
+  compares the file on disk with the stored version (after line-ending filters) and reports a
+  plain-language error if they differ.
+
+**Decisions**
+- Large files get a warning, not a block: the user decides. Chunking and Git LFS are still out of
+  scope.
+- Unreadable sub-folders are skipped silently (libgit2 behaviour) rather than stopping the scan.
+  The user can add them to `.gitignore`.
+
+**Issues / notes**
+- Class diagram update for the report: `VentrailException` is new, and `FileAsset` gained
+  `IsLarge` / `LargeFileBytes`.
+- Git does not track empty folders. This is normal Git behaviour, worth a line in the user guide.
