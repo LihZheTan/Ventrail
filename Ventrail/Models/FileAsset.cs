@@ -13,6 +13,13 @@ public class FileAsset
     // True when the change is in the staging index and will go into the next commit.
     public bool IsStaged { get; set; }
 
+    // Week 6: files at or above this size get a "Large" badge and a warning before saving,
+    // because every version keeps a full copy (the storage-bloat problem in the proposal).
+    // Weeks 8-9 replace this fixed rule with the ML.NET heavy/light classifier.
+    public const long LargeFileBytes = 50L * 1024 * 1024;
+
+    public bool IsLarge => SizeInBytes >= LargeFileBytes;
+
     // Friendly type for the File Inspector, e.g. "DOCX file".
     public string FileType
     {
