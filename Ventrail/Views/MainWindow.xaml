@@ -124,6 +124,92 @@
         </StackPanel>
     </Grid>
 
+    <!-- Week 7: diff viewer, last saved version vs the file on disk (Esc = close) -->
+    <Grid Background="{StaticResource BackdropBrush}"
+          Visibility="{Binding IsDiffOpen, Converter={StaticResource BoolToVis}}">
+        <Border Style="{StaticResource Card}" Background="{StaticResource PanelBrush}" Margin="40,30" Padding="0">
+            <DockPanel>
+                <!-- Header -->
+                <DockPanel DockPanel.Dock="Top" Margin="20,16,14,12">
+                    <Button DockPanel.Dock="Right" Command="{Binding CloseDiffCommand}" Padding="10,6"
+                            VerticalAlignment="Top" ToolTip="Close (Esc)">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE711;"/>
+                    </Button>
+                    <StackPanel>
+                        <TextBlock Text="Changes since the last saved version" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding CurrentDiff.FilePath}" Style="{StaticResource SubtleText}" Margin="0,4,0,0"/>
+                        <TextBlock Text="{Binding CurrentDiff.Summary}" FontSize="12" Margin="0,6,0,0"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   Visibility="{Binding CurrentDiff.CanShowLines, Converter={StaticResource BoolToVis}}"/>
+                    </StackPanel>
+                </DockPanel>
+                <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource LineBrush}"/>
+
+                <Grid>
+                    <!-- Binary / too large / no changes -->
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="420" Margin="20"
+                                Visibility="{Binding CurrentDiff.CanShowLines, Converter={StaticResource InverseBoolToVis}}">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE7C3;" FontSize="32" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,12"/>
+                        <TextBlock Text="{Binding CurrentDiff.Message}" Style="{StaticResource SubtleText}"
+                                   TextAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Line-by-line view (virtualised so long files stay fast) -->
+                    <ItemsControl ItemsSource="{Binding CurrentDiff.Lines}" Margin="0,4,0,4"
+                                  VirtualizingPanel.IsVirtualizing="True" ScrollViewer.CanContentScroll="True"
+                                  Visibility="{Binding CurrentDiff.CanShowLines, Converter={StaticResource BoolToVis}}">
+                        <ItemsControl.Template>
+                            <ControlTemplate TargetType="ItemsControl">
+                                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                    <ItemsPresenter/>
+                                </ScrollViewer>
+                            </ControlTemplate>
+                        </ItemsControl.Template>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border x:Name="Row" Padding="0,1">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding OldLineNumber}" Width="48" TextAlignment="Right"
+                                                   Foreground="{StaticResource SubtleTextBrush}" FontFamily="Consolas" FontSize="12"/>
+                                        <TextBlock Text="{Binding NewLineNumber}" Width="48" TextAlignment="Right"
+                                                   Foreground="{StaticResource SubtleTextBrush}" FontFamily="Consolas" FontSize="12"/>
+                                        <TextBlock x:Name="SignText" Text="{Binding Sign}" Width="26" TextAlignment="Center"
+                                                   FontFamily="Consolas" FontSize="13"/>
+                                        <TextBlock x:Name="LineText" Text="{Binding Text}" FontFamily="Consolas" FontSize="13"
+                                                   Margin="0,0,20,0"/>
+                                    </StackPanel>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Added">
+                                        <Setter TargetName="Row" Property="Background" Value="{StaticResource AddedTintBrush}"/>
+                                        <Setter TargetName="SignText" Property="Foreground" Value="{StaticResource AddedBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Removed">
+                                        <Setter TargetName="Row" Property="Background" Value="{StaticResource DeletedTintBrush}"/>
+                                        <Setter TargetName="SignText" Property="Foreground" Value="{StaticResource DeletedBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Hunk">
+                                        <Setter TargetName="Row" Property="Background" Value="{StaticResource AccentTintBrush}"/>
+                                        <Setter TargetName="Row" Property="Padding" Value="0,4"/>
+                                        <Setter TargetName="LineText" Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                        <Setter TargetName="LineText" Property="FontFamily" Value="Segoe UI"/>
+                                        <Setter TargetName="LineText" Property="FontSize" Value="12"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
+            </DockPanel>
+        </Border>
+    </Grid>
+
     <!-- Confirm dialog: firewall permission, restore, exit (Esc = cancel) -->
     <Grid Background="{StaticResource BackdropBrush}"
           Visibility="{Binding IsDialogOpen, Converter={StaticResource BoolToVis}}">

@@ -268,3 +268,78 @@
 - Class diagram update for the report: `VentrailException` is new, and `FileAsset` gained
   `IsLarge` / `LargeFileBytes`.
 - Git does not track empty folders. This is normal Git behaviour, worth a line in the user guide.
+
+---
+
+## Week 7 – Staging to Git index, hashing, DAG commit
+
+**What was done**
+- The Week 7 core (ticking files writes them to the Git index; saving hashes the staged tree and
+  writes a commit node with its parent links into the DAG) was already working and was hardened in
+  Week 6. This week adds the two everyday actions a non-technical user needs around it.
+- **Discard changes** (File Inspector, red "Discard" button). It takes one file back to the last
+  saved version:
+  - modified file: the saved content comes back, and the staging tick is cleared;
+  - new file that was never saved: removed from the folder and from staging;
+  - deleted file: comes back;
+  - renamed file: the old name comes back and the new one is removed.
+- **Safety:**
+  - a confirm dialog explains what will happen for that kind of change;
+  - **the current copy is moved to the Windows Recycle Bin first** (`SafeDelete`, Shell
+    `SHFileOperation` with `FOF_ALLOWUNDO`), so a mis-click never loses work for good;
+  - USB and network drives have no Recycle Bin (Windows would delete for good), so there the file
+    is copied to `%LocalAppData%\Ventrail\Discarded\<date-time>\` instead, and the toast says where;
+  - a file that is open in another program is refused before anything is touched.
+- **"View changes" diff viewer.** Opened with the "View changes" button or by double-clicking a
+  file; Esc closes it. It is a full-window overlay comparing the last saved version with the file on
+  disk:
+  - green added lines, red removed lines, old and new line numbers;
+  - "Around line N" section headers with 3 lines of context;
+  - a summary such as "2 line(s) added, 1 line(s) removed";
+  - new files show every line as added, and deleted files every line as removed.
+  - Built on LibGit2Sharp `Diff.Compare<Patch>(HEAD tree, WorkingDirectory)`. The unified-diff text
+    is parsed into `DiffLine`s (`Models/FileDiff.cs`), and the list is virtualised so long files
+    stay fast.
+  - Files that can't be compared line by line show a plain-language message instead: binary files
+    (detected the same way as Git: a zero byte in the first 8000 bytes), files over 2 MB, and output
+    is capped at 3000 lines.
+- `IRepositoryManager` gained `DiscardChanges(path)` (returns where the old copy went) and
+  `GetFileDiff(path)`. `MockRepositoryManager` implements both, and the demo data now has a text file
+  (`notes/todo.md`) so the diff viewer has something to show.
+
+**Testing**
+- Headless test console app (outside the repo) driving the real `RepositoryManager` on temporary
+  folders: **24/24 checks passed**:
+  - diff of a modified file: exact added/removed lines and line numbers;
+  - a staged change is still compared with the last saved version;
+  - new and deleted files;
+  - binary and >2 MB files give messages;
+  - discard of a modified+staged file: content back and no longer listed;
+  - discard of new, deleted and binary files;
+  - discard of a staged file in a repository with no versions yet;
+  - discard of a staged rename (`git mv`): back to the old name and nothing left changed;
+  - discard of a file locked by another process: friendly error and the edits are kept;
+  - discard of an unchanged file: friendly message.
+- **Test finding (not a bug):** Git for Windows sets `core.autocrlf=true` system-wide, so restored
+  text files get Windows line endings (`\r\n`). Content checks compare with line endings ignored,
+  which matches what users see in Notepad/Word.
+- App builds with 0 warnings and 0 errors. A demo click-through of the diff overlay is still to do
+  in Visual Studio.
+
+**Decisions**
+- **No DAG graph drawing for branches.** Ventrail only works on one branch (the proposal notes that
+  branching intimidates non-technical users), so history is always a straight line. The existing
+  timeline already marks merge commits (from other Git tools) with a "Merge" tag. A full graph is
+  left out unless branch features are added later.
+- Discard uses the Recycle Bin instead of a hidden backup inside `.git`: users already know how to
+  get files back from the Recycle Bin.
+- The diff compares with the *last saved version*, not the staging area, because "what did I change
+  since I last saved?" is the question users ask. The staging area is a Git detail they don't see.
+- Word/Excel/PDF files show "can't be compared line by line". Comparing document contents is left
+  for the optional specialised-file handler.
+
+**Issues / notes**
+- Class diagram update for the report: `FileDiff`/`DiffLine` models, `SafeDelete` helper, and
+  `IRepositoryManager.DiscardChanges` / `GetFileDiff`.
+- The File Inspector (and so the two new buttons) is hidden when the window is narrower than 760px.
+  Double-click still opens the diff viewer there; Discard needs the wider window.

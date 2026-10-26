@@ -95,7 +95,12 @@ public partial class MainDashboardViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedFile))]
+    [NotifyCanExecuteChangedFor(nameof(DiscardSelectedFileCommand), nameof(ViewChangesCommand))]
     private FileAsset? _selectedFile;
+
+    // Week 7: diff viewer overlay.
+    [ObservableProperty] private bool _isDiffOpen;
+    [ObservableProperty] private FileDiff? _currentDiff;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedCommit))]
     private CommitNode? _selectedCommit;
@@ -384,6 +389,54 @@ public partial class MainDashboardViewModel : ObservableObject
         StatusText = $"Restored {path} from version {hash[..7]}. Save a version to keep it.";
         ShowToast($"Restored {System.IO.Path.GetFileName(path)}. Save a version to keep it.", ToastKind.Success);
     });
+
+    // Week 7: "Discard changes" in the File Inspector. Always asks first, and the current copy
+    // goes to the Recycle Bin, so a mis-click never loses work for good.
+    [RelayCommand(CanExecute = nameof(HasSelectedFile))]
+    private Task DiscardSelectedFileAsync() => RunBusyAsync("Discarding changes...", async () =>
+    {
+        var file = SelectedFile!;
+        string path = file.FilePath, status = file.TrackStatus;
+
+        string what = status switch
+        {
+            "Added" => "This file has never been saved in a version, so it will be removed from the folder " +
+                       "(moved to the Recycle Bin).",
+            "Deleted" => "The file will come back exactly as it was in the last saved version.",
+            _ => "Your unsaved edits will be thrown away and the file goes back to the last saved version. " +
+                 "The current copy is moved to the Recycle Bin first, so you can still get it back."
+        };
+        if (!await AskAsync("Discard changes?", $"\"{path}\"\n\n{what}", "Discard", "Cancel", ""))
+            return;
+
+        string? movedTo = await Background(() => _repo.DiscardChanges(path));
+        await ReloadAsync();
+        if (status is "Added" or "Deleted" or "Renamed")
+            await RefreshTreeAsync();   // the file appeared or disappeared on disk
+
+        string name = Path.GetFileName(path);
+        string where = movedTo switch
+        {
+            null => string.Empty,
+            SafeDelete.RecycleBin => " The old copy is in the Recycle Bin.",
+            _ => $" A copy of the old file was kept in {movedTo}."
+        };
+        LogActivity($"Discarded changes to {path}" + (movedTo is null ? string.Empty : $" (old copy: {movedTo})"));
+        StatusText = $"Discarded changes to {path}.";
+        ShowToast($"Discarded changes to {name}.{where}", ToastKind.Success, 5);
+    });
+
+    // Week 7: line-by-line comparison with the last saved version (double-click a file or "View changes").
+    [RelayCommand(CanExecute = nameof(HasSelectedFile))]
+    private Task ViewChangesAsync() => RunBusyAsync("Comparing with the last saved version...", async () =>
+    {
+        string path = SelectedFile!.FilePath;
+        CurrentDiff = await Background(() => _repo.GetFileDiff(path));
+        IsDiffOpen = true;
+    });
+
+    [RelayCommand]
+    private void CloseDiff() => IsDiffOpen = false;
 
     // ---------- helpers ----------
 

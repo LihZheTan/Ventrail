@@ -248,6 +248,158 @@ public class RepositoryManager : IRepositoryManager
                 $"\"{filePath}\" could not be replaced. If it is open in another program, close it and try again.");
     }, filePath);
 
+    // ---------- Week 7: discard changes + diff viewer ----------
+
+    public string? DiscardChanges(string filePath) => Use(repo =>
+    {
+        StatusEntry entry = repo.RetrieveStatus(new StatusOptions { IncludeUntracked = true, RecurseUntrackedDirs = true })
+            .FirstOrDefault(e => e.FilePath == filePath)
+            ?? throw new VentrailException($"\"{filePath}\" has no unsaved changes to discard.");
+
+        // A rename shows up under the new name; discarding it also brings back the old name.
+        string? oldPath = entry.HeadToIndexRenameDetails?.OldFilePath
+                       ?? entry.IndexToWorkDirRenameDetails?.OldFilePath;
+        Commit? head = repo.Head.Tip;
+
+        // 1. Safety copy: move the current file to the Recycle Bin (or backup folder) first.
+        string full = Path.Combine(RepoPath, filePath);
+        string? movedTo = File.Exists(full) ? SafeDelete.MoveAway(full, filePath) : null;
+
+        // 2. Files that were never saved are simply taken out of the staging area.
+        if (head?[filePath] == null)
+        {
+            repo.Index.Remove(filePath);
+            repo.Index.Write();
+        }
+
+        // 3. Files that have a saved version get it back, like "git checkout HEAD -- file".
+        var restore = new[] { filePath, oldPath }
+            .Where(p => p != null && head?[p] != null)
+            .Select(p => p!)
+            .ToList();
+        if (restore.Count > 0)
+            repo.CheckoutPaths(head!.Sha, restore, new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
+
+        return movedTo;
+    }, filePath);
+
+    // Bigger files are not compared line by line (too slow, and too long to read anyway).
+    private const long MaxDiffBytes = 2 * 1024 * 1024;
+    private const int MaxDiffLines = 3000;
+
+    public FileDiff GetFileDiff(string filePath) => Use(repo =>
+    {
+        var diff = new FileDiff { FilePath = filePath };
+        string full = Path.Combine(RepoPath, filePath);
+        Blob? saved = repo.Head.Tip?[filePath]?.Target as Blob;
+        bool onDisk = File.Exists(full);
+
+        if (Math.Max(onDisk ? SafeFileSize(full) : 0, saved?.Size ?? 0) > MaxDiffBytes)
+        {
+            diff.Message = "This file is too large to compare line by line. You can still restore or discard the whole file.";
+            return diff;
+        }
+        if (saved?.IsBinary == true || (onDisk && LooksBinary(full)))
+        {
+            diff.Message = "This kind of file (for example a Word document, spreadsheet or picture) can't be " +
+                           "compared line by line. You can still restore or discard the whole file.";
+            return diff;
+        }
+
+        if (saved == null || !onDisk)
+        {
+            // New file: every line is added. Deleted file: every line is removed.
+            string text = onDisk ? File.ReadAllText(full) : saved!.GetContentText(new FilteringOptions(filePath));
+            var kind = onDisk ? DiffLineKind.Added : DiffLineKind.Removed;
+            int n = 0;
+            foreach (string line in SplitLines(text))
+            {
+                if (++n > MaxDiffLines) { diff.IsTruncated = true; break; }
+                diff.Lines.Add(new DiffLine
+                {
+                    Kind = kind,
+                    Text = line,
+                    NewLineNumber = onDisk ? n : null,
+                    OldLineNumber = onDisk ? null : n
+                });
+            }
+        }
+        else
+        {
+            // Changed file: last saved version (HEAD) against the file on disk, 3 lines of context.
+            Patch patch = repo.Diff.Compare<Patch>(repo.Head.Tip!.Tree, DiffTargets.WorkingDirectory,
+                new[] { filePath }, null, new CompareOptions { ContextLines = 3 });
+            PatchEntryChanges? entry = patch[filePath];
+            if (entry?.IsBinaryComparison == true)
+            {
+                diff.Message = "This file can't be compared line by line.";
+                return diff;
+            }
+            diff.IsTruncated = ParsePatch(entry?.Patch ?? string.Empty, diff.Lines);
+        }
+
+        diff.LinesAdded = diff.Lines.Count(l => l.Kind == DiffLineKind.Added);
+        diff.LinesRemoved = diff.Lines.Count(l => l.Kind == DiffLineKind.Removed);
+        if (diff.Lines.Count == 0)
+            diff.Message = "No text changes (only the file's details, such as line endings, changed).";
+        return diff;
+    }, filePath);
+
+    // Turns unified-diff text ("@@ -3,4 +3,5 @@", "+added", "-removed", " same") into DiffLines.
+    // Returns true if it stopped early because of MaxDiffLines.
+    internal static bool ParsePatch(string patch, List<DiffLine> lines)
+    {
+        int oldNo = 0, newNo = 0;
+        bool inHunk = false;
+        foreach (string raw in SplitLines(patch))
+        {
+            if (lines.Count >= MaxDiffLines) return true;
+
+            if (raw.StartsWith("@@"))
+            {
+                // @@ -oldStart[,count] +newStart[,count] @@ optional section text
+                var parts = raw.Split(' ');
+                oldNo = int.Parse(parts[1].TrimStart('-').Split(',')[0]);
+                newNo = int.Parse(parts[2].TrimStart('+').Split(',')[0]);
+                inHunk = true;
+                lines.Add(new DiffLine { Kind = DiffLineKind.Hunk, Text = $"Around line {newNo}" });
+                continue;
+            }
+            if (!inHunk || raw.StartsWith("\\")) continue;   // file header lines / "\ No newline at end of file"
+
+            if (raw.StartsWith("+"))
+                lines.Add(new DiffLine { Kind = DiffLineKind.Added, Text = raw[1..], NewLineNumber = newNo++ });
+            else if (raw.StartsWith("-"))
+                lines.Add(new DiffLine { Kind = DiffLineKind.Removed, Text = raw[1..], OldLineNumber = oldNo++ });
+            else
+                lines.Add(new DiffLine
+                {
+                    Kind = DiffLineKind.Context,
+                    Text = raw.Length > 0 ? raw[1..] : string.Empty,
+                    OldLineNumber = oldNo++,
+                    NewLineNumber = newNo++
+                });
+        }
+        return false;
+    }
+
+    private static IEnumerable<string> SplitLines(string text)
+    {
+        if (text.Length == 0) yield break;
+        var lines = text.Replace("\r\n", "\n").Split('\n');
+        int count = text.EndsWith('\n') ? lines.Length - 1 : lines.Length;   // no empty line after the last newline
+        for (int i = 0; i < count; i++) yield return lines[i];
+    }
+
+    // Same rule Git uses: a zero byte in the first 8000 bytes means "binary".
+    private static bool LooksBinary(string fullPath)
+    {
+        using var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        var buffer = new byte[8000];
+        int n = fs.Read(buffer, 0, buffer.Length);
+        return Array.IndexOf(buffer, (byte)0, 0, n) >= 0;
+    }
+
     // ---------- Week 6: error handling ----------
 
     // Opens the repository for one operation and translates errors into plain language.

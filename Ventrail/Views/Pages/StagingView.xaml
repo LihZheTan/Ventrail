@@ -135,7 +135,12 @@
                 <ListBox ItemsSource="{Binding Changes}" SelectedItem="{Binding SelectedFile}">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <DockPanel>
+                            <DockPanel Background="Transparent">
+                                <!-- Week 7: double-click a file to see what changed in it -->
+                                <DockPanel.InputBindings>
+                                    <MouseBinding MouseAction="LeftDoubleClick"
+                                                  Command="{Binding DataContext.ViewChangesCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"/>
+                                </DockPanel.InputBindings>
                                 <!-- Status badge: + added, pencil modified, - deleted -->
                                 <Border Style="{StaticResource StatusBadge}" Margin="0,0,10,0">
                                     <TextBlock Style="{StaticResource StatusGlyph}"/>
@@ -221,6 +226,26 @@
                                Text="{Binding TrackStatus}" Style="{StaticResource StatusText}"
                                HorizontalAlignment="Left"/>
                 </Grid>
+
+                <!-- Week 7: compare with / go back to the last saved version -->
+                <UniformGrid Columns="2" Margin="0,0,0,18"
+                             Visibility="{Binding HasSelectedFile, Converter={StaticResource BoolToVis}}">
+                    <Button Command="{Binding ViewChangesCommand}" Style="{StaticResource OutlineButton}" Margin="0,0,5,0"
+                            Padding="8,7" ToolTip="Compare with the last saved version (or double-click the file)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8A1;" Margin="0,0,6,0"/>
+                            <TextBlock Text="View changes"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding DiscardSelectedFileCommand}" Margin="5,0,0,0" Padding="8,7"
+                            Foreground="{StaticResource DeletedBrush}"
+                            ToolTip="Go back to the last saved version. The current copy goes to the Recycle Bin.">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE7A7;" Margin="0,0,6,0"/>
+                            <TextBlock Text="Discard"/>
+                        </StackPanel>
+                    </Button>
+                </UniformGrid>
 
                 <!-- AI card -->
                 <Border Style="{StaticResource GlowCard}" Padding="14">

@@ -34,6 +34,7 @@ public class MockRepositoryManager : IRepositoryManager
             File("figures/flowchart_v2.png", "Added", 1_250_000),
             File("data/survey_results.xlsx", "Modified", 96_500),
             File("notes/old_ideas.txt", "Deleted", 0),
+            File("notes/todo.md", "Modified", 412),   // text file, so the Week 7 diff viewer has lines to show
             File("slides/scan_sample.svs", "Added", 2_400_000_000), // large specialised file for AI demo later
         };
 
@@ -88,6 +89,40 @@ public class MockRepositoryManager : IRepositoryManager
         original.TrackStatus = "Modified";
         original.IsStaged = true;
         _workingChanges.Add(original);
+    }
+
+    public string? DiscardChanges(string filePath)
+    {
+        var file = _workingChanges.FirstOrDefault(f => f.FilePath == filePath);
+        if (file is null) return null;
+        _workingChanges.Remove(file);
+        return file.TrackStatus == "Deleted" ? null : "the Recycle Bin";
+    }
+
+    public FileDiff GetFileDiff(string filePath)
+    {
+        var diff = new FileDiff { FilePath = filePath };
+        if (filePath == "notes/todo.md")
+        {
+            diff.Lines = new List<DiffLine>
+            {
+                new() { Kind = DiffLineKind.Hunk, Text = "Around line 3" },
+                new() { Kind = DiffLineKind.Context, Text = "## Chapter 3", OldLineNumber = 3, NewLineNumber = 3 },
+                new() { Kind = DiffLineKind.Removed, Text = "- [ ] Write methodology draft", OldLineNumber = 4 },
+                new() { Kind = DiffLineKind.Added, Text = "- [x] Write methodology draft", NewLineNumber = 4 },
+                new() { Kind = DiffLineKind.Added, Text = "- [ ] Ask Dr Munirah to review section 3.2", NewLineNumber = 5 },
+                new() { Kind = DiffLineKind.Context, Text = "- [ ] Redraw flowchart (Fig 3.4)", OldLineNumber = 5, NewLineNumber = 6 },
+                new() { Kind = DiffLineKind.Context, Text = "", OldLineNumber = 6, NewLineNumber = 7 },
+            };
+            diff.LinesAdded = 2;
+            diff.LinesRemoved = 1;
+        }
+        else
+        {
+            diff.Message = "This kind of file (for example a Word document, spreadsheet or picture) can't be " +
+                           "compared line by line. You can still restore or discard the whole file.";
+        }
+        return diff;
     }
 
     // ---------- helpers ----------

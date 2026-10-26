@@ -87,8 +87,13 @@ public partial class MainDashboardViewModel
     [RelayCommand]
     private void ConfirmDialog() => CloseDialog(true);
 
+    // Also bound to Esc, which closes the diff viewer (Week 7) when no dialog is open.
     [RelayCommand]
-    private void CancelDialog() => CloseDialog(false);
+    private void CancelDialog()
+    {
+        if (IsDialogOpen) CloseDialog(false);
+        else IsDiffOpen = false;
+    }
 
     private void CloseDialog(bool result)
     {

@@ -35,4 +35,13 @@ public interface IRepositoryManager
     // Bring back a file exactly as it was in an earlier commit (non-destructive:
     // history is untouched; the restored file shows up as a staged change).
     void RestoreFileFromCommit(string filePath, string commitHash);
+
+    // Week 7: throw away unsaved changes to one file and go back to the last saved version.
+    // The current copy goes to the Windows Recycle Bin first (or a backup folder on drives
+    // without one), so nothing is lost for good. Returns where that copy went, or null if
+    // there was no file on disk (e.g. discarding a deletion).
+    string? DiscardChanges(string filePath);
+
+    // Week 7: line-by-line comparison of a changed file with its last saved version.
+    FileDiff GetFileDiff(string filePath);
 }
