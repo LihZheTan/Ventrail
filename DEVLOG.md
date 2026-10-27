@@ -343,3 +343,115 @@
   `IRepositoryManager.DiscardChanges` / `GetFileDiff`.
 - The File Inspector (and so the two new buttons) is hidden when the window is narrower than 760px.
   Double-click still opens the diff viewer there; Discard needs the wider window.
+
+---
+
+## Week 8 – ML.NET setup: classifying heavy vs light files
+
+**What was done**
+- **Defined "heavy" so it can be measured, not guessed.** A file is *heavy* if saving one new
+  version adds **at least 1 MB to the history after Git's zlib compression**. This is the storage
+  bloat problem from the proposal: a 4 MB photo is heavy (already compressed, so every version is a
+  new full copy), but a 3 MB text log is light (it compresses to a fraction of that).
+- **Features read cheaply from the file** (`Services/AI/FileFeatures.cs`, shared by the app and the
+  trainer). Only the **size and the first 4 KB** are read, so even multi-GB files classify in
+  milliseconds:
+  - log10 of the size;
+  - Shannon entropy of the header (about 8 bits/byte = already compressed or encrypted);
+  - the share of zero bytes and of text-like bytes;
+  - the **format from the magic bytes** (zip/docx, PNG, JPEG, PDF, TIFF/BigTIFF (.svs), PSD,
+    MP4, EXE...), because the extension can lie but the header can't;
+  - the file family from the extension (document, image, video, code...).
+- **Offline trainer** (`Ventrail.ModelTrainer`, a new console project in the solution):
+  - Collects ~6,000 real files from **non-personal locations only**: Windows wallpapers and media,
+    fonts, logs, Program Files, and the NuGet cache. It caps each extension at 250 files so DLLs
+    don't dominate. The user's own folders are included only with `--include`.
+  - Adds 300 synthetic large text files (logs, CSV exports, plain text, 100 KB–40 MB). These are
+    common for students but rare in system folders.
+  - **Labels each file by actually compressing it** with zlib, the same compression Git uses. Files
+    over 16 MB are labelled from 8 evenly spread 1 MB samples, to keep training fast.
+  - Trains an **ML.NET FastTree** binary classifier on the cheap features: the model *predicts* the
+    expensive measurement without compressing the file.
+  - Evaluates on a held-out 20%, runs 5-fold cross-validation, compares with size-only rules, and
+    writes `data/metrics.md`.
+  - The dataset is saved as `data/training-data.csv` with **no file names or paths**.
+  - Saves the model to `Ventrail/MLModels/ventrail_classifier.zip` (63 KB), which is copied next to
+    the exe.
+- **`IntelligentStorageEngine` is now real** (was a stub):
+  - loads the model once, then `ClassifyFile()` returns Heavy/Light, the probability, a friendly
+    format name ("JPEG picture", "Word document") and whether the format is already compressed;
+  - `AnalyzeFileFormat()` works from the header bytes;
+  - `GenerateRecommendation()` stays for Week 9;
+  - runs fully offline: no file content leaves the PC;
+  - thread-safe (`PredictionEngine` is used under a lock);
+  - a missing or corrupt model never crashes the app: the advisor switches off and the Week 6 50 MB
+    rule takes over;
+  - for files that aren't on disk (demo data, locked files) it estimates from the extension and
+    size, and says so in the UI.
+- **In the app:**
+  - the staging list shows an amber **"Heavy"** badge (tooltip = the advisor's explanation),
+    instead of the Week 6 "Large" badge;
+  - the File Inspector's AI card shows the verdict, e.g. *"Heavy file (99% sure). This JPEG picture
+    is already compressed, so every saved version stores a full new copy in the history (about
+    4.0 MB each time)."*;
+  - the commit progress screen shows "Checking photo.jpg (2 of 5): heavy file...".
+
+**Results** (held-out test set, 1,270 files; full report in `Ventrail.ModelTrainer/data/metrics.md`)
+
+| Rule | Accuracy | Precision (heavy) | Recall (heavy) | F1 (heavy) |
+|---|---|---|---|---|
+| Size >= 50 MB (Week 6 "Large" badge) | 96.22% | 1.000 | 0.059 | 0.111 |
+| Size >= 1 MB | 97.24% | 0.593 | 1.000 | 0.745 |
+| **ML.NET FastTree** | **99.92%** | **1.000** | **0.980** | **0.990** |
+
+- AUC 1.000; 5-fold cross-validation accuracy 99.63% (±0.22%).
+- Only 4% of files are heavy, so **accuracy is misleading**: the 50 MB rule scores 96% while finding
+  only 6% of heavy files. F1 shows the real gap.
+- The model beats the size rule because it knows *what kind* of content it is looking at: big text
+  is light, compressed media just over 1 MB is heavy.
+
+**Testing**
+- Engine test console app (outside the repo), 22/22 checks passed:
+  - 4 MB JPEG → heavy; 150 KB JPEG → light; 30 MB MP4 → heavy; 400 KB Word file → light;
+  - 3 MB text log → light; 40 MB text log → heavy; 2 KB note → light;
+  - demo estimates (2.4 GB .svs → heavy; 482 KB .docx → light);
+  - thread-safety under 8 parallel callers;
+  - missing and corrupt model files → advisor off, no crash;
+  - end to end with the ViewModel and demo data: badges fill in, the inspector text is right,
+    deleted files get their own message, and badges don't flicker on reload.
+- **Performance problem found and fixed:**
+  - Predicting is about 1 ms per file, but the *first* time a file is opened Windows' antivirus
+    scans it: about 30–70 ms per file, so 500 new files took ~30 s. The first version classified
+    inside the scan, which would have frozen opening a big folder.
+  - Fixes:
+    1. Classification now runs **after** the scan, in batches of 25 on a background thread. Files
+       appear at once and badges fill in a moment later.
+    2. The engine **caches verdicts by path, size and last-modified time**, so the rescans after
+       every checkbox tick don't re-open files: 500 unchanged files in ~0.35 s instead of ~33 s.
+    3. Verdicts carry over across reloads, so badges don't flicker.
+    4. Loading ML.NET and the model takes about 4–8 s the first time, so the app now starts loading
+       it in the background at startup.
+- App and trainer build with 0 warnings and 0 errors.
+
+**Decisions**
+- FastTree (gradient-boosted trees) rather than logistic regression: "heavy" depends on
+  size *combined with* content type (big text is fine, big JPEG isn't), which trees capture
+  naturally.
+- Labels come from a real measurement (zlib size), not hand-labelling or a rule. That avoids a
+  circular "ML learns my own rule", and gives the model a meaning a user can check.
+- Training data is taken from system folders, not the developer's personal files: it is
+  reproducible, raises no privacy issue, and is still varied (291 extensions).
+- The Week 6 large-file *dialog* (≥ 50 MB) stays. The Heavy badge is information; a pop-up for
+  every heavy photo would be annoying. Week 9 turns the verdict into advice.
+- Confidence is shown capped at 99%: tree models output probabilities near 0/1, and "100% sure"
+  would overstate it to users.
+
+**Issues / notes**
+- Class diagram update for the report: `FileFeatures`, `FileFeatureExtractor`, `HeavyPrediction`
+  and `FileClassification`; `IIntelligentStorageEngine.IsModelLoaded` / `ClassifyFile`;
+  `FileAsset.Classification` (FileAsset is now observable).
+- Dataset limitation: system folders have few personal document types (photos from phones, theses,
+  datasets). Running the trainer with `--include` on a folder of typical student files would make
+  it more representative. The model's near-perfect score partly reflects how separable size plus
+  content type is.
+- New dependency: Microsoft.ML / Microsoft.ML.FastTree 4.0.2 (about 4-5 MB of DLLs in the app output).

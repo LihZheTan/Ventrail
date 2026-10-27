@@ -1,9 +1,12 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace Ventrail.Models;
 
 /// <summary>
 /// One changed file, as reported by a working-directory scan.
+/// Observable since Week 8: the storage advisor's verdict arrives a moment after the scan.
 /// </summary>
-public class FileAsset
+public partial class FileAsset : ObservableObject
 {
     public string FileName { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;      // path relative to the repo root (what Git uses)
@@ -42,11 +45,28 @@ public class FileAsset
         _ => "\uE7C3"                                                                                        // other
     };
 
-    public string DisplaySize => SizeInBytes switch
+    public string DisplaySize => FormatSize(SizeInBytes);
+
+    public static string FormatSize(long bytes) => bytes switch
     {
-        < 1024 => $"{SizeInBytes} B",
-        < 1024 * 1024 => $"{SizeInBytes / 1024.0:F1} KB",
-        < 1024L * 1024 * 1024 => $"{SizeInBytes / (1024.0 * 1024):F1} MB",
-        _ => $"{SizeInBytes / (1024.0 * 1024 * 1024):F2} GB"
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+        < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
+        _ => $"{bytes / (1024.0 * 1024 * 1024):F2} GB"
     };
+
+    // Week 8: the ML.NET storage advisor's verdict (null = not classified yet, a deleted file,
+    // or the model could not be loaded). Filled in after the scan, so the list updates live.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsHeavy), nameof(StorageBadge), nameof(HasStorageBadge), nameof(StorageBadgeTip))]
+    private FileClassification? _classification;
+
+    public bool IsHeavy => Classification?.IsHeavy == true;
+
+    // Badge in the staging list: the model's "Heavy" verdict, or the Week 6 size rule if the
+    // model isn't available.
+    public string? StorageBadge => IsHeavy ? "Heavy" : Classification is null && IsLarge ? "Large" : null;
+    public bool HasStorageBadge => StorageBadge is not null;
+    public string StorageBadgeTip => Classification?.Summary
+        ?? "Large file: every saved version keeps a full copy of it";
 }

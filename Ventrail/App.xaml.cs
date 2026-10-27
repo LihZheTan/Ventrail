@@ -24,7 +24,11 @@ public partial class App : Application
         bool demoMode = e.Args.Contains("--demo");
 
         IRepositoryManager repository = demoMode ? new MockRepositoryManager() : new RepositoryManager();
-        IIntelligentStorageEngine storageEngine = new IntelligentStorageEngine();   // stub until Weeks 8-9
+        IIntelligentStorageEngine storageEngine = new IntelligentStorageEngine();   // ML.NET advisor (Week 8)
+
+        // Week 8: loading ML.NET and the model takes a few seconds the first time, so start it in
+        // the background now. By the time a folder is opened the advisor is ready. Never throws.
+        _ = System.Threading.Tasks.Task.Run(() => storageEngine.IsModelLoaded);
         INetworkNodeCoordinator network = new NetworkNodeCoordinator();             // stub until Weeks 10-12
         ISpecializedFileHandler fileHandler = new SpecializedFileHandler();         // optional feature
         IRecentRepositoryStore recentStore = demoMode

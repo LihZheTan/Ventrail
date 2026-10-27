@@ -157,12 +157,12 @@
                                            Width="64" TextAlignment="Right"/>
                                 <TextBlock DockPanel.Dock="Right" Text="{Binding DisplaySize}" Style="{StaticResource SubtleText}"
                                            FontSize="12" VerticalAlignment="Center" Margin="12,0,12,0"/>
-                                <!-- Week 6: large file warning (each version keeps a full copy) -->
+                                <!-- Week 8: ML.NET "Heavy" verdict (Week 6 "Large" size rule if the model is unavailable) -->
                                 <Border DockPanel.Dock="Right" Style="{StaticResource Pill}" Padding="8,2" Margin="8,0,0,0"
                                         Background="{StaticResource ModifiedTintBrush}"
-                                        Visibility="{Binding IsLarge, Converter={StaticResource BoolToVis}}"
-                                        ToolTip="Large file: every saved version keeps a full copy of it">
-                                    <TextBlock Text="Large" FontSize="11" Foreground="{StaticResource ModifiedBrush}"/>
+                                        Visibility="{Binding HasStorageBadge, Converter={StaticResource BoolToVis}}"
+                                        ToolTip="{Binding StorageBadgeTip}">
+                                    <TextBlock Text="{Binding StorageBadge}" FontSize="11" Foreground="{StaticResource ModifiedBrush}"/>
                                 </Border>
                                 <StackPanel VerticalAlignment="Center">
                                     <TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis"/>

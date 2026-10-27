@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="Ventrail/Ventrail.csproj" />
+  <Project Path="Ventrail.ModelTrainer/Ventrail.ModelTrainer.csproj" />
 </Solution>

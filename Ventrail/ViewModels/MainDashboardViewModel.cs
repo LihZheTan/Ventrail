@@ -184,19 +184,25 @@ public partial class MainDashboardViewModel : ObservableObject
         }
     }
 
-    /// <summary>Class diagram: CheckFileRecommendation(String filePath). Real AI arrives in Weeks 8-9.</summary>
+    /// <summary>
+    /// Class diagram: CheckFileRecommendation(String filePath).
+    /// Week 8: shows the ML.NET heavy/light verdict (worked out in the background after each scan).
+    /// Week 9 adds storage advice and commit message suggestions.
+    /// </summary>
     public void CheckFileRecommendation(string filePath)
     {
         var file = Changes.FirstOrDefault(f => f.FilePath == filePath);
-        try
-        {
-            string type = _ai.AnalyzeFileFormat(filePath);
-            RecommendationText = _ai.GenerateRecommendation(type, file?.SizeInBytes ?? 0);
-        }
-        catch (NotImplementedException)
-        {
-            RecommendationText = "AI suggestions will appear here once the ML.NET engine is added (Weeks 8-9).";
-        }
+        if (file is null) return;
+
+        if (file.TrackStatus == "Deleted")
+            RecommendationText = "This file was deleted. Saving this change adds nothing to the history.";
+        else if (file.Classification is { } verdict)
+            RecommendationText = verdict.Summary;
+        else if (_advisorAvailable == false)
+            RecommendationText = "The storage advisor isn't available (its model file could not be loaded), " +
+                                 "so Ventrail only flags files over 50 MB.";
+        else
+            RecommendationText = "Checking this file...";
     }
 
     // ---------- commands (buttons) ----------
@@ -293,7 +299,8 @@ public partial class MainDashboardViewModel : ObservableObject
             for (int i = 0; i < staged.Count; i++)
             {
                 var file = staged[i];
-                CommitProgressText = $"Checking {file.FileName} ({i + 1} of {staged.Count})...";
+                string verdict = file.Classification is { } c ? $": {c.Label.ToLowerInvariant()} file" : string.Empty;
+                CommitProgressText = $"Checking {file.FileName} ({i + 1} of {staged.Count}){verdict}...";
                 CommitProgress = 80.0 * i / staged.Count;
                 await Background(() =>
                 {
@@ -442,6 +449,7 @@ public partial class MainDashboardViewModel : ObservableObject
 
     private async Task ReloadAsync()
     {
+        string root = CurrentDirectory;
         var (files, history, branch) = await Background(() =>
             (_repo.ScanWorkingDirectory(), _repo.GetCommitHistory(), _repo.GetCurrentBranchName()));
 
@@ -449,6 +457,12 @@ public partial class MainDashboardViewModel : ObservableObject
         string? selectedPath = SelectedFile?.FilePath;
         string? selectedHash = SelectedCommit?.Hash;
         string? selectedCommitFile = SelectedCommitFile?.FilePath;
+
+        // Week 8: keep the advisor's verdicts for files that didn't change, so badges don't flicker.
+        var previous = Changes.GroupBy(c => c.FilePath).ToDictionary(g => g.Key, g => g.First());
+        foreach (var f in files)
+            if (previous.TryGetValue(f.FilePath, out var old) && old.SizeInBytes == f.SizeInBytes)
+                f.Classification = old.Classification;
 
         Changes.Clear();
         foreach (var f in files) Changes.Add(f);
@@ -472,6 +486,46 @@ public partial class MainDashboardViewModel : ObservableObject
         OnPropertyChanged(nameof(HasHistory));
         OnPropertyChanged(nameof(LatestVersionHash));
         if (!IsBusy) StatusText = $"{Changes.Count} changed file(s), {StagedCount} staged.";
+
+        _ = ClassifyChangesAsync(files, root);
+    }
+
+    // ---------- Week 8: storage advisor ----------
+
+    private int _classifyRun;
+    private bool? _advisorAvailable;   // null = not known yet
+
+    // Runs after every scan without blocking the UI: files show up at once and their Heavy/Light
+    // verdicts fill in batch by batch. Opening a file for the first time can be slow (Windows'
+    // antivirus checks it), but the engine caches verdicts for unchanged files, so rescans are quick.
+    private async Task ClassifyChangesAsync(List<FileAsset> files, string root)
+    {
+        int run = ++_classifyRun;   // a newer scan makes this pass stop
+        try
+        {
+            _advisorAvailable = await Background(() => _ai.IsModelLoaded);
+            if (_advisorAvailable != true) return;
+
+            foreach (var batch in files.Where(f => f.TrackStatus != "Deleted").Take(2000).Chunk(25))
+            {
+                if (run != _classifyRun) return;
+                var verdicts = await Background(() => batch.Select(f => SafeClassify(f, root)).ToArray());
+                for (int i = 0; i < batch.Length; i++) batch[i].Classification = verdicts[i];
+
+                if (SelectedFile is { } selected && batch.Contains(selected))
+                    CheckFileRecommendation(selected.FilePath);
+            }
+        }
+        catch (Exception)
+        {
+            // The advisor is a helper: it must never break scanning, staging or saving.
+        }
+    }
+
+    private FileClassification? SafeClassify(FileAsset file, string root)
+    {
+        try { return _ai.ClassifyFile(Path.Combine(root, file.FilePath), file.SizeInBytes); }
+        catch (Exception) { return null; }
     }
 
     private void LoadRecentRepositories()
