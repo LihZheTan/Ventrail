@@ -75,7 +75,7 @@ public partial class MainDashboardViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRepo), nameof(RepoName))]
     [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(StageAllCommand),
-                                nameof(CommitCommand), nameof(ShareRepositoryCommand))]
+                                nameof(CommitCommand), nameof(ShareRepositoryCommand), nameof(AcceptSuggestionCommand))]
     private string _currentDirectory = string.Empty;
 
     [ObservableProperty] private string _branchName = string.Empty;
@@ -88,9 +88,27 @@ public partial class MainDashboardViewModel : ObservableObject
     [ObservableProperty] private string _statusText = "Select a folder to start tracking.";
     [ObservableProperty] private string _recommendationText = "Select a changed file to see suggestions.";
 
+    // Week 9: storage + sharing tip under the verdict in the File Inspector.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRecommendationTip))]
+    private string _recommendationTip = string.Empty;
+    public bool HasRecommendationTip => !string.IsNullOrEmpty(RecommendationTip);
+
+    // Week 9: the AI suggestion card above the commit box (null when nothing is ticked).
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSuggestionVisible))]
+    private CommitSuggestion? _suggestion;
+
+    // "Accept" or "Edit Manually" hides the card until the ticked files change.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSuggestionVisible))]
+    private bool _isSuggestionDismissed;
+
+    public bool IsSuggestionVisible => Suggestion is not null && !IsSuggestionDismissed;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(StageAllCommand),
-                                nameof(CommitCommand), nameof(ShareRepositoryCommand))]
+                                nameof(CommitCommand), nameof(ShareRepositoryCommand), nameof(AcceptSuggestionCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -187,12 +205,15 @@ public partial class MainDashboardViewModel : ObservableObject
     /// <summary>
     /// Class diagram: CheckFileRecommendation(String filePath).
     /// Week 8: shows the ML.NET heavy/light verdict (worked out in the background after each scan).
-    /// Week 9 adds storage advice and commit message suggestions.
+    /// Week 9: adds a tip on when to save the file and how it is sent in blocks when shared.
     /// </summary>
     public void CheckFileRecommendation(string filePath)
     {
         var file = Changes.FirstOrDefault(f => f.FilePath == filePath);
         if (file is null) return;
+
+        try { RecommendationTip = _ai.GetStorageTip(file); }
+        catch (Exception) { RecommendationTip = string.Empty; }   // the advisor must never break the inspector
 
         if (file.TrackStatus == "Deleted")
             RecommendationText = "This file was deleted. Saving this change adds nothing to the history.";
@@ -445,6 +466,47 @@ public partial class MainDashboardViewModel : ObservableObject
     [RelayCommand]
     private void CloseDiff() => IsDiffOpen = false;
 
+    // Week 9: "Accept AI Suggestions" uses the suggested message and unticks the files the
+    // advisor suggests leaving out (very large heavy files), as long as something stays ticked.
+    [RelayCommand(CanExecute = nameof(CanUseRepo))]
+    private Task AcceptSuggestionAsync() => RunBusyAsync("Applying AI suggestions...", async () =>
+    {
+        if (Suggestion is not { } suggestion) return;
+
+        var staged = Changes.Where(f => f.IsStaged).ToList();
+        var leaveOut = staged.Where(f => suggestion.LeaveOutPaths.Contains(f.FilePath)).ToList();
+        if (leaveOut.Count == staged.Count) leaveOut.Clear();   // never untick everything
+
+        foreach (var file in leaveOut)
+        {
+            string path = file.FilePath;
+            await Background(() => _repo.Unstage(path));
+        }
+        if (leaveOut.Count > 0) await ReloadAsync();   // rebuilds the suggestion for the files still ticked
+
+        CommitMessage = (Suggestion ?? suggestion).Message;
+        IsSuggestionDismissed = true;
+
+        string unticked = leaveOut.Count switch
+        {
+            0 => string.Empty,
+            1 => $" and unticked {leaveOut[0].FileName}",
+            _ => $" and unticked {leaveOut.Count} large files"
+        };
+        LogActivity($"AI suggestion accepted: \"{suggestion.Message}\"{unticked}");
+        ShowToast($"Message filled in{unticked}. Check it, then commit.", ToastKind.Success, 4);
+    });
+
+    // Week 9: "Edit Manually" puts the suggestion in the box as a starting point (only if the box
+    // is empty) and leaves the ticked files alone. The view moves the keyboard focus to the box.
+    [RelayCommand]
+    private void EditSuggestionManually()
+    {
+        if (Suggestion is { } suggestion && string.IsNullOrWhiteSpace(CommitMessage))
+            CommitMessage = suggestion.Message;
+        IsSuggestionDismissed = true;
+    }
+
     // ---------- helpers ----------
 
     private async Task ReloadAsync()
@@ -487,7 +549,28 @@ public partial class MainDashboardViewModel : ObservableObject
         OnPropertyChanged(nameof(LatestVersionHash));
         if (!IsBusy) StatusText = $"{Changes.Count} changed file(s), {StagedCount} staged.";
 
+        UpdateSuggestion();
         _ = ClassifyChangesAsync(files, root);
+    }
+
+    // ---------- Week 9: AI suggestions ----------
+
+    private string _suggestionKey = string.Empty;
+
+    // Rebuilt after every scan and whenever new verdicts arrive (the advice depends on them).
+    // A dismissed card comes back only when the set of ticked files changes.
+    private void UpdateSuggestion()
+    {
+        var staged = Changes.Where(c => c.IsStaged).ToList();
+        string key = string.Join("|", staged.Select(f => $"{f.FilePath}:{f.TrackStatus}:{f.SizeInBytes}"));
+        if (key != _suggestionKey)
+        {
+            _suggestionKey = key;
+            IsSuggestionDismissed = false;
+        }
+
+        try { Suggestion = staged.Count == 0 ? null : _ai.SuggestCommit(staged); }
+        catch (Exception) { Suggestion = null; }
     }
 
     // ---------- Week 8: storage advisor ----------
@@ -514,6 +597,7 @@ public partial class MainDashboardViewModel : ObservableObject
 
                 if (SelectedFile is { } selected && batch.Contains(selected))
                     CheckFileRecommendation(selected.FilePath);
+                if (batch.Any(f => f.IsStaged)) UpdateSuggestion();
             }
         }
         catch (Exception)

@@ -455,3 +455,88 @@
   it more representative. The model's near-perfect score partly reflects how separable size plus
   content type is.
 - New dependency: Microsoft.ML / Microsoft.ML.FastTree 4.0.2 (about 4-5 MB of DLLs in the app output).
+
+## Week 9 – AI suggestions in the UI (commit messages, storage and chunking advice)
+
+**What was done**
+- **AI suggestion card above the commit box** (proposal mockup):
+  - It appears as soon as files are ticked and shows:
+    - a **suggested commit message**;
+    - a one-line summary (e.g. *"2 heavy files in this version. Leaving 1 file out would keep about
+      2.24 GB out of the history."*);
+    - one line of advice per heavy file. A very large file gets a red warning icon.
+  - **Accept AI Suggestions** fills in the message and unticks the files the advisor suggests
+    leaving out (heavy and ≥ 50 MB). It never unticks the last ticked file, and the message is
+    rewritten for the files that are still ticked.
+  - **Edit Manually** uses the suggestion as a starting draft only if the box is empty (it never
+    overwrites what the user typed). It moves the cursor into the box and leaves the ticked files
+    alone.
+  - Either button hides the card until the set of ticked files changes.
+- **Commit message writer** (`Services/AI/SuggestionWriter.cs`), rule-based and offline:
+  - It groups files by change: *Update* (modified), *Add*, *Remove* (deleted), *Rename*.
+  - It names files where that reads well (*"Update Chapter3.docx"*, *"Update a.docx and b.xlsx"*).
+    It counts them when they're the same kind (*"Add 3 pictures"*), and adds the folder when all
+    files share one (*"... in figures"*).
+  - It tries three levels of detail and keeps the first that fits in **72 characters** (Git's
+    first-line convention). Example for the demo: *"Update 3 files, add 2 pictures and remove
+    old_ideas.txt"*.
+- **Storage and chunking tip in the File Inspector**, under the Week 8 verdict:
+  - heavy files: save at milestones rather than after every small edit;
+  - very large files: ask whether the file needs a history at all;
+  - **chunking**: *"When you share this folder, it is sent in 2,289 blocks of 1 MB, each checked
+    against its fingerprint (hash)..."*. The block size (`SuggestionWriter.ShareBlockBytes`, 1 MB)
+    is the constant Week 12's block streaming will use;
+  - light files: a short note that saving often costs almost nothing.
+- **`GenerateRecommendation(fileType, fileSize)` is implemented** (it was `NotImplementedException`).
+  It estimates from the extension and size with the Week 8 model, and accepts `"report.docx"`,
+  `".docx"` or `"docx"`. New contract methods:
+  - `GetStorageTip(FileAsset)`, which never loads the model, so it is safe on the UI thread;
+  - `SuggestCommit(stagedFiles)`.
+- The suggestion is rebuilt after every scan and whenever new verdicts arrive. The advice depends
+  on them, and they fill in a moment after the scan.
+
+**Testing**
+- Headless test console app (outside the repo), 39/39 checks passed:
+  - commit messages: single file per verb, same kind counted plus folder, mixed files named,
+    "biggest + N other files", demo set, 40 files still ≤ 72 characters, an over-long file name
+    falling back to counts;
+  - advice: only heavy files (or large ones with no verdict), none for deleted files, warnings
+    first, leave-out list, summary text;
+  - block count rounding (0 B, 1 B, exactly 1 MB, 1 MB + 1 → 1, 1, 1, 2);
+  - `GenerateRecommendation` with and without a model file;
+  - end to end with the ViewModel and demo data:
+    - no card while nothing is ticked;
+    - the card appears after Stage All;
+    - Edit Manually fills an empty box but keeps a typed message;
+    - the card comes back when the ticked files change;
+    - Accept unticks the 2.4 GB slide and writes a message without it;
+    - the version is saved with the AI message;
+    - Accept never unticks the only ticked file.
+- Visual check in the demo app: the inspector tip shows correctly. The card's buttons weren't
+  clicked through, because Windows focus switching interrupted the automated clicks.
+- Builds with 0 warnings and 0 errors.
+
+**Decisions**
+- **Templates rather than a language model** for commit messages:
+  - everything stays offline and small (no multi-GB model);
+  - the same files always give the same message, which is easy to test and explain;
+  - the message stays honest: it only describes what Ventrail actually knows (file names, change
+    type, kind of file).
+  - The ML part is the Week 8 classifier that drives the advice.
+- "Accept" applies the advice (unticking very large files) because that is what accepting a
+  suggestion means. It never deletes, ignores or moves files: unticked files stay in the folder and
+  can be ticked again. The Week 6 large-file dialog still guards the save.
+- The card hides after a choice instead of nagging, and comes back only when the ticked files
+  change.
+
+**Issues / notes**
+- Class diagram update for the report:
+  - `CommitSuggestion` and `StorageAdvice`;
+  - `SuggestionWriter`;
+  - `IIntelligentStorageEngine.GetStorageTip` and `SuggestCommit`;
+  - ViewModel `Suggestion`, `AcceptSuggestionCommand`, `EditSuggestionManuallyCommand` and
+    `RecommendationTip`.
+- Renamed files only know their new path, so the message says "Rename new_name.docx", not
+  "old → new".
+- "Edit Manually" uses a few lines of code-behind (`StagingView.xaml.cs`) to move keyboard focus,
+  which is a view-only concern; all logic stays in the ViewModel.

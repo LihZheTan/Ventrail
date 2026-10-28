@@ -94,6 +94,59 @@
 
             <!-- Commit box (bottom) -->
             <StackPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
+                <!-- Week 9: AI suggestion for the ticked files (proposal mockup: Accept / Edit Manually) -->
+                <Border Style="{StaticResource GlowCard}" Padding="14,12" Margin="0,0,0,12"
+                        Visibility="{Binding IsSuggestionVisible, Converter={StaticResource BoolToVis}}">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Margin="14,0,0,0">
+                            <Button Content="Accept AI Suggestions" Style="{StaticResource AccentButton}" Padding="12,6"
+                                    Command="{Binding AcceptSuggestionCommand}"
+                                    ToolTip="Use this message, and untick any very large file the advisor suggests leaving out"/>
+                            <Button Content="Edit Manually" Style="{StaticResource OutlineButton}" Padding="12,6" Margin="0,8,0,0"
+                                    Command="{Binding EditSuggestionManuallyCommand}" Click="EditManually_Click"
+                                    ToolTip="Write your own message (the suggestion is a starting point if the box is empty)"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE946;" Foreground="{StaticResource AccentBrush}"
+                                           Margin="0,0,8,0"/>
+                                <TextBlock Text="AI suggestion for this version" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            <TextBlock TextWrapping="Wrap" FontSize="14">
+                                <Run Text="“"/><Run Text="{Binding Suggestion.Message, Mode=OneWay}"/><Run Text="”"/>
+                            </TextBlock>
+                            <TextBlock Text="{Binding Suggestion.Summary}" Style="{StaticResource SubtleText}"
+                                       FontSize="12" Margin="0,6,0,0"/>
+                            <ScrollViewer MaxHeight="72" VerticalScrollBarVisibility="Auto" Margin="0,4,0,0"
+                                          Visibility="{Binding Suggestion.HasAdvice, Converter={StaticResource BoolToVis}}">
+                                <ItemsControl ItemsSource="{Binding Suggestion.Advice}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,2,0,0" ToolTip="{Binding FilePath}">
+                                                <TextBlock VerticalAlignment="Top" Margin="0,2,8,0" FontSize="11">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                                            <Setter Property="Text" Value="&#xE946;"/>
+                                                            <Setter Property="Foreground" Value="{StaticResource ModifiedBrush}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsWarning}" Value="True">
+                                                                    <Setter Property="Text" Value="&#xE7BA;"/>
+                                                                    <Setter Property="Foreground" Value="{StaticResource DeletedBrush}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding Text}" Style="{StaticResource SubtleText}" FontSize="12"/>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
                 <Grid>
                     <TextBox x:Name="CommitBox" Text="{Binding CommitMessage, UpdateSourceTrigger=PropertyChanged}"
                              Height="64" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto">
@@ -260,6 +313,10 @@
                                        VerticalAlignment="Top" Margin="0,2,8,0"/>
                             <TextBlock Text="{Binding RecommendationText}" Style="{StaticResource SubtleText}"/>
                         </DockPanel>
+                        <!-- Week 9: when to save this file, and how it is sent in blocks when shared -->
+                        <TextBlock Text="{Binding RecommendationTip}" Style="{StaticResource SubtleText}" FontSize="12"
+                                   Margin="22,8,0,0"
+                                   Visibility="{Binding HasRecommendationTip, Converter={StaticResource BoolToVis}}"/>
                     </StackPanel>
                 </Border>
             </StackPanel>

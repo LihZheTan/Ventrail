@@ -17,7 +17,8 @@ namespace Ventrail.Services.Implementations;
 /// Ventrail.ModelTrainer (shipped as MLModels/ventrail_classifier.zip). Everything runs on the
 /// user's PC: no file content ever leaves the machine. Only the size and first 4 KB of each
 /// file are read, so it is fast even for multi-gigabyte files.
-/// Week 9 adds the recommendations (GenerateRecommendation).
+/// Week 9: turns the verdicts into advice (commit message, storage and sharing tips) through
+/// SuggestionWriter.
 /// </summary>
 public class IntelligentStorageEngine : IIntelligentStorageEngine
 {
@@ -62,8 +63,20 @@ public class IntelligentStorageEngine : IIntelligentStorageEngine
         return FormatName(signature, ext);
     }
 
-    public string GenerateRecommendation(string fileType, long fileSize) =>
-        throw new NotImplementedException("Planned for Week 9: commit message and storage recommendations.");
+    // Week 9: advice for a kind of file without opening it (extension + size estimate).
+    public string GenerateRecommendation(string fileType, long fileSize)
+    {
+        string ext = Path.GetExtension(fileType);
+        if (ext.Length == 0) ext = "." + fileType.TrimStart('.');
+        if (!IsModelLoaded) return SuggestionWriter.StorageTip(null, fileSize);
+        var verdict = Predict(FileFeatureExtractor.Estimate(ext, fileSize), ext, fileSize, estimate: true);
+        return SuggestionWriter.StorageTip(verdict, fileSize);
+    }
+
+    public string GetStorageTip(FileAsset file) =>
+        file.TrackStatus == "Deleted" ? string.Empty : SuggestionWriter.StorageTip(file.Classification, file.SizeInBytes);
+
+    public CommitSuggestion SuggestCommit(IReadOnlyList<FileAsset> stagedFiles) => SuggestionWriter.Suggest(stagedFiles);
 
     public FileClassification? ClassifyFile(string fullPath, long sizeInBytes)
     {
@@ -101,10 +114,18 @@ public class IntelligentStorageEngine : IIntelligentStorageEngine
             estimate = true;
         }
 
+        var result = Predict(features, ext, sizeInBytes, estimate);
+        if (!estimate && info != null)
+            _cache[fullPath] = (info.Length, info.LastWriteTimeUtc, result);
+        return result;
+    }
+
+    private FileClassification Predict(FileFeatures features, string ext, long sizeInBytes, bool estimate)
+    {
         HeavyPrediction prediction;
         lock (_gate) prediction = _predictor!.Predict(features);
 
-        var result = new FileClassification
+        return new FileClassification
         {
             IsHeavy = prediction.IsHeavy,
             Probability = prediction.Probability,
@@ -113,9 +134,6 @@ public class IntelligentStorageEngine : IIntelligentStorageEngine
             IsEstimate = estimate,
             SizeInBytes = sizeInBytes
         };
-        if (!estimate && info != null)
-            _cache[fullPath] = (info.Length, info.LastWriteTimeUtc, result);
-        return result;
     }
 
     private readonly ConcurrentDictionary<string, (long Size, DateTime Modified, FileClassification Result)> _cache =
