@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Ventrail.Models;
+using Ventrail.Services.Implementations.Dht;
 
 namespace Ventrail.ViewModels;
 
@@ -22,7 +25,7 @@ public partial class MainDashboardViewModel
 
     // Bound two-way to the "Enable P2P Sharing" switch and drives the Online/Offline pill.
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(NetworkStateText))]
+    [NotifyPropertyChangedFor(nameof(NetworkStateText), nameof(PeersSummary))]
     private bool _isSharingEnabled;
 
     public PortCheck? TcpCheck => Firewall?.Ports.FirstOrDefault(p => p.Protocol == "TCP");
@@ -57,25 +60,156 @@ public partial class MainDashboardViewModel
         }
     }
 
-    // Class diagram: ShareRepository(String peerId). Week 10 makes the firewall part real.
+    // ---------- Week 11: peer discovery ----------
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PeersSummary))]
+    private bool _isSearchingPeers;
+
+    // "Add by address" box, for networks that block broadcasts.
+    [ObservableProperty] private string _peerAddress = string.Empty;
+
+    // Peers that announced a copy of the open repository (DHT provider records).
+    private readonly HashSet<string> _providerIds = new();
+    private SynchronizationContext? _uiContext;
+
+    public string LocalDisplayName => _network.DisplayName;
+
+    public string PeersSummary =>
+        IsSearchingPeers ? "Searching your network..."
+        : !IsSharingEnabled ? "Turn on P2P sharing to find other computers running Ventrail on your network."
+        : ActivePeers.Count == 0 ? "No other computers found yet. Make sure Ventrail is open with sharing on there, " +
+                                   "and that both computers are on the same network."
+        : $"{ActivePeers.Count} computer(s) found on your network.";
+
+    // Called from the constructor: other computers can find this one at any time, so the list also
+    // updates when a peer appears on its own (the event comes from a background thread).
+    private void HookNetworkEvents()
+    {
+        _uiContext = SynchronizationContext.Current;
+        _network.PeersChanged += (_, _) =>
+        {
+            if (_uiContext is null) RefreshPeerList();
+            else _uiContext.Post(_ => RefreshPeerList(), null);
+        };
+    }
+
+    private void RefreshPeerList()
+    {
+        ActivePeers.Clear();
+        if (IsSharingEnabled)
+            foreach (var p in _network.GetKnownPeers())
+            {
+                p.HasCurrentRepository = _providerIds.Contains(p.PeerId);
+                ActivePeers.Add(p);
+            }
+        OnPropertyChanged(nameof(HasPeers));
+        OnPropertyChanged(nameof(PeersSummary));
+    }
+
+    // Off: the list empties. On: it shows the peers still in the routing table.
+    partial void OnIsSharingEnabledChanged(bool value) => RefreshPeerList();
+
+    // A different repository: who has a copy must be looked up again.
+    partial void OnCurrentDirectoryChanged(string value)
+    {
+        _providerIds.Clear();
+        RefreshPeerList();
+    }
+
+    // The DHT key for the open repository (a hash of its first version), or null before the first save.
+    private string? CurrentRepositoryKey()
+    {
+        var root = History.LastOrDefault(c => c.ParentHashes.Count == 0);
+        return root is null ? null : DhtKey.ForRepository(root.Hash);
+    }
+
+    private async Task SearchPeersAsync()
+    {
+        IsSearchingPeers = true;
+        try
+        {
+            var peers = await Background(_network.DiscoverPeers);
+            RefreshPeerList();
+            LogActivity($"Peer discovery found {peers.Count} computer(s)");
+        }
+        finally
+        {
+            IsSearchingPeers = false;
+        }
+    }
+
+    [RelayCommand]
+    private Task FindPeersAsync() => RunBusyAsync("Searching for other computers...", async () =>
+    {
+        if (!await EnsureSharingReadyAsync()) return;
+        await SearchPeersAsync();
+        StatusText = PeersSummary;
+    });
+
+    [RelayCommand]
+    private Task AddPeerByAddressAsync() => RunBusyAsync("Contacting that computer...", async () =>
+    {
+        string address = PeerAddress.Trim();
+        if (address.Length == 0)
+        {
+            ShowToast("Type the other computer's IP address or name first.");
+            return;
+        }
+        if (!await EnsureSharingReadyAsync()) return;
+        var peer = await Background(() => _network.AddPeerByAddress(address));
+        if (peer is null)
+        {
+            ShowToast($"No Ventrail answered at {address}. Check that it is open with sharing on.", ToastKind.Error);
+            StatusText = $"No answer from {address}.";
+            return;
+        }
+        PeerAddress = string.Empty;
+        RefreshPeerList();
+        LogActivity($"Added peer {peer.Title} ({peer.IPAddress}) by address");
+        ShowToast($"Found {peer.Title}.", ToastKind.Success);
+        StatusText = PeersSummary;
+    });
+
+    // The Connect button: checks that the computer really answers as that peer (TCP hello).
+    [RelayCommand]
+    private Task ConnectPeerAsync(PeerNode? peer) => peer is null ? Task.CompletedTask
+        : RunBusyAsync($"Connecting to {peer.Title}...", async () =>
+        {
+            await Background(() => _network.EstablishConnection(peer.PeerId));
+            RefreshPeerList();
+            LogActivity($"Connected to {peer.Title} ({peer.IPAddress})");
+            ShowToast($"Connected to {peer.Title}.", ToastKind.Success);
+            StatusText = $"Connected to {peer.Title}. Sending versions arrives in Week 12.";
+        });
+
+    // Class diagram: ShareRepository(String peerId). Week 10 made the firewall part real; Week 11
+    // announces the repository in the DHT and finds who else already has a copy.
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
     private Task ShareRepositoryAsync() => RunBusyAsync("Checking network permissions...", async () =>
     {
         if (!await EnsureSharingReadyAsync()) return;
-        try
+        string? key = CurrentRepositoryKey();
+        if (key is null)
         {
-            var peers = await Background(_network.DiscoverPeers);
-            ActivePeers.Clear();
-            foreach (var p in peers) ActivePeers.Add(p);
-            OnPropertyChanged(nameof(HasPeers));
-            StatusText = $"Found {ActivePeers.Count} peer(s).";
-            LogActivity($"Peer discovery found {ActivePeers.Count} peer(s)");
+            ShowToast("Save a first version before sharing this repository.");
+            StatusText = "Nothing to share yet: save a first version.";
+            return;
         }
-        catch (NotImplementedException)
-        {
-            StatusText = "Ventrail is online. Finding other computers arrives in Week 11.";
-            ShowToast("Sharing is on. Finding other computers arrives in Week 11.", ToastKind.Success);
-        }
+
+        StatusText = $"Announcing {RepoName} on your network...";
+        await Background(() => _network.ProvideRepository(key));
+        await SearchPeersAsync();
+        var providers = await Background(() => _network.FindProviders(key));
+        _providerIds.Clear();
+        foreach (var p in providers) _providerIds.Add(p.PeerId);
+        RefreshPeerList();
+
+        LogActivity($"Shared {RepoName} on the network (key {key}); {providers.Count} other computer(s) have a copy");
+        StatusText = providers.Count == 0
+            ? $"{RepoName} is shared. {PeersSummary}"
+            : $"{RepoName} is shared. {providers.Count} computer(s) already have a copy.";
+        ShowToast($"{RepoName} is now offered to computers on your network.", ToastKind.Success);
     });
 
     // The "Enable P2P Sharing" switch (its IsChecked has already flipped through the binding).
@@ -91,8 +225,10 @@ public partial class MainDashboardViewModel
         }
         return RunBusyAsync("Checking network permissions...", async () =>
         {
-            if (await EnsureSharingReadyAsync())
-                ShowToast("Sharing is on. Other computers on your network can now reach Ventrail.", ToastKind.Success);
+            if (!await EnsureSharingReadyAsync()) return;
+            ShowToast("Sharing is on. Other computers on your network can now reach Ventrail.", ToastKind.Success);
+            await SearchPeersAsync();
+            StatusText = PeersSummary;
         });
     }
 

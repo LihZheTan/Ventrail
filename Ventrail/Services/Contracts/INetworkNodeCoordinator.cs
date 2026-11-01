@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Ventrail.Models;
 
 namespace Ventrail.Services.Contracts;
@@ -25,7 +26,17 @@ public interface INetworkNodeCoordinator
     bool StartListening();
     void StopListening();
 
-    List<PeerNode> DiscoverPeers();
+    // Week 11: peer discovery (LAN broadcast + Kademlia DHT). All need listening to be on.
+    // Raised (on a background thread) when a peer appears, disappears or connects.
+    event EventHandler? PeersChanged;
+    string DisplayName { get; }                     // this computer's name as other peers see it
+    List<PeerNode> GetKnownPeers();                 // routing table snapshot, most recently seen first
+    List<PeerNode> DiscoverPeers();                 // broadcast + DHT lookup, then GetKnownPeers()
+    PeerNode? AddPeerByAddress(string address);     // for networks that block broadcasts
+    void ProvideRepository(string repositoryKey);   // "this computer has a copy" (DhtKey.ForRepository)
+    List<PeerNode> FindProviders(string repositoryKey);
+
+    // Week 11: TCP hello check (the peer id must match). Week 12 streams blocks over it.
     bool EstablishConnection(string targetPeerId);
     bool TransferData(string peerId, string dataHash);
 }

@@ -661,3 +661,87 @@
   - `INetworkNodeCoordinator.CheckFirewall`, `RequestFirewallPermission`,
     `RemoveFirewallPermission`, `IsListening`, `StopListening` and `DiscoveryPort`;
   - `MockNetworkNodeCoordinator`.
+
+## Week 11 — Peer discovery (LAN broadcast + Kademlia DHT)
+
+**Goal:** find other computers running Ventrail, show them on the Peer-to-Peer page, and know which
+of them already have a copy of the open repository (proposal: libp2p/IPFS and DHT peer discovery).
+
+**What was built**
+- **Two-step discovery, the same way libp2p works on a local network:**
+  1. **LAN broadcast** on UDP 4002 ("is any Ventrail here?"), like libp2p's mDNS. Sent to
+     255.255.255.255 *and* each network's own broadcast address, because Windows only sends the
+     first one out of one adapter.
+  2. **Kademlia DHT lookup**: Ventrail asks the peers it found "who do you know near this id?", then
+     asks the closer peers they name, until nobody closer turns up. Peers that missed the broadcast
+     (e.g. Wi-Fi that drops broadcasts) are still found through someone else.
+- **Routing table** (`KademliaRoutingTable`): 48 k-buckets (K = 8) by XOR distance between ids.
+  Peer ids (`vt-` + 12 hex) and repository keys (`rp-` + 12 hex) share the same 48-bit space.
+  A full bucket keeps its long-lived peers and only replaces one that's been silent for 15 min.
+  Peers that stop answering are dropped during lookups.
+- **Provider records** (IPFS "content routing"): "Share via P2P" announces the repository to the
+  K peers closest to its key; any peer can then ask "who has this repository?".
+  - The key is a SHA-256 of the repository's **first version**, so every copy of the same
+    repository gets the same key, and the key reveals nothing about folder or file names.
+  - Records expire after 30 min and are re-announced on each search.
+- **Messages** (`DiscoveryMessage`): one line of plain text per UDP packet, each starting with the
+  sender's id, ports and computer name, so the receiver learns the sender (as Kademlia does).
+  `VENTRAIL?`/`!`, `-FIND`/`-PEERS`, `-PROVIDE`, `-GETPROV`/`-PROVIDERS`. Week 10's bare
+  `VENTRAIL?` still works.
+- **Connect** (`EstablishConnection`): opens TCP 4001 and checks the hello line carries the peer id
+  discovery promised. A different computer now using that address is noticed and dropped.
+  Week 12 will keep this connection open and stream blocks over it.
+- **Add by address**: type an IP or computer name when a computer doesn't show up.
+- **Network page:**
+  - "Find peers" button and a live summary line;
+  - each peer shows its computer name, IP and peer id, a green **"Has a copy"** badge, and a
+    working Connect button;
+  - the list also updates on its own when another computer finds this one (`PeersChanged` event).
+  - Switching sharing on searches automatically; switching it off empties the list.
+- **Demo mode:** finds two made-up computers (LAB-PC-02 has a copy); Connect and Add work.
+
+**Testing** (headless console app, `%LOCALAPPDATA%\Temp\vw11`, **67/67 pass**)
+- Keys and XOR distance, bucket index, repository key.
+- Routing table rules, checked against a brute-force sort of 300 random ids.
+- Provider expiry and cap, plus message/entry parsing including malformed, oversized and
+  non-UTF-8 packets.
+- Three real nodes on loopback where A's "broadcast" only reaches B:
+  - **A still finds C through the DHT**;
+  - B learns C passively, and discovery took about 1.5 s;
+  - C finds that A has the repository;
+  - connect works, an impostor at A's old address is caught, and a peer that went offline is
+    dropped.
+- A **lying fake peer** that lists an internet address (8.8.8.8) and a dead local one: neither ends
+  up in the table.
+- The ViewModel flow with the demo node.
+- Week 10's 54 checks still pass. Two expectations were updated on purpose: the discovery answer
+  now has extra fields after the old ones, and Share now really finds peers.
+- Visual check in demo mode: Allow, then peers listed with the "Has a copy" badge, then Connect
+  shows "Connected".
+  - Some test clicks went to the Claude app window sitting on top of Ventrail (invisible in
+    screenshots). That also explains the Week 9 click problems; it's not a Ventrail bug.
+
+**Decisions**
+- **Own small Kademlia instead of a libp2p library.** The .NET libp2p ports were still previews,
+  and joining the public IPFS DHT would announce this computer on the internet. That contradicts
+  the "same network only" firewall rule and the privacy goal. The design follows Kademlia
+  (k-buckets, XOR distance, iterative lookup, alpha = 3, provider records), so the report can
+  explain it in the same terms.
+- **Everything stays on the local network:**
+  - packets from, and peer addresses pointing to, anything outside this PC's subnets are ignored
+    (the same rule as the firewall's `localsubnet`);
+  - peers learnt second-hand only enter the table after they answer directly.
+- Announcing a repository only happens when the user clicks **Share via P2P**, never automatically.
+- Timeouts are fixed for now (broadcast 1.5 s, query 0.8 s × 2 tries, connect 3 s). Week 13 makes
+  them adaptive.
+
+**Issues / notes**
+- Windows reports "port unreachable" from an earlier UDP send as an error on the *next* receive,
+  which would have ended the listening loop. Turned off with `SIO_UDP_CONNRESET`.
+- Campus/café Wi-Fi often blocks devices from talking to each other ("client isolation"). Then
+  neither broadcast nor DHT can help; a phone hotspot or home router works for the demo.
+- Class diagram update for the report:
+  - `KademliaRoutingTable`, `ProviderStore`, `DhtKey` and `DiscoveryMessage`;
+  - `PeerNode` gains DiscoveryPort, DisplayName, LastSeen and HasCurrentRepository;
+  - `INetworkNodeCoordinator` gains PeersChanged, DisplayName, GetKnownPeers, AddPeerByAddress,
+    ProvideRepository and FindProviders.

@@ -47,6 +47,7 @@ public partial class MainDashboardViewModel : ObservableObject
         IsDemoMode = isDemoMode;
         AuthorName = Environment.UserName;
         LoadRecentRepositories();
+        HookNetworkEvents();
     }
 
     // ---------- state bound by the UI ----------

@@ -11,7 +11,8 @@
     <!--
         Peer-to-peer page (proposal Fig: P2P network screen).
         Week 10: real firewall audit + permission (Fig 3.5) and local listening.
-        Discovery arrives in Week 11, transfers in Week 12.
+        Week 11: peer discovery (LAN broadcast + DHT), "Has a copy" badges, Connect (hello check).
+        Transfers arrive in Week 12.
     -->
     <UserControl.Resources>
         <!-- Pill for one port: green = allowed, amber = needs permission, red = blocked -->
@@ -183,26 +184,75 @@
                         </Style.Triggers>
                     </Style>
                 </DockPanel.Style>
-                <TextBlock DockPanel.Dock="Top" Text="Discovered Peers" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                <!-- Week 11: LAN broadcast + DHT discovery -->
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                    <Button DockPanel.Dock="Right" Command="{Binding FindPeersCommand}" Padding="10,4"
+                            ToolTip="Search the local network for other computers running Ventrail">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE721;" FontSize="12" Margin="0,0,6,0"/>
+                            <TextBlock Text="Find peers"/>
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Text="Discovered Peers" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </DockPanel>
 
-                <Border DockPanel.Dock="Top" Style="{StaticResource Card}"
-                        Visibility="{Binding HasPeers, Converter={StaticResource InverseBoolToVis}}">
-                    <TextBlock Style="{StaticResource SubtleText}"
-                               Text="No peers found yet. Turn on sharing first; other computers running Ventrail on your network will appear here once peer discovery is added (Week 11)."/>
-                </Border>
+                <TextBlock DockPanel.Dock="Top" Style="{StaticResource SubtleText}" FontSize="12" TextWrapping="Wrap"
+                           Text="{Binding PeersSummary}" Margin="0,0,0,10"/>
+
+                <!-- For networks that block broadcasts: ask one computer directly -->
+                <DockPanel DockPanel.Dock="Bottom" Margin="0,6,0,0"
+                           ToolTip="If a computer doesn't show up, type its IP address (shown on its Peer-to-Peer page) or its name">
+                    <Button DockPanel.Dock="Right" Content="Add" Padding="12,4" Margin="8,0,0,0"
+                            Command="{Binding AddPeerByAddressCommand}"/>
+                    <TextBox Text="{Binding PeerAddress, UpdateSourceTrigger=PropertyChanged}" Padding="6,4"
+                             VerticalContentAlignment="Center">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Return" Command="{Binding AddPeerByAddressCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+                </DockPanel>
+                <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource SubtleText}" FontSize="11" Margin="0,10,0,0">
+                    <Run Text="Not listed? Add a computer by IP address or name."/>
+                    <Run Text="{Binding LocalDisplayName, Mode=OneWay, StringFormat='This computer: {0}'}"/>
+                </TextBlock>
 
                 <ItemsControl ItemsSource="{Binding ActivePeers}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Background="{StaticResource CardBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,8">
                                 <DockPanel>
-                                    <Button DockPanel.Dock="Right" Content="Connect" IsEnabled="False"/>
+                                    <Button DockPanel.Dock="Right" VerticalAlignment="Center" Padding="12,4"
+                                            Command="{Binding DataContext.ConnectPeerCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                <Setter Property="Content" Value="Connect"/>
+                                                <Setter Property="ToolTip" Value="Check that this computer answers (sending versions arrives in Week 12)"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                                        <Setter Property="Content" Value="Connected"/>
+                                                        <Setter Property="IsEnabled" Value="False"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                    <Border DockPanel.Dock="Right" Style="{StaticResource Pill}" Margin="0,0,10,0"
+                                            VerticalAlignment="Center" Background="{StaticResource AddedTintBrush}"
+                                            ToolTip="This computer already has a copy of the open repository"
+                                            Visibility="{Binding HasCurrentRepository, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="Has a copy" FontSize="11" Foreground="{StaticResource AddedBrush}"/>
+                                    </Border>
                                     <Ellipse Width="8" Height="8" Fill="{StaticResource AddedBrush}" Margin="0,0,10,0"
                                              VerticalAlignment="Center"/>
-                                    <TextBlock VerticalAlignment="Center">
-                                        <Run Text="{Binding PeerId, Mode=OneWay}"/>
-                                        <Run Text="{Binding IPAddress, Mode=OneWay}" Foreground="{StaticResource SubtleTextBrush}"/>
-                                    </TextBlock>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Style="{StaticResource SubtleText}" FontSize="11">
+                                            <Run Text="{Binding IPAddress, Mode=OneWay}"/>
+                                            <Run Text="·"/>
+                                            <Run Text="{Binding PeerId, Mode=OneWay}" FontFamily="Consolas"/>
+                                        </TextBlock>
+                                    </StackPanel>
                                 </DockPanel>
                             </Border>
                         </DataTemplate>
