@@ -15,6 +15,10 @@ public class PeerNode
     public string DisplayName { get; set; } = string.Empty;   // computer name, e.g. "LAB-PC-02"
     public DateTime LastSeen { get; set; }
 
+    // Week 13: smoothed round-trip time to this peer (null until it has answered).
+    public int? RoundTripMs { get; set; }
+    public string RoundTripText => RoundTripMs is { } ms ? $"· {ms} ms" : string.Empty;
+
     // Set by the Network page: this peer already has a copy of the open repository.
     public bool HasCurrentRepository { get; set; }
 

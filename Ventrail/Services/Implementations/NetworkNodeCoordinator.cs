@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -11,6 +12,7 @@ using System.Threading.Tasks;
 using Ventrail.Models;
 using Ventrail.Services.Contracts;
 using Ventrail.Services.Implementations.Dht;
+using Ventrail.Services.Implementations.Transfer;
 
 namespace Ventrail.Services.Implementations;
 
@@ -38,10 +40,22 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
     // Kademlia's "alpha": how many peers a lookup asks at the same time.
     private const int Alpha = 3;
     private const int MaxLookupRounds = 6;
-    // Fixed for now; Week 13 makes these adaptive.
+    // Week 13: waits adapt per peer (PeerLink). These are only the limits for the broadcast, where
+    // nobody is known yet, and for asking an address typed by the user.
     private static readonly TimeSpan BroadcastWait = TimeSpan.FromMilliseconds(1500);
-    private static readonly TimeSpan QueryWait = TimeSpan.FromMilliseconds(800);
-    private static readonly TimeSpan ConnectWait = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan MaxBroadcastWait = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan AddressWait = TimeSpan.FromSeconds(4);
+
+    // What has been learnt about each peer's connection (round-trip time, speed).
+    private readonly ConcurrentDictionary<string, PeerLink> _links = new();
+
+    private PeerLink Link(string peerId) => _links.GetOrAdd(peerId, _ => new PeerLink());
+
+    /// <summary>
+    /// For tests only: makes this computer answer like one on a slow or broken network
+    /// (delay before every answer, limited sending speed, or no answers at all).
+    /// </summary>
+    public NetworkConditions? TestConditions { get; set; }
 
     // Windows reports "port unreachable" from an earlier send as an error on the next receive,
     // which would end the receive loop. This switches that off (SIO_UDP_CONNRESET).
@@ -184,9 +198,18 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
                 try { packet = await udp.ReceiveAsync(stop); }
                 catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionReset) { continue; }
 
+                if (TestConditions is { Stall: true }) continue;
                 string? reply = HandleRequest(DiscoveryMessage.Parse(packet.Buffer), packet.RemoteEndPoint);
-                if (reply != null)
-                    await udp.SendAsync(Encoding.UTF8.GetBytes(reply), packet.RemoteEndPoint, stop);
+                if (reply is null) continue;
+                byte[] data = Encoding.UTF8.GetBytes(reply);
+                if (TestConditions is { Latency: var delay } && delay > TimeSpan.Zero)
+                    _ = Task.Run(async () =>   // answer later without holding up other questions
+                    {
+                        try { await Task.Delay(delay, stop); await udp.SendAsync(data, packet.RemoteEndPoint, stop); }
+                        catch (Exception) { }
+                    }, stop);
+                else
+                    await udp.SendAsync(data, packet.RemoteEndPoint, stop);
             }
         }
         catch (Exception) when (stop.IsCancellationRequested) { }
@@ -234,7 +257,19 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
 
     // ---------- Week 11: discovery ----------
 
-    public List<PeerNode> GetKnownPeers() => _table.All();
+    public List<PeerNode> GetKnownPeers() => _table.All().Select(p =>
+    {
+        if (_links.TryGetValue(p.PeerId, out var link) && link.Rtt.Smoothed is { } rtt)
+            p.RoundTripMs = (int)Math.Round(rtt.TotalMilliseconds);
+        return p;
+    }).ToList();
+
+    // Long enough for the slowest peer heard from before, at least 1.5 s.
+    private TimeSpan BroadcastWaitNow()
+    {
+        var slowest = _links.Values.Select(l => l.Rtt.Timeout).DefaultIfEmpty(TimeSpan.Zero).Max() * 1.5;
+        return slowest < BroadcastWait ? BroadcastWait : slowest > MaxBroadcastWait ? MaxBroadcastWait : slowest;
+    }
 
     /// <summary>
     /// Broadcasts to the local network, then looks up our own id in the DHT (Kademlia's way of
@@ -247,7 +282,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
         Run(async () =>
         {
             await AskAsync(BroadcastTargets(), Header(DiscoveryMessage.Hello), DiscoveryMessage.HelloAnswer,
-                           BroadcastWait, firstOnly: false);
+                           BroadcastWaitNow(), firstOnly: false);
             await LookupAsync(LocalPeerId);
             string[] keys;
             lock (_gate) keys = _provided.Keys.ToArray();
@@ -281,7 +316,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
             throw new VentrailException($"{ip} is not on your local network. Ventrail only shares with computers on the same network.");
 
         var replies = Run(() => AskAsync(new[] { new IPEndPoint(ip, port) }, Header(DiscoveryMessage.Hello),
-                                         DiscoveryMessage.HelloAnswer, BroadcastWait, firstOnly: true));
+                                         DiscoveryMessage.HelloAnswer, AddressWait, firstOnly: true));
         return replies.Count == 0 ? null : _table.Find(replies[0].Sender!.PeerId);
     }
 
@@ -372,10 +407,14 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
                 if (replies[i] is not { } reply)
                 {
                     candidates.Remove(batch[i].PeerId);
-                    if (_table.Remove(batch[i].PeerId)) PeersChanged?.Invoke(this, EventArgs.Empty);
+                    // Week 13: only drop a peer after several lookups in a row got no answer, so a link that
+                    // suddenly got slower keeps its peer while the waits adapt.
+                    if (Link(batch[i].PeerId).MissedLookup() >= PeerLink.DropAfterMisses && _table.Remove(batch[i].PeerId))
+                        PeersChanged?.Invoke(this, EventArgs.Empty);
                     continue;
                 }
-                answered[reply.Sender!.PeerId] = reply.Sender;
+                Link(reply.Sender!.PeerId).AnsweredLookup();
+                answered[reply.Sender.PeerId] = reply.Sender;
                 foreach (var p in UsableEntries(reply.Args.FirstOrDefault(), reply.Sender))
                     candidates.TryAdd(p.PeerId, p);
             }
@@ -399,15 +438,19 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
 
     // One question to one peer, asked twice before giving up (a single UDP packet can get lost).
     // The answer only counts if it comes from the peer id we asked.
+    // Week 13: the wait is that peer's learnt round-trip timeout, doubled after each miss.
     private async Task<DiscoveryMessage?> QueryAsync(PeerNode peer, string message, string expectVerb)
     {
         var target = new IPEndPoint(IPAddress.Parse(peer.IPAddress), peer.DiscoveryPort);
+        var link = Link(peer.PeerId);
         for (int attempt = 0; attempt < 2; attempt++)
         {
-            var replies = await AskAsync(new[] { target }, message, expectVerb, QueryWait, firstOnly: true);
+            var wait = link.Rtt.Timeout * (attempt + 1);   // second try: twice as patient
+            var replies = await AskAsync(new[] { target }, message, expectVerb, wait, firstOnly: true);
             var reply = replies.FirstOrDefault(r => r.Sender!.PeerId == peer.PeerId);
             if (reply != null) return reply;
         }
+        link.Rtt.Backoff();   // remembered for the next question to this peer
         return null;
     }
 
@@ -426,6 +469,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
         }
 
         using var timeout = new CancellationTokenSource(wait);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             while (true)
@@ -435,6 +479,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
                 if (msg?.Sender is not { } sender || msg.Verb != expectVerb || sender.PeerId == LocalPeerId ||
                     !IsLocalNetworkAddress(packet.RemoteEndPoint.Address))
                     continue;
+                Link(sender.PeerId).Rtt.Observe(clock.Elapsed);   // Week 13: every answer teaches the round-trip time
                 sender.IPAddress = packet.RemoteEndPoint.Address.MapToIPv4().ToString();
                 Learn(sender, packet.RemoteEndPoint.Address);
                 replies.Add(msg);

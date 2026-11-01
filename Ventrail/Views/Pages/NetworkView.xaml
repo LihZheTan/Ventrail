@@ -268,6 +268,8 @@
                                             <Run Text="{Binding IPAddress, Mode=OneWay}"/>
                                             <Run Text="·"/>
                                             <Run Text="{Binding PeerId, Mode=OneWay}" FontFamily="Consolas"/>
+                                            <Run Text="{Binding RoundTripText, Mode=OneWay}"
+                                                 ToolTip="Round-trip time: how long this computer takes to answer. Ventrail sets its waiting times from it."/>
                                         </TextBlock>
                                     </StackPanel>
                                 </DockPanel>

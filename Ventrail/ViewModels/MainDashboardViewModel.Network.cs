@@ -294,7 +294,9 @@ public partial class MainDashboardViewModel
             TransferPercent = p.Percent;
             TransferDetail = $"{p.BlocksDone} of {p.BlockCount} blocks checked · {FormatBytes(p.BytesDone)} of {FormatBytes(p.TotalBytes)}" +
                              (p.BlocksResumed > 0 ? $" · {p.BlocksResumed} kept from last time" : "") +
-                             (p.BlocksRetried > 0 ? $" · {p.BlocksRetried} damaged block(s) sent again" : "");
+                             (p.BlocksRetried > 0 ? $" · {p.BlocksRetried} block(s) asked for again" : "") +
+                             (p.BytesPerSecond > 0 ? $" · {FormatBytes((long)p.BytesPerSecond)}/s" : "") +
+                             (p.TimeLeft is { } left && p.BlocksDone < p.BlockCount ? $" · about {FormatDuration(left)} left" : "");
         });
         try
         {
@@ -302,7 +304,7 @@ public partial class MainDashboardViewModel
             _bytesReceived += manifest.Size;
             SessionBytesShared = _bytesReceived + _network.BytesSent;
             if (last?.BlocksRetried > 0)
-                LogActivity($"{last.BlocksRetried} block(s) from {peerName} failed the SHA-256 check and were sent again");
+                LogActivity($"{last.BlocksRetried} block(s) from {peerName} were damaged (failed the SHA-256 check) or too slow, and were asked for again");
             return package;
         }
         catch (OperationCanceledException)
@@ -344,6 +346,11 @@ public partial class MainDashboardViewModel
     {
         try { File.Delete(package); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
+
+    private static string FormatDuration(TimeSpan t) =>
+        t.TotalSeconds < 60 ? $"{Math.Max(1, (int)Math.Ceiling(t.TotalSeconds))} s"
+        : t.TotalMinutes < 60 ? $"{(int)Math.Ceiling(t.TotalMinutes)} min"
+        : $"{t.TotalHours:F1} h";
 
     private static string FormatBytes(long bytes) => bytes switch
     {

@@ -841,3 +841,85 @@ get a brand-new copy ("Download a copy").
   - `INetworkNodeCoordinator` gains ListRepositories, RequestVersion, DownloadPackage,
     TransferData and BytesSent;
   - `IRepositoryManager` gains ImportVersionPackage and InitFromPackage.
+
+## Week 13 — End-to-end testing and adaptive timeouts
+
+**Goal:**
+- test the whole flow the way two users would actually use it, not just the parts one by one;
+- replace the fixed waiting times from Weeks 11–12 with ones that learn from the real network.
+
+**Adaptive timeouts** (`RttEstimator`, `ThroughputEstimator` and `PeerLink`, one per peer)
+- **Round-trip time** is tracked the way TCP itself does it (Jacobson/Karels, RFC 6298):
+  - Ventrail keeps a smoothed round-trip time (SRTT) and how much it varies (RTTVAR), and waits
+    SRTT + 4 × RTTVAR;
+  - a missed answer doubles the next wait (back-off), and a real answer brings it back down;
+  - limits are 0.25–8 s. It starts at 0.8 s, the old fixed value.
+  - Every answer counts as a sample: broadcast replies, DHT answers and TCP connect + hello.
+- **Speed:** a smoothed bytes-per-second figure per peer sets how long one 1 MB block may take
+  (3 × the expected time + the round-trip wait, between 2 and 120 s). It starts at 30 s, the old
+  fixed value.
+  - When a block times out, the speed estimate drops **at once** to half of what that timeout
+    proves is possible (like TCP's "multiplicative decrease"), instead of averaging down over
+    many timeouts.
+- **Where the waits apply:**
+  - DHT questions use that peer's round-trip wait; the second try waits twice as long.
+  - The broadcast waits at least 1.5 s, longer if a slow peer has been seen.
+  - Connecting waits 2 × round trip + 1 s; each answer line waits 2 s + 4 × round trip.
+- **"WAIT" keep-alive:** a sender busy packing a big repository says `WAIT` every 2 s. A busy
+  sender gets all the time it needs, while a frozen one is noticed within seconds.
+- **Three strikes:** a peer only leaves the routing table after 3 lookups in a row get no answer.
+  Before, one miss was enough, so a link that briefly got slower lost its peers.
+- **On screen:** each peer shows its round-trip time ("· 4 ms"), and the progress card shows speed
+  and time left ("3.4 MB/s · about 1 s left").
+
+**End-to-end tests** (`%LOCALAPPDATA%\Temp\vw13`, **42/42 pass**)
+- **Set-up:** two real nodes on loopback, each driven through its **own real ViewModel**, real
+  RepositoryManager and real Git repository, exactly as the buttons would.
+  - Only the firewall check is replaced, so tests never trigger the Windows admin prompt.
+- **A day in the life:**
+  1. Alice saves a version, switches sharing on and shares it.
+  2. Bob finds her, sees "Download a copy", and gets an identical copy (a 1.6 MB binary,
+     byte-for-byte), which opens straight away.
+  3. Alice saves again, and Bob's button now says "Get latest"; his files update.
+  4. With unsaved work, Bob's files are left alone. After both have saved different versions,
+     the versions are kept apart.
+  5. Bob shares back, and Alice sees his copy as the same repository.
+- **Slow network:** 1 s delay on every answer and 400 KB/s.
+  - Bob still finds Alice. The old fixed 0.8 s wait would have missed every answer.
+  - The download completes, with speed and time left shown.
+  - Speed learnt earlier on the fast link no longer causes a timeout on every block: 1 retry
+    instead of 4 (this was found by the test and fixed, see Issues).
+- **Busy sender:** packing takes 8 s, longer than any single wait, and the receiver keeps
+  waiting thanks to `WAIT`.
+- **Frozen peer mid-download:** noticed in about 12 s (Week 12 would take 90 s+). Once the peer
+  is back, the download resumes from block 3.
+- **Peer health:**
+  - a peer whose link got slower is kept, and the waits grow until its answers get through again
+    (Carol then learns Bob from Alice through the DHT);
+  - a peer that's silent for 3 lookups is dropped.
+- **Sharing switched off on the other side:** a clear message within 2 s, also in the activity
+  log.
+- **Unit checks** of the estimators: fast and slow links, jitter, back-off and limits.
+- **Every earlier suite still passes:** Week 7 (24), 8 (22), 9 (39), 10 (54), 11 (67), 12 (48).
+  One Week 11 expectation changed on purpose: a dead peer is now dropped after 3 lookups, not 1.
+- **Visual check in demo mode:** ping on the peer cards, and the progress card with speed and
+  time left.
+
+**Issues found by the end-to-end tests**
+- **Remembered speed on a changed link:** after a fast download, a slow link timed out once on
+  *every* block, because the averaged speed came down too slowly. Fixed with the immediate drop
+  on timeout.
+- **Inflated reconnect wait:** block timeouts were also doubling the round-trip wait, which made
+  noticing a frozen peer slower (17.5 s). Block timeouts now only lower the speed estimate.
+- **Test clean-up:** temp folders were left behind, because Git's pack files are read-only.
+  Fixed in the test clean-up. Some older `vw12-*` / `vw13-*` folders are still in Temp (about
+  50 MB) and are safe to delete.
+
+**Decisions**
+- Follow TCP's own proven method instead of inventing one. It's easy to justify in the report,
+  and the unit tests show its known behaviour (steady vs. unsteady links, back-off, recovery).
+- The test hooks (`TestConditions`, `TestBlockFilter`) live in the real coordinator but do
+  nothing unless a test sets them. The slow, frozen and busy cases run through the real code
+  paths, not a copy.
+- Class diagram update for the report: `RttEstimator`, `ThroughputEstimator`, `PeerLink`,
+  `NetworkConditions`; `PeerNode.RoundTripMs`; `TransferProgress.BytesPerSecond` / `TimeLeft`.

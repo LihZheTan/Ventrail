@@ -49,6 +49,9 @@ public class TransferProgress
     public long TotalBytes { get; init; }
     public int BlocksResumed { get; init; }   // already on disk from an interrupted download
     public int BlocksRetried { get; init; }   // arrived damaged and were asked for again
+    public double BytesPerSecond { get; init; }   // Week 13: measured speed of this download (0 = not yet known)
+
+    public TimeSpan? TimeLeft => BytesPerSecond > 0 ? TimeSpan.FromSeconds((TotalBytes - BytesDone) / BytesPerSecond) : null;
 
     public double Percent => BlockCount == 0 ? 100 : 100.0 * BlocksDone / BlockCount;
 }

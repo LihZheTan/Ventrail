@@ -35,10 +35,11 @@ public partial class NetworkNodeCoordinator
 {
     private const long MaxPackageBytes = 16L * 1024 * 1024 * 1024;
     private const int MaxBlockAttempts = 3;
-    // Fixed for now; Week 13 makes these adaptive.
+    // Week 13: each line and block has its own adaptive wait (PeerLink); these are only outer limits.
     private static readonly TimeSpan IdleTimeout = TimeSpan.FromSeconds(60);
-    private static readonly TimeSpan ManifestWait = TimeSpan.FromMinutes(3);   // the sender may be packing a big repository
-    private static readonly TimeSpan BlockWait = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MaxRequestTime = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan ManifestWait = TimeSpan.FromMinutes(15);   // a huge repository takes a while to pack
+    private static readonly TimeSpan KeepAliveEvery = TimeSpan.FromSeconds(2);   // "WAIT" while packing
 
     private record Offer(string Path, string Name);
     private record CachedPackage(PackageInfo Info, List<string> BlockHashes);
@@ -66,17 +67,17 @@ public partial class NetworkNodeCoordinator
     /// <summary>The repositories a peer currently shares, with its latest version of each.</summary>
     public List<OfferedRepository> ListRepositories(string peerId) => Run(async () =>
     {
-        using var timeout = new CancellationTokenSource(ConnectWait + QueryWait * 4);
+        using var timeout = new CancellationTokenSource(MaxRequestTime);
         using var session = await OpenSessionAsync(peerId, timeout.Token);
         await session.SendAsync("LIST", timeout.Token);
-        string[] head = Words(await session.ReadLineAsync(timeout.Token));
+        string[] head = Words(await ReadAnswerAsync(session, timeout.Token));
         if (head.Length != 2 || head[0] != "REPOS" || !int.TryParse(head[1], out int count) || count is < 0 or > 100)
             throw ProtocolError(session.Peer, head);
 
         var list = new List<OfferedRepository>();
         for (int i = 0; i < count; i++)
         {
-            string[] w = Words(await session.ReadLineAsync(timeout.Token), 4);
+            string[] w = Words(await ReadAnswerAsync(session, timeout.Token), 4);
             if (w.Length == 4 && DhtKey.IsValid(w[0]) && w[0].StartsWith("rp-") && IsCommitHash(w[1]))
                 list.Add(new OfferedRepository
                 {
@@ -93,7 +94,7 @@ public partial class NetworkNodeCoordinator
         using var timeout = new CancellationTokenSource(ManifestWait);
         using var session = await OpenSessionAsync(peerId, timeout.Token);
         await session.SendAsync($"MANIFEST {repositoryKey}", timeout.Token);
-        string[] w = Words(await session.ReadLineAsync(timeout.Token), 8);
+        string[] w = Words(await ReadAnswerAsync(session, timeout.Token), 8);
         if (w.Length >= 2 && w[0] == "ERROR")
             throw new VentrailException($"{session.Peer.Title}: {string.Join(' ', w[1..])}");
         if (w.Length != 8 || w[0] != "MANIFEST" || !BlockHashing.IsHash(w[1]) ||
@@ -110,7 +111,7 @@ public partial class NetworkNodeCoordinator
         };
         for (int i = 0; i < blocks; i++)
         {
-            string? line = (await session.ReadLineAsync(timeout.Token))?.Trim();
+            string? line = (await ReadAnswerAsync(session, timeout.Token))?.Trim();
             if (!BlockHashing.IsHash(line)) throw ProtocolError(session.Peer, new[] { line ?? "" });
             manifest.BlockHashes.Add(line!);
         }
@@ -143,8 +144,9 @@ public partial class NetworkNodeCoordinator
 
         return Run(async () =>
         {
-            int count = manifest.BlockCount, done = 0, resumed = 0, retried = 0;
-            long bytesDone = 0;
+            int count = manifest.BlockCount, done = 0, resumed = 0, retried = 0, stalled = 0;
+            long bytesDone = 0, fetched = 0;
+            var started = System.Diagnostics.Stopwatch.StartNew();
             var missing = new List<int>();
             using (var file = new FileStream(part, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
             {
@@ -169,22 +171,29 @@ public partial class NetworkNodeCoordinator
                 Report();
 
                 Session? session = null;
+                var link = Link(manifest.PeerId);
                 try
                 {
                     foreach (int i in missing)
                     {
                         int length = BlockLength(manifest, i);
+                        TimeSpan waited = TimeSpan.Zero;
                         for (int attempt = 1; ; attempt++)
                         {
                             cancel.ThrowIfCancellationRequested();
                             try
                             {
+                                session ??= await OpenSessionAsync(manifest.PeerId, cancel);
+                                // Week 13: the wait follows this peer's measured speed, doubled on every retry.
                                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
-                                timeout.CancelAfter(BlockWait);
-                                session ??= await OpenSessionAsync(manifest.PeerId, timeout.Token);
+                                waited = link.BlockTimeout(length) * (1 << (attempt - 1));
+                                timeout.CancelAfter(waited);
+                                var clock = System.Diagnostics.Stopwatch.StartNew();
                                 byte[]? data = await FetchBlockAsync(session, manifest.PackageHash, i, length, timeout.Token);
                                 if (data != null && BlockHashing.Sha256(data) == manifest.BlockHashes[i])
                                 {
+                                    link.Throughput.Observe(length, clock.Elapsed);
+                                    fetched += length;
                                     file.Position = (long)i * manifest.BlockSize;
                                     await file.WriteAsync(data, cancel);
                                     break;
@@ -193,14 +202,21 @@ public partial class NetworkNodeCoordinator
                             catch (Exception ex) when (ex is IOException or SocketException ||
                                                        ex is OperationCanceledException && !cancel.IsCancellationRequested)
                             {
+                                if (ex is OperationCanceledException)
+                                {
+                                    stalled++;
+                                    link.Throughput.TimedOut(length, waited);
+                                }
                                 session?.Dispose();   // broken or silent connection: open a new one
                                 session = null;
                             }
                             retried++;
                             if (attempt >= MaxBlockAttempts)
-                                throw new VentrailException(
-                                    $"Block {i + 1} of {count} kept arriving damaged or not at all, so the download " +
-                                    "stopped. The blocks received so far are kept; try again to continue.");
+                                throw new VentrailException(stalled >= MaxBlockAttempts
+                                    ? $"{manifest.Name}: the other computer stopped sending (block {i + 1} of {count}), so the " +
+                                      "download stopped. The blocks received so far are kept; try again to continue."
+                                    : $"Block {i + 1} of {count} kept arriving damaged or not at all, so the download " +
+                                      "stopped. The blocks received so far are kept; try again to continue.");
                         }
                         done++;
                         bytesDone += length;
@@ -225,7 +241,8 @@ public partial class NetworkNodeCoordinator
             void Report() => progress?.Report(new TransferProgress
             {
                 BlocksDone = done, BlockCount = count, BytesDone = bytesDone, TotalBytes = manifest.Size,
-                BlocksResumed = resumed, BlocksRetried = retried
+                BlocksResumed = resumed, BlocksRetried = retried,
+                BytesPerSecond = fetched > 0 ? fetched / Math.Max(0.001, started.Elapsed.TotalSeconds) : 0
             });
         });
     }
@@ -260,14 +277,17 @@ public partial class NetworkNodeCoordinator
                    ?? throw new VentrailException("Ventrail no longer knows this computer. Search for peers again.");
         var client = new TcpClient(AddressFamily.InterNetwork);
         var session = new Session(client, peer);
+        var link = Link(peerId);
         string? hello;
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
-            timeout.CancelAfter(ConnectWait);
+            timeout.CancelAfter(link.ConnectTimeout);   // Week 13: from this peer's round-trip time
+            var clock = System.Diagnostics.Stopwatch.StartNew();
             await client.ConnectAsync(IPAddress.Parse(peer.IPAddress), peer.Port, timeout.Token);
             session.Start();
             hello = await session.ReadLineAsync(timeout.Token);
+            if (hello != null) link.Rtt.Observe(clock.Elapsed / 2);   // handshake + hello = about two round trips
         }
         catch (Exception ex) when (ex is SocketException or IOException ||
                                    ex is OperationCanceledException && !cancel.IsCancellationRequested)
@@ -297,6 +317,37 @@ public partial class NetworkNodeCoordinator
         return session;
     }
 
+    /// <summary>
+    /// Week 13: reads one answer line, waiting as long as this peer's round-trip time suggests. A busy
+    /// sender says "WAIT" every 2 s (e.g. while packing a big repository), which restarts the wait, so
+    /// a slow sender is given time but a frozen one is noticed within seconds.
+    /// </summary>
+    private async Task<string?> ReadAnswerAsync(Session session, CancellationToken overall)
+    {
+        var link = Link(session.Peer.PeerId);
+        while (true)
+        {
+            using var wait = CancellationTokenSource.CreateLinkedTokenSource(overall);
+            wait.CancelAfter(link.LineTimeout);
+            string? line;
+            try
+            {
+                line = await session.ReadLineAsync(wait.Token);
+            }
+            catch (OperationCanceledException) when (!overall.IsCancellationRequested)
+            {
+                link.Rtt.Backoff();
+                throw new VentrailException($"{session.Peer.Title} stopped answering. Try again in a moment.");
+            }
+            catch (OperationCanceledException)
+            {
+                throw new VentrailException($"{session.Peer.Title} is taking too long to answer. Try again later.");
+            }
+            if (line?.Trim() == "WAIT") continue;
+            return line;
+        }
+    }
+
     private static VentrailException ProtocolError(PeerNode peer, string[] words) =>
         new($"{peer.Title} sent an answer Ventrail doesn't understand ({string.Join(' ', words).Truncate(60)}). " +
             "Both computers may need the same Ventrail version.");
@@ -315,6 +366,7 @@ public partial class NetworkNodeCoordinator
         try
         {
             session.Start();
+            await ActLikeTestNetworkAsync(stop);
             await session.SendAsync($"{HelloPrefix} {LocalPeerId}", stop);
             while (true)
             {
@@ -323,6 +375,7 @@ public partial class NetworkNodeCoordinator
                 string[] w = Words(await session.ReadLineAsync(idle.Token));
                 if (w.Length == 0 || w[0] == "BYE") return;
 
+                await ActLikeTestNetworkAsync(stop);
                 switch (w[0])
                 {
                     case "LIST":
@@ -378,7 +431,11 @@ public partial class NetworkNodeCoordinator
         CachedPackage package;
         try
         {
-            package = await PreparePackageAsync(key, offer, stop);
+            // Week 13: say "WAIT" every 2 s while packing, so the receiver knows we are alive.
+            var prepare = PreparePackageAsync(key, offer, stop);
+            while (await Task.WhenAny(prepare, Task.Delay(KeepAliveEvery, stop)) != prepare)
+                await session.SendAsync("WAIT", stop);
+            package = await prepare;
         }
         catch (Exception ex) when (ex is VentrailException or LibGit2SharpException or IOException or UnauthorizedAccessException)
         {
@@ -410,7 +467,7 @@ public partial class NetworkNodeCoordinator
         }
         data = TestBlockFilter?.Invoke(index, data) ?? data;
         await session.SendAsync($"DATA {index} {data.Length}", stop, flush: false);
-        await session.WriteAsync(data, stop);
+        await session.WriteAsync(data, stop, TestConditions?.BytesPerSecond ?? 0);
         Interlocked.Add(ref _bytesSent, data.Length);
     }
 
@@ -428,6 +485,7 @@ public partial class NetworkNodeCoordinator
             lock (_gate) _packages.TryGetValue(key, out cached);
             if (cached != null && cached.Info.HeadHash == head && File.Exists(cached.Info.FilePath)) return cached;
 
+            if (TestConditions is { ExtraPackingTime: var extra } && extra > TimeSpan.Zero) await Task.Delay(extra, stop);
             var package = await Task.Run(() =>
             {
                 var info = VersionPackage.Create(offer.Path, Outbox);
@@ -447,6 +505,14 @@ public partial class NetworkNodeCoordinator
     private static void TryDelete(string path)
     {
         try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+    }
+
+    // Tests only (NetworkConditions): a frozen peer never answers; a slow one answers late.
+    private async Task ActLikeTestNetworkAsync(CancellationToken stop)
+    {
+        if (TestConditions is not { } c) return;
+        if (c.Stall) await Task.Delay(Timeout.Infinite, stop);
+        if (c.Latency > TimeSpan.Zero) await Task.Delay(c.Latency, stop);
     }
 
     private static string SafeWord(string s) => string.IsNullOrWhiteSpace(s) ? "main" : s.Replace(' ', '-');
@@ -481,10 +547,23 @@ public partial class NetworkNodeCoordinator
             if (flush) await Io.FlushAsync(cancel);
         }
 
-        public async Task WriteAsync(byte[] data, CancellationToken cancel)
+        // bytesPerSecond > 0 only in tests (NetworkConditions): sends in small pieces at that speed.
+        public async Task WriteAsync(byte[] data, CancellationToken cancel, long bytesPerSecond = 0)
         {
-            await Io.WriteAsync(data, cancel);
-            await Io.FlushAsync(cancel);
+            if (bytesPerSecond <= 0)
+            {
+                await Io.WriteAsync(data, cancel);
+                await Io.FlushAsync(cancel);
+                return;
+            }
+            const int piece = 16 * 1024;
+            for (int offset = 0; offset < data.Length; offset += piece)
+            {
+                int n = Math.Min(piece, data.Length - offset);
+                await Io.WriteAsync(data.AsMemory(offset, n), cancel);
+                await Io.FlushAsync(cancel);
+                await Task.Delay(TimeSpan.FromSeconds((double)n / bytesPerSecond), cancel);
+            }
         }
 
         // Null when the other side closed the connection.

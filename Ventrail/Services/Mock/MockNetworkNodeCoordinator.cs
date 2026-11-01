@@ -149,7 +149,8 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
             progress?.Report(new TransferProgress
             {
                 BlocksDone = i, BlockCount = manifest.BlockCount, TotalBytes = manifest.Size,
-                BytesDone = Math.Min(manifest.Size, i * (long)manifest.BlockSize), BlocksRetried = i >= 5 ? 1 : 0
+                BytesDone = Math.Min(manifest.Size, i * (long)manifest.BlockSize), BlocksRetried = i >= 5 ? 1 : 0,
+                BytesPerSecond = 3.4 * 1024 * 1024
             });
         }
         return @"C:\Demo\inbox\" + manifest.PackageHash + ".vtpk";
@@ -165,5 +166,6 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
     };
 
     private static PeerNode Peer(string id, string name, string ip) =>
-        new() { PeerId = id, DisplayName = name, IPAddress = ip, Port = 4001, DiscoveryPort = 4002, LastSeen = DateTime.UtcNow };
+        new() { PeerId = id, DisplayName = name, IPAddress = ip, Port = 4001, DiscoveryPort = 4002, LastSeen = DateTime.UtcNow,
+                RoundTripMs = name.StartsWith("LAB") ? 4 : 23 };
 }
