@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
 using Ventrail.Models;
+using Ventrail.Services.Contracts;
 using Ventrail.Services.Implementations.Dht;
 
 namespace Ventrail.ViewModels;
@@ -97,10 +100,13 @@ public partial class MainDashboardViewModel
     private void RefreshPeerList()
     {
         ActivePeers.Clear();
+        string? currentKey = CurrentRepositoryKey();
         if (IsSharingEnabled)
             foreach (var p in _network.GetKnownPeers())
             {
-                p.HasCurrentRepository = _providerIds.Contains(p.PeerId);
+                p.Repositories = (_offersByPeer.TryGetValue(p.PeerId, out var offers) ? offers : new())
+                    .Select(o => { o.IsCurrentRepository = HasRepo && o.Key == currentKey; return o; }).ToList();
+                p.HasCurrentRepository = _providerIds.Contains(p.PeerId) || p.Repositories.Any(o => o.IsCurrentRepository);
                 ActivePeers.Add(p);
             }
         OnPropertyChanged(nameof(HasPeers));
@@ -130,6 +136,7 @@ public partial class MainDashboardViewModel
         try
         {
             var peers = await Background(_network.DiscoverPeers);
+            await LoadOffersAsync(peers);
             RefreshPeerList();
             LogActivity($"Peer discovery found {peers.Count} computer(s)");
         }
@@ -180,11 +187,174 @@ public partial class MainDashboardViewModel
             RefreshPeerList();
             LogActivity($"Connected to {peer.Title} ({peer.IPAddress})");
             ShowToast($"Connected to {peer.Title}.", ToastKind.Success);
-            StatusText = $"Connected to {peer.Title}. Sending versions arrives in Week 12.";
+            StatusText = $"Connected to {peer.Title}.";
         });
 
+    // ---------- Week 12: receiving versions (block streaming + hash checks) ----------
+
+    // What each peer shares (its "LIST" answer), refreshed after every search.
+    private readonly Dictionary<string, List<OfferedRepository>> _offersByPeer = new();
+    private CancellationTokenSource? _transferCancel;
+    private long _bytesReceived;
+
+    [ObservableProperty] private bool _isTransferring;
+    [ObservableProperty] private string _transferTitle = string.Empty;
+    [ObservableProperty] private string _transferDetail = string.Empty;
+    [ObservableProperty] private double _transferPercent;
+
+    /// <summary>Where a downloaded copy goes. Replaced in tests; normally asks with the folder dialog.</summary>
+    public Func<string, string?> PickFolder { get; set; } = title =>
+    {
+        var dialog = new OpenFolderDialog { Title = title };
+        return dialog.ShowDialog() == true ? dialog.FolderName : null;
+    };
+
+    private async Task LoadOffersAsync(IEnumerable<PeerNode> peers)
+    {
+        var lists = await Task.WhenAll(peers.Select(async p =>
+        {
+            try { return (p.PeerId, Offers: await Background(() => _network.ListRepositories(p.PeerId))); }
+            catch (Exception) { return (p.PeerId, Offers: new List<OfferedRepository>()); }   // older Ventrail or busy: no list
+        }));
+        _offersByPeer.Clear();
+        foreach (var (peerId, offers) in lists) _offersByPeer[peerId] = offers;
+    }
+
+    /// <summary>
+    /// "Get latest" (same repository as the one open here) or "Download a copy" (a new folder).
+    /// Fig 3.8 TransferData: ask for the manifest, stream every block with its SHA-256 check, then let
+    /// Git check every version before anything on disk changes.
+    /// </summary>
+    [RelayCommand]
+    private async Task DownloadOfferAsync(OfferedRepository? offer)
+    {
+        if (offer is null || IsBusy) return;
+        bool intoCurrent = offer.IsCurrentRepository && HasRepo;
+        string? newCopy = null;
+        if (!intoCurrent)
+        {
+            string? parent = PickFolder($"Choose where to put the copy of {offer.Name}");
+            if (parent is null) return;
+            newCopy = FreeFolderName(Path.Combine(parent, offer.Name));
+        }
+        else if (History.Count > 0 && History[0].Hash == offer.HeadHash)
+        {
+            ShowToast($"You already have {offer.PeerName}'s latest version of {offer.Name}.", ToastKind.Success);
+            return;
+        }
+
+        bool copied = false;
+        await RunBusyAsync($"Asking {offer.PeerName} for {offer.Name}...", async () =>
+        {
+            var manifest = await Background(() => _network.RequestVersion(offer.PeerId, offer.Key));
+            LogActivity($"{offer.PeerName} offered {offer.Name} ({FormatBytes(manifest.Size)}, {manifest.BlockCount} block(s), " +
+                        $"SHA-256 {manifest.PackageHash[..12]}...)");
+            string package = await ReceiveAsync(manifest, offer.PeerName);
+
+            if (newCopy != null)
+            {
+                await Background(() => _repo.InitFromPackage(newCopy, package, manifest.HeadHash, manifest.Branch));
+                DeletePackage(package);
+                LogActivity($"Downloaded a copy of {offer.Name} from {offer.PeerName} into {newCopy}");
+                copied = true;
+                return;
+            }
+
+            var result = await Background(() =>
+                _repo.ImportVersionPackage(package, manifest.HeadHash, manifest.Branch, offer.PeerName));
+            if (result.Outcome != ImportOutcome.WaitingForSave) DeletePackage(package);   // kept to retry instantly
+            await ReloadAsync();
+            var (text, kind) = DescribeImport(result, offer);
+            StatusText = text;
+            ShowToast(text, kind, 7);
+            LogActivity($"Get latest from {offer.PeerName}: {result.Outcome} ({result.HeadHash[..7]})");
+        });
+
+        if (copied && newCopy != null)
+        {
+            await InitializeDashboardAsync(newCopy);
+            ShowToast($"Downloaded {offer.Name} from {offer.PeerName}. Every block and version was checked.", ToastKind.Success, 6);
+        }
+    }
+
+    [RelayCommand]
+    private void CancelTransfer() => _transferCancel?.Cancel();
+
+    private async Task<string> ReceiveAsync(TransferManifest manifest, string peerName)
+    {
+        _transferCancel = new CancellationTokenSource();
+        TransferTitle = $"Receiving {manifest.Name} from {peerName}";
+        TransferDetail = $"{manifest.BlockCount} block(s), {FormatBytes(manifest.Size)}";
+        TransferPercent = 0;
+        IsTransferring = true;
+        TransferProgress? last = null;
+        var progress = new Progress<TransferProgress>(p =>
+        {
+            last = p;
+            TransferPercent = p.Percent;
+            TransferDetail = $"{p.BlocksDone} of {p.BlockCount} blocks checked · {FormatBytes(p.BytesDone)} of {FormatBytes(p.TotalBytes)}" +
+                             (p.BlocksResumed > 0 ? $" · {p.BlocksResumed} kept from last time" : "") +
+                             (p.BlocksRetried > 0 ? $" · {p.BlocksRetried} damaged block(s) sent again" : "");
+        });
+        try
+        {
+            string package = await Background(() => _network.DownloadPackage(manifest, progress, _transferCancel.Token));
+            _bytesReceived += manifest.Size;
+            SessionBytesShared = _bytesReceived + _network.BytesSent;
+            if (last?.BlocksRetried > 0)
+                LogActivity($"{last.BlocksRetried} block(s) from {peerName} failed the SHA-256 check and were sent again");
+            return package;
+        }
+        catch (OperationCanceledException)
+        {
+            throw new VentrailException("Download cancelled. The blocks received so far are kept, so trying again " +
+                                        "continues where it stopped.");
+        }
+        finally
+        {
+            IsTransferring = false;
+            _transferCancel.Dispose();
+            _transferCancel = null;
+        }
+    }
+
+    private static (string, ToastKind) DescribeImport(ImportResult result, OfferedRepository offer) => result.Outcome switch
+    {
+        ImportOutcome.Updated => ($"Your files now match {offer.PeerName}'s latest version ({result.HeadHash[..7]}).", ToastKind.Success),
+        ImportOutcome.AlreadyUpToDate => ($"You already have {offer.PeerName}'s latest version.", ToastKind.Success),
+        ImportOutcome.AlreadyNewer => ($"You already have {offer.PeerName}'s version, plus newer ones of your own.", ToastKind.Success),
+        ImportOutcome.WaitingForSave => ($"{offer.PeerName}'s newer version arrived, but you have unsaved changes, so your files " +
+                                         "were not touched. Save or discard your changes, then click Get latest again.", ToastKind.Info),
+        ImportOutcome.Diverged => ($"You and {offer.PeerName} each saved different versions. Theirs was kept separately, so " +
+                                   "nothing of yours was overwritten. Combining both isn't supported yet.", ToastKind.Info),
+        _ => ($"Received {offer.Name} from {offer.PeerName}.", ToastKind.Success)
+    };
+
+    // "Thesis", or "Thesis (2)" if a non-empty "Thesis" folder is already there.
+    private static string FreeFolderName(string path)
+    {
+        string candidate = path;
+        for (int n = 2; Directory.Exists(candidate) && Directory.EnumerateFileSystemEntries(candidate).Any(); n++)
+            candidate = $"{path} ({n})";
+        return candidate;
+    }
+
+    // The package was only a carrier: its versions are now inside the repository.
+    private static void DeletePackage(string package)
+    {
+        try { File.Delete(package); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        < 1024 * 1024 => $"{bytes / 1024.0:F0} KB",
+        < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
+        _ => $"{bytes / (1024.0 * 1024 * 1024):F2} GB"
+    };
+
     // Class diagram: ShareRepository(String peerId). Week 10 made the firewall part real; Week 11
-    // announces the repository in the DHT and finds who else already has a copy.
+    // announces the repository in the DHT and finds who else already has a copy; Week 12 lets them
+    // download its versions (served by NetworkNodeCoordinator.Transfer).
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
     private Task ShareRepositoryAsync() => RunBusyAsync("Checking network permissions...", async () =>
     {
@@ -198,7 +368,8 @@ public partial class MainDashboardViewModel
         }
 
         StatusText = $"Announcing {RepoName} on your network...";
-        await Background(() => _network.ProvideRepository(key));
+        string folder = CurrentDirectory, name = RepoName;
+        await Background(() => _network.ProvideRepository(key, folder, name));
         await SearchPeersAsync();
         var providers = await Background(() => _network.FindProviders(key));
         _providerIds.Clear();

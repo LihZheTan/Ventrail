@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using Ventrail.Models;
 
 namespace Ventrail.Services.Contracts;
@@ -33,10 +34,18 @@ public interface INetworkNodeCoordinator
     List<PeerNode> GetKnownPeers();                 // routing table snapshot, most recently seen first
     List<PeerNode> DiscoverPeers();                 // broadcast + DHT lookup, then GetKnownPeers()
     PeerNode? AddPeerByAddress(string address);     // for networks that block broadcasts
-    void ProvideRepository(string repositoryKey);   // "this computer has a copy" (DhtKey.ForRepository)
+    // "This computer has a copy" (DhtKey.ForRepository); Week 12: also lets others download it.
+    void ProvideRepository(string repositoryKey, string repositoryPath, string name);
     List<PeerNode> FindProviders(string repositoryKey);
 
     // Week 11: TCP hello check (the peer id must match). Week 12 streams blocks over it.
     bool EstablishConnection(string targetPeerId);
-    bool TransferData(string peerId, string dataHash);
+
+    // Week 12: block streaming with SHA-256 checks (TCP).
+    List<OfferedRepository> ListRepositories(string peerId);              // what a peer shares
+    TransferManifest RequestVersion(string peerId, string repositoryKey);  // sizes + block fingerprints
+    // Downloads and verifies every block; returns the verified package file. Resumes if interrupted.
+    string DownloadPackage(TransferManifest manifest, IProgress<TransferProgress>? progress, CancellationToken cancel);
+    bool TransferData(string peerId, string dataHash);                     // class diagram: download a requested package
+    long BytesSent { get; }
 }

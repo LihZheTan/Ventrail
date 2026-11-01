@@ -12,7 +12,7 @@
         Peer-to-peer page (proposal Fig: P2P network screen).
         Week 10: real firewall audit + permission (Fig 3.5) and local listening.
         Week 11: peer discovery (LAN broadcast + DHT), "Has a copy" badges, Connect (hello check).
-        Transfers arrive in Week 12.
+        Week 12: what each peer shares, Get latest / Download a copy, transfer progress.
     -->
     <UserControl.Resources>
         <!-- Pill for one port: green = allowed, amber = needs permission, red = blocked -->
@@ -199,6 +199,22 @@
                 <TextBlock DockPanel.Dock="Top" Style="{StaticResource SubtleText}" FontSize="12" TextWrapping="Wrap"
                            Text="{Binding PeersSummary}" Margin="0,0,0,10"/>
 
+                <!-- Week 12: download progress (every block is checked with SHA-256 as it arrives) -->
+                <Border DockPanel.Dock="Top" Style="{StaticResource GlowCard}" Margin="0,0,0,12"
+                        Visibility="{Binding IsTransferring, Converter={StaticResource BoolToVis}}">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <Button DockPanel.Dock="Right" Content="Cancel" Padding="10,3" Command="{Binding CancelTransferCommand}"
+                                    ToolTip="Stop the download. Blocks already received are kept, so trying again continues."/>
+                            <TextBlock Text="{Binding TransferTitle}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </DockPanel>
+                        <ProgressBar Value="{Binding TransferPercent, Mode=OneWay}" Maximum="100" Height="6"/>
+                        <TextBlock Text="{Binding TransferDetail}" Style="{StaticResource SubtleText}" FontSize="11"
+                                   TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- For networks that block broadcasts: ask one computer directly -->
                 <DockPanel DockPanel.Dock="Bottom" Margin="0,6,0,0"
                            ToolTip="If a computer doesn't show up, type its IP address (shown on its Peer-to-Peer page) or its name">
@@ -220,6 +236,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Background="{StaticResource CardBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,8">
+                                <StackPanel>
                                 <DockPanel>
                                     <Button DockPanel.Dock="Right" VerticalAlignment="Center" Padding="12,4"
                                             Command="{Binding DataContext.ConnectPeerCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
@@ -227,7 +244,7 @@
                                         <Button.Style>
                                             <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                                                 <Setter Property="Content" Value="Connect"/>
-                                                <Setter Property="ToolTip" Value="Check that this computer answers (sending versions arrives in Week 12)"/>
+                                                <Setter Property="ToolTip" Value="Check that this computer answers as the peer it claims to be"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsConnected}" Value="True">
                                                         <Setter Property="Content" Value="Connected"/>
@@ -254,6 +271,30 @@
                                         </TextBlock>
                                     </StackPanel>
                                 </DockPanel>
+
+                                <!-- Week 12: what this computer shares; download or update from it -->
+                                <ItemsControl ItemsSource="{Binding Repositories}" Margin="18,8,0,0"
+                                              Visibility="{Binding HasRepositories, Converter={StaticResource BoolToVis}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,6,0,0" Margin="0,0,0,2">
+                                                <DockPanel>
+                                                    <Button DockPanel.Dock="Right" Content="{Binding ActionText}" Padding="10,3"
+                                                            Command="{Binding DataContext.DownloadOfferCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            ToolTip="Sent in 1 MB blocks; each block and every version is checked by its fingerprint (hash)"/>
+                                                    <TextBlock VerticalAlignment="Center" FontSize="12">
+                                                        <Run Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets"/>
+                                                        <Run Text="{Binding Name, Mode=OneWay}"/>
+                                                        <Run Text="{Binding ShortHead, Mode=OneWay, StringFormat='· latest {0}'}"
+                                                             Foreground="{StaticResource SubtleTextBrush}" FontFamily="Consolas"/>
+                                                    </TextBlock>
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                </StackPanel>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

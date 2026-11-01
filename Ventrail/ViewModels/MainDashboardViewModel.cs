@@ -515,6 +515,7 @@ public partial class MainDashboardViewModel : ObservableObject
         if (!IsBusy) StatusText = $"{Changes.Count} changed file(s), {StagedCount} staged.";
 
         UpdateSuggestion();
+        RefreshPeerList();   // Week 12: "Get latest" vs "Download a copy" depends on this history
         _ = ClassifyChangesAsync(files, root);
     }
 

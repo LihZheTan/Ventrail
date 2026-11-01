@@ -5,6 +5,7 @@ using System.Linq;
 using LibGit2Sharp;
 using Ventrail.Models;
 using Ventrail.Services.Contracts;
+using Ventrail.Services.Implementations.Transfer;
 
 namespace Ventrail.Services.Implementations;
 
@@ -398,6 +399,104 @@ public class RepositoryManager : IRepositoryManager
         var buffer = new byte[8000];
         int n = fs.Read(buffer, 0, buffer.Length);
         return Array.IndexOf(buffer, (byte)0, 0, n) >= 0;
+    }
+
+    // ---------- Week 12: receiving versions from another computer ----------
+
+    /// <summary>
+    /// Adds the versions in a verified package to this repository. The files on disk only change
+    /// when that is completely safe: the other computer's version must simply continue this one
+    /// (a fast-forward) and there must be no unsaved changes here. Otherwise the received version
+    /// is kept beside the local one (refs/remotes/&lt;computer&gt;/&lt;branch&gt;) and nothing is overwritten.
+    /// </summary>
+    public ImportResult ImportVersionPackage(string packageFile, string headHash, string branch, string sourceName) =>
+        Use(repo =>
+        {
+            VersionPackage.Unpack(packageFile, repo.Info.Path);
+            var remote = VerifyReceivedHistory(repo, headHash);
+            string savedAs = $"refs/remotes/{SafeRefPart(sourceName)}/{SafeRefPart(branch)}";
+            repo.Refs.Add(savedAs, remote.Id, allowOverwrite: true);
+
+            var local = repo.Head.Tip;
+            bool dirty = repo.RetrieveStatus(new StatusOptions { IncludeUntracked = true }).IsDirty;
+            if (local is null)   // nothing saved here yet: take the received history as it is
+            {
+                if (dirty) return new ImportResult(ImportOutcome.WaitingForSave, remote.Sha, savedAs);
+                repo.Refs.Add(repo.Refs.Head.TargetIdentifier, remote.Id, allowOverwrite: true);
+                repo.Reset(ResetMode.Hard, remote);
+                return new ImportResult(ImportOutcome.Updated, remote.Sha, savedAs);
+            }
+            if (local.Sha == remote.Sha) return new ImportResult(ImportOutcome.AlreadyUpToDate, remote.Sha, savedAs);
+
+            var mergeBase = repo.ObjectDatabase.FindMergeBase(local, remote);
+            if (mergeBase?.Sha == remote.Sha) return new ImportResult(ImportOutcome.AlreadyNewer, remote.Sha, savedAs);
+            if (mergeBase?.Sha != local.Sha) return new ImportResult(ImportOutcome.Diverged, remote.Sha, savedAs);
+            if (dirty) return new ImportResult(ImportOutcome.WaitingForSave, remote.Sha, savedAs);
+
+            repo.Reset(ResetMode.Hard, remote);   // fast-forward: the working folder was clean
+            return new ImportResult(ImportOutcome.Updated, remote.Sha, savedAs);
+        });
+
+    /// <summary>Creates a new repository in an empty (or new) folder from a verified package and opens it.</summary>
+    public bool InitFromPackage(string folder, string packageFile, string headHash, string branch)
+    {
+        folder = Path.GetFullPath(folder);
+        if (Directory.Exists(folder) && Directory.EnumerateFileSystemEntries(folder).Any())
+            throw new VentrailException($"\"{folder}\" is not empty. Choose an empty folder for the copy.");
+        Directory.CreateDirectory(folder);
+
+        Translate(() =>
+        {
+            Repository.Init(folder);
+            using var repo = new Repository(folder);
+            VersionPackage.Unpack(packageFile, repo.Info.Path);
+            var remote = VerifyReceivedHistory(repo, headHash);
+            string branchRef = "refs/heads/" + SafeRefPart(branch);
+            repo.Refs.Add(branchRef, remote.Id, allowOverwrite: true);
+            repo.Refs.UpdateTarget(repo.Refs.Head, branchRef);
+            repo.Reset(ResetMode.Hard, remote);
+            return true;
+        }, folder);
+
+        RepoPath = folder;
+        GetCommitHistory();
+        return true;
+    }
+
+    // Git names every object by the hash of its content and checks that hash when it reads it, so
+    // reading every version and folder listing proves the received history is complete and intact.
+    private static Commit VerifyReceivedHistory(Repository repo, string headHash)
+    {
+        try
+        {
+            var head = repo.Lookup<Commit>(headHash)
+                       ?? throw new VentrailException("The received versions are incomplete, so nothing was changed.");
+            var seenTrees = new HashSet<ObjectId>();
+            void Walk(Tree tree)
+            {
+                if (!seenTrees.Add(tree.Id)) return;
+                foreach (var entry in tree)
+                {
+                    if (entry.TargetType == TreeEntryTargetType.Tree) Walk((Tree)entry.Target);
+                    else if (entry.TargetType == TreeEntryTargetType.Blob && repo.ObjectDatabase.RetrieveObjectMetadata(entry.Target.Id) is null)
+                        throw new VentrailException("A file in the received versions is missing, so nothing was changed.");
+                }
+            }
+            foreach (var c in repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = head }))
+                Walk(c.Tree);
+            return head;
+        }
+        catch (LibGit2SharpException ex)
+        {
+            throw new VentrailException("The received versions failed Git's own check, so nothing was changed.", ex);
+        }
+    }
+
+    // A computer or branch name as one safe part of a Git reference name.
+    private static string SafeRefPart(string name)
+    {
+        string clean = System.Text.RegularExpressions.Regex.Replace(name ?? "", "[^A-Za-z0-9_-]", "-").Trim('-');
+        return clean.Length == 0 ? "peer" : clean;
     }
 
     // ---------- Week 6: error handling ----------

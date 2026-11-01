@@ -745,3 +745,99 @@ of them already have a copy of the open repository (proposal: libp2p/IPFS and DH
   - `PeerNode` gains DiscoveryPort, DisplayName, LastSeen and HasCurrentRepository;
   - `INetworkNodeCoordinator` gains PeersChanged, DisplayName, GetKnownPeers, AddPeerByAddress,
     ProvideRepository and FindProviders.
+
+## Week 12 — Sending versions: sockets, block streaming, hash verification
+
+**Goal:** actually move versions between computers over TCP, in 1 MB blocks, checking every block
+by its fingerprint (hash), so a receiving computer can either update its copy ("Get latest") or
+get a brand-new copy ("Download a copy").
+
+**What was built**
+- **Version package** (`VersionPackage`): one file holding a Git **pack** (every version, compressed
+  the way Git stores it) plus its index, made with LibGit2Sharp's `PackBuilder`.
+  - The file is named after its SHA-256, so the same versions always give the same package.
+  - The sender builds it once per latest version and reuses it until the repository changes.
+- **TCP protocol** on port 4001, after Week 10's hello line:
+  - `LIST` returns the repositories this computer shares, with the latest version of each;
+  - `MANIFEST <repo key>` returns the package's size, its SHA-256 and the SHA-256 of every 1 MB block;
+  - `BLOCK <hash> <index>` returns exactly one block;
+  - `ERROR …` for anything wrong, `BYE` to finish.
+  - Text lines and raw bytes share one buffered stream; the receiver checks every field before using it.
+- **Three layers of checking** on the receiving side:
+  1. **each block** is checked against its SHA-256 as it arrives; a damaged block is asked for
+     again (up to 3 tries, reconnecting if the connection broke);
+  2. **the whole package** is checked against its SHA-256 at the end;
+  3. **Git checks every version** while importing (objects are named by their own hash), so a
+     package that matched its fingerprint but holds broken data is still refused.
+- **Resume:** finished blocks stay on disk (`%LocalAppData%\Ventrail\inbox`). After a failure or
+  Cancel, trying again only fetches the missing blocks.
+- **Importing safely** (`RepositoryManager.ImportVersionPackage`): your files only change when
+  that is completely safe:
+  - **Updated:** the other version simply continues yours (a fast-forward) **and** you have no
+    unsaved changes;
+  - **Waiting for save:** you have unsaved changes, so the version is kept aside and your files
+    are untouched;
+  - **Diverged:** you both saved different versions, so theirs is kept aside as
+    `refs/remotes/<computer>/<branch>`. Combining both is future work.
+  - **Already up to date / already newer:** nothing changes.
+- **Download a copy** (`InitFromPackage`): you pick a folder, it gets a new subfolder named after
+  the repository, `Thesis (2)` if that name is taken, and the copy opens straight away.
+- **Network page:**
+  - each peer lists what it shares, with a **Get latest** button (same repository) or a
+    **Download a copy** button;
+  - a progress card shows "N of M blocks checked", blocks kept from last time and damaged blocks
+    sent again, with a **Cancel** button;
+  - the Summary page's "shared this session" now counts real bytes.
+- **Demo mode:** LAB-PC-02 has a newer version of the open repo (one block "arrives damaged" and
+  is re-sent), and both demo PCs offer "Group-Report" to download.
+
+**Testing** (headless console app, `%LOCALAPPDATA%\Temp\vw12`, **48/48 pass**)
+- A real repository with a 3 MB random file:
+  - the package spans 4 blocks and is byte-identical after the trip;
+  - all 3 versions arrive, and the copy gets the same repository key.
+- Malformed and truncated packages are refused. A package with damaged pack data is refused by
+  **Git's check**.
+- Get latest:
+  - with unsaved changes, the files are left alone;
+  - after the edit is undone, it fast-forwards;
+  - then up to date, already newer, and diverged (nothing overwritten).
+- Damaged blocks:
+  - a block damaged twice is re-sent and the download succeeds;
+  - a block that's always damaged stops the download with a clear message;
+  - trying again **resumes** (only the missing blocks are fetched), and Cancel also resumes.
+- When the sender saves a new version, a new package is made, the old one is deleted from the
+  sender's outbox, and requests for its blocks are refused.
+- Nonsense requests get `ERROR` and the connection closes; the sender keeps serving others.
+- The ViewModel flow with the demo services: Get latest, a second click says "already have",
+  folder dialog cancelled, the copy opens in `Group-Report (2)`, and Cancel works.
+- Weeks 10 (54/54) and 11 (67/67) still pass. Two Week 11 expectations changed on purpose
+  (Connect status text; the same history in another folder now counts as the same repository).
+- Visual check in demo mode: peer cards with Get latest / Download a copy, then the progress card
+  mid-transfer, then "Your files now match LAB-PC-02's latest version".
+
+**Decisions**
+- **Pull, never push:** versions only move when the receiving user clicks. Nobody can drop files
+  onto someone else's computer.
+- **A whole pack each time**, not just the new versions. That's simpler and always complete; a
+  smaller "only what's new" pack is possible later (Git can exclude what the receiver already has).
+- **Never overwrite:** unsaved work or different saved versions on the receiving side are never
+  replaced; the received version is kept aside instead.
+- 1 MB blocks match the Week 9 storage advice ("sent in N blocks of 1 MB").
+- Timeouts are still fixed (connect 3 s, block 30 s, manifest 3 min while the sender packs).
+  Week 13 makes them adaptive.
+
+**Issues / notes**
+- libgit2 writes pack files **read-only**, so cleaning up the build folder failed at first;
+  the attributes are now cleared first.
+- With `core.autocrlf=true` (set on this PC), text files are checked out with Windows line
+  endings. That's expected, and only the tests had to allow for it.
+- The peer list now refreshes after the history loads. Before, opening a different folder could
+  briefly show "Get latest" for the wrong repository.
+- Clicks on the right half of the screen during visual tests went to the Claude app window, so
+  buttons there were pressed through UI Automation instead (same cause as Week 11).
+- Class diagram update for the report:
+  - `VersionPackage`, `BlockHashing`, `TransferManifest`, `TransferProgress`, `OfferedRepository`,
+    `ImportResult`;
+  - `INetworkNodeCoordinator` gains ListRepositories, RequestVersion, DownloadPackage,
+    TransferData and BytesSent;
+  - `IRepositoryManager` gains ImportVersionPackage and InitFromPackage.

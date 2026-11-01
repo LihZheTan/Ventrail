@@ -75,6 +75,25 @@ public class MockRepositoryManager : IRepositoryManager
         return true;
     }
 
+    // Week 12 (demo): a "received" version appears on top of the history.
+    public ImportResult ImportVersionPackage(string packageFile, string headHash, string branch, string sourceName)
+    {
+        if (CommitHistory.Count > 0 && CommitHistory[0].Hash == headHash)
+            return new ImportResult(ImportOutcome.AlreadyUpToDate, headHash, $"refs/remotes/{sourceName}/{branch}");
+        AddCommit($"Update figures and Chapter 4 draft (from {sourceName})", "Lab partner", DateTime.Now.AddMinutes(-5),
+            File("Chapter4_Results.docx", "Added", 512_000), File("figures/chart_age.png", "Modified", 214_000));
+        CommitHistory[0].Hash = headHash;
+        _filesByCommit[headHash] = _filesByCommit.Values.Last();
+        return new ImportResult(ImportOutcome.Updated, headHash, $"refs/remotes/{sourceName}/{branch}");
+    }
+
+    public bool InitFromPackage(string folder, string packageFile, string headHash, string branch)
+    {
+        RepoPath = folder;
+        _workingChanges.Clear();
+        return true;
+    }
+
     public List<CommitNode> GetCommitHistory() => CommitHistory.ToList();
     public string GetCurrentBranchName() => "main";
 

@@ -27,7 +27,7 @@ namespace Ventrail.Services.Implementations;
 /// Only computers on the same local network are accepted, matching the firewall rules
 /// (remoteip=localsubnet); nothing is sent to the internet or the public IPFS network.
 /// </summary>
-public class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposable
+public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposable
 {
     public const int DefaultTcpPort = 4001;   // libp2p's common default port
     public const int DefaultUdpPort = 4002;
@@ -52,7 +52,7 @@ public class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposable
     private readonly object _gate = new();
     private readonly KademliaRoutingTable _table;
     private readonly ProviderStore _providers = new();
-    private readonly HashSet<string> _provided = new();   // repository keys this computer offers
+    private readonly Dictionary<string, Offer> _provided = new();   // repositories this computer offers
     private TcpListener? _tcp;
     private UdpClient? _udp;
     private CancellationTokenSource? _stop;
@@ -81,8 +81,9 @@ public class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposable
         LocalPort = tcpPort;
         DiscoveryPort = udpPort;
         ExePath = exePath ?? Environment.ProcessPath ?? string.Empty;
-        LocalPeerId = LoadOrCreatePeerId(dataFolder ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ventrail"));
+        _dataFolder = dataFolder ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ventrail");
+        LocalPeerId = LoadOrCreatePeerId(_dataFolder);
         DisplayName = DiscoveryMessage.CleanName(displayName ?? Environment.MachineName);
         _fixedTargets = discoveryTargets?.ToList();
         _table = new KademliaRoutingTable(LocalPeerId);
@@ -164,14 +165,7 @@ public class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposable
             while (!stop.IsCancellationRequested)
             {
                 var client = await listener.AcceptTcpClientAsync(stop);
-                _ = Task.Run(async () =>
-                {
-                    using (client)
-                    {
-                        byte[] hello = Encoding.UTF8.GetBytes($"{HelloPrefix} {LocalPeerId}\n");
-                        await client.GetStream().WriteAsync(hello, stop);
-                    }
-                }, stop);
+                _ = Task.Run(() => ServeAsync(client, stop), stop);   // Week 12: hello, then requests
             }
         }
         catch (Exception) when (stop.IsCancellationRequested) { }   // StopListening
@@ -227,7 +221,7 @@ public class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposable
             case DiscoveryMessage.GetProviders when msg.Args.Length >= 1 && IsRepoKey(msg.Args[0]):
                 string key = msg.Args[0];
                 bool selfHas;
-                lock (_gate) selfHas = _provided.Contains(key);
+                lock (_gate) selfHas = _provided.ContainsKey(key);
                 var known = _providers.Get(key, DateTime.UtcNow).Where(p => p.PeerId != sender?.PeerId);
                 return $"{Header(DiscoveryMessage.Providers)} {key} {(selfHas ? 1 : 0)} " +
                        $"{DiscoveryMessage.Entries(known)} " +
@@ -256,7 +250,7 @@ public class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposable
                            BroadcastWait, firstOnly: false);
             await LookupAsync(LocalPeerId);
             string[] keys;
-            lock (_gate) keys = _provided.ToArray();
+            lock (_gate) keys = _provided.Keys.ToArray();
             foreach (string key in keys) await AnnounceAsync(key);
         });
         return GetKnownPeers();
@@ -291,12 +285,15 @@ public class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposable
         return replies.Count == 0 ? null : _table.Find(replies[0].Sender!.PeerId);
     }
 
-    /// <summary>Announces in the DHT that this computer has a copy of the repository (provider record).</summary>
-    public void ProvideRepository(string repositoryKey)
+    /// <summary>
+    /// Announces in the DHT that this computer has a copy of the repository (provider record), and
+    /// (Week 12) lets other computers download its versions over TCP.
+    /// </summary>
+    public void ProvideRepository(string repositoryKey, string repositoryPath, string name)
     {
         if (!IsRepoKey(repositoryKey)) throw new ArgumentException("Not a repository key", nameof(repositoryKey));
         RequireListening();
-        lock (_gate) _provided.Add(repositoryKey);
+        lock (_gate) _provided[repositoryKey] = new Offer(repositoryPath, name);
         Run(() => AnnounceAsync(repositoryKey));
     }
 
@@ -332,44 +329,11 @@ public class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposable
     /// </summary>
     public bool EstablishConnection(string targetPeerId)
     {
-        var peer = _table.Find(targetPeerId)
-                   ?? throw new VentrailException("Ventrail no longer knows this computer. Search for peers again.");
-        string expected = $"{HelloPrefix} {targetPeerId}";
-        string? hello = Run(async () =>
+        Run(async () =>
         {
-            using var timeout = new CancellationTokenSource(ConnectWait);
-            using var client = new TcpClient(AddressFamily.InterNetwork);
-            try
-            {
-                await client.ConnectAsync(IPAddress.Parse(peer.IPAddress), peer.Port, timeout.Token);
-                var buffer = new byte[128];
-                int length = 0, read;
-                var stream = client.GetStream();
-                while (length < buffer.Length &&
-                       (read = await stream.ReadAsync(buffer.AsMemory(length), timeout.Token)) > 0)
-                {
-                    length += read;
-                    if (Array.IndexOf(buffer, (byte)'\n', 0, length) >= 0) break;
-                }
-                return Encoding.UTF8.GetString(buffer, 0, length).Trim();
-            }
-            catch (Exception ex) when (ex is SocketException or OperationCanceledException or IOException)
-            {
-                return null;
-            }
+            using var session = await OpenSessionAsync(targetPeerId, CancellationToken.None);
+            await session.SendAsync("BYE", CancellationToken.None);
         });
-
-        if (hello is null)
-            throw new VentrailException($"{peer.Title} didn't answer on port {peer.Port}. Check that sharing is " +
-                                        "switched on there and that its firewall allows Ventrail.");
-        if (hello != expected)
-        {
-            _table.Remove(targetPeerId);
-            PeersChanged?.Invoke(this, EventArgs.Empty);
-            throw new VentrailException($"The computer at {peer.IPAddress} is no longer {peer.Title}. " +
-                                        "Search for peers again.");
-        }
-
         _table.Update(targetPeerId, p => p.IsConnected = true);
         lock (_gate)
         {
@@ -379,9 +343,6 @@ public class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposable
         PeersChanged?.Invoke(this, EventArgs.Empty);
         return true;
     }
-
-    public bool TransferData(string peerId, string dataHash) =>
-        throw new NotImplementedException("Planned for Week 12: data block streaming and hash verification.");
 
     // ---------- DHT internals ----------
 

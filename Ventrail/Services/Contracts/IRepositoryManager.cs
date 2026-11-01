@@ -44,4 +44,11 @@ public interface IRepositoryManager
 
     // Week 7: line-by-line comparison of a changed file with its last saved version.
     FileDiff GetFileDiff(string filePath);
+
+    // Week 12: add the versions from a verified package received from another computer.
+    // Files only change for a clean fast-forward; otherwise the received version is kept aside.
+    ImportResult ImportVersionPackage(string packageFile, string headHash, string branch, string sourceName);
+
+    // Week 12: "Download a copy": create a new repository in an empty folder and open it.
+    bool InitFromPackage(string folder, string packageFile, string headHash, string branch);
 }

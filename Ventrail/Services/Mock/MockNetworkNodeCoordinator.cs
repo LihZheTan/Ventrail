@@ -90,7 +90,9 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
         return peer.Copy();
     }
 
-    public void ProvideRepository(string repositoryKey) { }
+    private readonly Dictionary<string, string> _shared = new();   // key -> name
+
+    public void ProvideRepository(string repositoryKey, string repositoryPath, string name) => _shared[repositoryKey] = name;
 
     public List<PeerNode> FindProviders(string repositoryKey) => _known.Take(1).Select(p => p.Copy()).ToList();
 
@@ -105,8 +107,62 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
         return true;
     }
 
-    public bool TransferData(string peerId, string dataHash) =>
-        throw new NotImplementedException("Planned for Week 12: data block streaming and hash verification.");
+    // ---------- Week 12 (demo): LAB-PC-02 has a newer version of whatever is shared here, and
+    // both computers offer a "Group-Report" repository that can be downloaded as a new copy. ----------
+
+    public const string GroupReportKey = "rp-00000000beef";
+    private const int DemoBlocks = 8;
+
+    public long BytesSent { get; private set; }
+
+    public List<OfferedRepository> ListRepositories(string peerId)
+    {
+        Thread.Sleep(200);
+        var peer = _known.FirstOrDefault(p => p.PeerId == peerId)
+                   ?? throw new VentrailException("Ventrail no longer knows this computer. Search for peers again.");
+        var list = new List<OfferedRepository>();
+        if (peer == _known.FirstOrDefault())
+            list.AddRange(_shared.Select(s => Offer(peer, s.Key, s.Value)));
+        if (_known.IndexOf(peer) < 2)
+            list.Add(Offer(peer, GroupReportKey, "Group-Report"));
+        return list;
+    }
+
+    public TransferManifest RequestVersion(string peerId, string repositoryKey)
+    {
+        var offer = ListRepositories(peerId).FirstOrDefault(o => o.Key == repositoryKey)
+                    ?? throw new VentrailException("This repository is not shared from that computer.");
+        return new TransferManifest
+        {
+            PeerId = peerId, RepositoryKey = repositoryKey, Name = offer.Name, HeadHash = offer.HeadHash, Branch = "main",
+            PackageHash = new string('d', 64), BlockSize = 1024 * 1024, Size = DemoBlocks * 1024L * 1024 - 300_000,
+            BlockHashes = Enumerable.Range(0, DemoBlocks).Select(i => i.ToString("x64")).ToList()
+        };
+    }
+
+    public string DownloadPackage(TransferManifest manifest, IProgress<TransferProgress>? progress, CancellationToken cancel)
+    {
+        for (int i = 1; i <= manifest.BlockCount; i++)
+        {
+            cancel.ThrowIfCancellationRequested();
+            Thread.Sleep(250);   // feels like a real transfer
+            progress?.Report(new TransferProgress
+            {
+                BlocksDone = i, BlockCount = manifest.BlockCount, TotalBytes = manifest.Size,
+                BytesDone = Math.Min(manifest.Size, i * (long)manifest.BlockSize), BlocksRetried = i >= 5 ? 1 : 0
+            });
+        }
+        return @"C:\Demo\inbox\" + manifest.PackageHash + ".vtpk";
+    }
+
+    public bool TransferData(string peerId, string dataHash) => true;
+
+    // The demo peer's head is a fixed made-up version, so "Get latest" works once and then says "up to date".
+    private static OfferedRepository Offer(PeerNode peer, string key, string name) => new()
+    {
+        PeerId = peer.PeerId, PeerName = peer.Title, Key = key, Name = name, Branch = "main",
+        HeadHash = key == GroupReportKey ? new string('b', 40) : new string('a', 40)
+    };
 
     private static PeerNode Peer(string id, string name, string ip) =>
         new() { PeerId = id, DisplayName = name, IPAddress = ip, Port = 4001, DiscoveryPort = 4002, LastSeen = DateTime.UtcNow };

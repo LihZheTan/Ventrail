@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace Ventrail.Models;
 
@@ -16,6 +17,10 @@ public class PeerNode
 
     // Set by the Network page: this peer already has a copy of the open repository.
     public bool HasCurrentRepository { get; set; }
+
+    // Week 12: repositories this peer offers for download (its "LIST" answer).
+    public List<OfferedRepository> Repositories { get; set; } = new();
+    public bool HasRepositories => Repositories.Count > 0;
 
     public string Title => string.IsNullOrEmpty(DisplayName) ? PeerId : DisplayName;
 
