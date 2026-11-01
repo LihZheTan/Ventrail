@@ -540,3 +540,124 @@
   "old → new".
 - "Edit Manually" uses a few lines of code-behind (`StagingView.xaml.cs`) to move keyboard focus,
   which is a view-only concern; all logic stays in the ViewModel.
+
+## Week 10 – Firewall audit and permission prompt
+
+**What was done**
+- **Firewall audit** (`Services/Implementations/FirewallAuditor.cs`), read-only, no admin rights:
+  - It reads the Windows Firewall settings through Windows' own COM API (`HNetCfg.FwPolicy2`), which
+    works in any Windows language (unlike parsing `netsh` output).
+  - For each port (**TCP 4001** for transfers, **UDP 4002** for discovery) it works out what Windows
+    would do with an incoming connection. **Block rules win**, then allow rules, then the network's
+    default. It also handles "block all incoming connections" and a firewall that is switched off.
+  - It only counts rules that apply to the current network type (Private / Public / Domain), are
+    switched on, are inbound, and match the protocol, the port (single, list, range or any) and the
+    program (Ventrail's exe or any program).
+  - It ignores rules that Windows only applies to something else: service rules (e.g. Remote
+    Desktop) and Store-app rules (e.g. "Game Bar"; see Issues).
+  - Each port gets **Allowed / Needs permission / Blocked**, with a plain-language reason as a
+    tooltip, e.g. *Blocked by the firewall rule "Ventrail.exe"*.
+- **Permission prompt** (proposal Fig 3.5: denied → abort, allowed → continue):
+  1. Turning on sharing (the switch or "Share via P2P") audits the firewall first.
+  2. If a port isn't allowed, Ventrail's own dialog explains why, in plain words.
+  3. **Allow** opens the normal **Windows admin prompt (UAC)**, which adds two rules with `netsh`:
+     - `Ventrail P2P (TCP 4001)` and `Ventrail P2P (UDP 4002)`;
+     - limited to Ventrail's exe and its two ports;
+     - **only devices on the same local network** (`remoteip=localsubnet`).
+  4. The audit runs again to confirm. Only then are the ports opened.
+  5. "Not now" in Ventrail's dialog, or "No" on the Windows prompt, aborts cleanly: the switch goes
+     back off, a toast explains why, and the Activity Log records it.
+- **Public networks:**
+  - Rules normally cover Private and Domain (work) networks only.
+  - If the PC is on a **Public** network (café or campus Wi-Fi), the dialog says so, explains that
+    devices on the same network could connect, and points to Settings to mark a trusted network as
+    Private. Allowing then includes the Public profile.
+- **Blocked by an old rule:** if someone once pressed "Cancel" on Windows' own "allow access?"
+  pop-up, Windows created a block rule for Ventrail.exe. Ventrail recognises it as its own, says so
+  in the dialog, and replaces it. **Other programs' rules are never touched.**
+- **"Remove firewall permission"** link: asks first, stops sharing, and deletes only Ventrail's two
+  rules (again through the admin prompt).
+- **Local node listening** (`NetworkNodeCoordinator`):
+  - **TCP 4001** accepts connections and answers `VENTRAIL/1 <peer id>`. Week 12 replaces this with
+    block streaming.
+  - **UDP 4002** answers the discovery question `VENTRAIL?` with
+    `VENTRAIL! <peer id> <tcp port>` and ignores any other packet. Week 11's discovery broadcasts
+    that question.
+  - Start/stop is idempotent and thread-safe.
+  - "Port already used by another program (maybe Ventrail is open twice)" is a friendly error, and a
+    failed start never leaves one port half-open.
+  - A short **peer id** (`vt-` + 12 hex digits) is created once and kept in
+    `%LocalAppData%\Ventrail\peer-id.txt`, so peers recognise this computer between runs.
+- **Network page is live:**
+  - the Online/Offline pill turns green while sharing (tooltip shows the peer id);
+  - the firewall card shows a summary sentence, coloured pills per port, and a "check again"
+    button;
+  - the "Enable P2P Sharing" switch works;
+  - the firewall is checked automatically the first time the page opens.
+- **Demo mode** uses `MockNetworkNodeCoordinator`. It starts at "Needs permission" and "Allow"
+  succeeds without an admin prompt, so the flow can be shown without changing the PC's firewall or
+  opening ports.
+- The share logic moved into `MainDashboardViewModel.Network.cs` (partial class, like `.Feedback.cs`).
+
+**Testing**
+- Headless test console app (outside the repo), 54 checks:
+  - port matching (single, list, range, any, keywords, near-misses);
+  - **rule evaluation with made-up rules**:
+    - no rules; our allow rule; block beats allow;
+    - Windows' own block rule for Ventrail recognised, someone else's block rule not ours;
+    - other program; any program; Store-app rule; service rule; "any program, any port" rule;
+    - other network type; disabled and outbound rules; UDP vs TCP; any protocol;
+    - firewall off; block-all; network default allow; Public detection; `%SystemRoot%` paths;
+  - the exact `netsh` scripts (local subnet only, private/domain vs +public, old rules replaced
+    first, delete-by-program only when asked, remove only deletes Ventrail's rules);
+  - **real audit on this PC (read-only):** Public network, both ports "Needs permission";
+  - **real sockets on loopback** with spare ports (so Windows never shows a firewall pop-up):
+    - the TCP hello and the UDP discovery answer (other packets ignored);
+    - port-in-use error; stop frees the ports; nothing listens after stop;
+    - the peer id survives a restart;
+  - **ViewModel flow (Fig 3.5)** with the demo node:
+    - the page audits on first open;
+    - asks before changing anything;
+    - "Not now" aborts and is logged;
+    - "Allow" leads to online;
+    - switch off/on, with no second prompt;
+    - remove permission;
+    - a fake node that says "No" at the admin prompt: abort, the switch goes back off, and the
+      Public warning is shown.
+- I did **not** run the real admin prompt or change this PC's firewall during testing (that's the
+  user's decision); the exact commands it runs are tested instead.
+
+**Decisions**
+- Rules are tied to Ventrail's exe, its two ports and the **local subnet**, not "allow everything":
+  P2P sharing in this project is between computers on the same network.
+- The admin prompt is unavoidable for firewall changes, and that is a good thing: Windows shows the
+  user exactly what is being changed. Ventrail never tries to work around it.
+- Ventrail's own explanation comes **before** the Windows prompt, because a bare UAC prompt is
+  confusing for non-technical users.
+- The audit errs on the cautious side. A rule that *might* only apply to another app is ignored, so
+  the worst case is asking for permission that wasn't strictly needed, never claiming access that
+  isn't there.
+
+**Issues / notes**
+- **Found while testing on this PC:** the first audit said both ports were "Allowed by Game Bar".
+  - Store apps (Game Bar, Teams, Microsoft Store) have firewall rules with *no program and any
+    port*, which looked like "allow everything". Windows actually ties them to the app package.
+  - Through COM the package id comes back empty, but these rules have an owning user
+    (`LocalUserOwner`), so they are now ignored, along with service rules and "any program, any
+    port" allow rules.
+  - Reading `LocalUserOwner` through `dynamic` threw an exception on every rule (an 18 s audit). A
+    direct `IDispatch` call fixed it.
+- **Audit speed** depends on Windows. Reading the ~690 rules took 0.2 s on an idle PC and 3–4 s while
+  Visual Studio was installing extensions; plain PowerShell took the same time, so the delay is in
+  the firewall service, not Ventrail. The audit always runs in the background with "Checking..." on
+  screen, and the owner lookup is limited to the few rules that need it.
+- The rule is tied to the exe path. A Debug build (`bin\Debug`) and a later installed copy are
+  different programs to Windows, so each needs its own permission.
+- If Week 11 needs discovery beyond the local network (internet DHT), the `remoteip=localsubnet`
+  limit has to be widened. That is a deliberate change, made in one place (`BuildAllowScript`).
+- Class diagram update for the report:
+  - `FirewallStatus` and `PortCheck`;
+  - `FirewallAuditor`;
+  - `INetworkNodeCoordinator.CheckFirewall`, `RequestFirewallPermission`,
+    `RemoveFirewallPermission`, `IsListening`, `StopListening` and `DiscoveryPort`;
+  - `MockNetworkNodeCoordinator`.

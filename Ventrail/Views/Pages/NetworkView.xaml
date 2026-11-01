@@ -10,16 +10,63 @@
 
     <!--
         Peer-to-peer page (proposal Fig: P2P network screen).
-        Layout only for Week 3: firewall checks arrive in Week 10, discovery in Week 11, transfers in Week 12.
+        Week 10: real firewall audit + permission (Fig 3.5) and local listening.
+        Discovery arrives in Week 11, transfers in Week 12.
     -->
+    <UserControl.Resources>
+        <!-- Pill for one port: green = allowed, amber = needs permission, red = blocked -->
+        <Style x:Key="PortPill" TargetType="Border" BasedOn="{StaticResource Pill}">
+            <Setter Property="ToolTip" Value="{Binding Detail}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Access}" Value="Allowed">
+                    <Setter Property="Background" Value="{StaticResource AddedTintBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Access}" Value="NeedsPermission">
+                    <Setter Property="Background" Value="{StaticResource ModifiedTintBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Access}" Value="Blocked">
+                    <Setter Property="Background" Value="{StaticResource DeletedTintBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="PortPillText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Text" Value="{Binding Label, FallbackValue='Checking...'}"/>
+            <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Access}" Value="Allowed">
+                    <Setter Property="Foreground" Value="{StaticResource AddedBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Access}" Value="NeedsPermission">
+                    <Setter Property="Foreground" Value="{StaticResource ModifiedBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Access}" Value="Blocked">
+                    <Setter Property="Foreground" Value="{StaticResource DeletedBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
     <DockPanel Margin="26,22,26,20">
 
         <!-- Header -->
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,20">
-            <Border DockPanel.Dock="Right" Style="{StaticResource Pill}">
+            <Border DockPanel.Dock="Right" Style="{StaticResource Pill}"
+                    ToolTip="{Binding LocalPeerId, StringFormat='This computer''s peer id: {0}'}">
                 <StackPanel Orientation="Horizontal">
-                    <Ellipse Width="8" Height="8" Fill="{StaticResource SubtleTextBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="Offline" Foreground="{StaticResource SubtleTextBrush}"/>
+                    <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{StaticResource SubtleTextBrush}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSharingEnabled}" Value="True">
+                                        <Setter Property="Fill" Value="{StaticResource AddedBrush}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock Text="{Binding NetworkStateText}" Foreground="{StaticResource SubtleTextBrush}"/>
                 </StackPanel>
             </Border>
             <TextBlock Text="Peer-to-Peer Network" Style="{StaticResource PageTitle}"/>
@@ -55,15 +102,24 @@
                 <!-- Firewall -->
                 <Border Style="{StaticResource Card}" Padding="0" Margin="0,0,0,18">
                     <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="18,16,18,12">
-                            <TextBlock Style="{StaticResource Icon}" Text="&#xEA18;" FontSize="16" Margin="0,0,10,0"/>
-                            <TextBlock Text="Firewall Configuration" FontSize="16" FontWeight="SemiBold"/>
-                        </StackPanel>
+                        <DockPanel Margin="18,16,18,4">
+                            <Button DockPanel.Dock="Right" Command="{Binding CheckFirewallCommand}" ToolTip="Check again"
+                                    Padding="6,3" Background="Transparent" BorderThickness="0">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" FontSize="12"/>
+                            </Button>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xEA18;" FontSize="16" Margin="0,0,10,0"/>
+                                <TextBlock Text="Firewall Configuration" FontSize="16" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <TextBlock Text="{Binding FirewallSummary}" Style="{StaticResource SubtleText}" FontSize="12"
+                                   Margin="18,0,18,12"/>
 
+                        <!-- Week 10: live audit result per port (hover a pill for the reason) -->
                         <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="18,12">
                             <DockPanel>
-                                <Border DockPanel.Dock="Right" Style="{StaticResource Pill}">
-                                    <TextBlock Text="Not checked" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"/>
+                                <Border DockPanel.Dock="Right" Style="{StaticResource PortPill}" DataContext="{Binding TcpCheck}">
+                                    <TextBlock Style="{StaticResource PortPillText}"/>
                                 </Border>
                                 <TextBlock Text="Port 4001 (TCP)" VerticalAlignment="Center"/>
                             </DockPanel>
@@ -71,8 +127,8 @@
 
                         <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="18,12">
                             <DockPanel>
-                                <Border DockPanel.Dock="Right" Style="{StaticResource Pill}">
-                                    <TextBlock Text="Not checked" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"/>
+                                <Border DockPanel.Dock="Right" Style="{StaticResource PortPill}" DataContext="{Binding UdpCheck}">
+                                    <TextBlock Style="{StaticResource PortPillText}"/>
                                 </Border>
                                 <TextBlock Text="Port 4002 (UDP)" VerticalAlignment="Center"/>
                             </DockPanel>
@@ -80,10 +136,18 @@
 
                         <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="18,12">
                             <DockPanel>
-                                <CheckBox DockPanel.Dock="Right" IsEnabled="False" VerticalAlignment="Center"
-                                          ToolTip="Available once firewall checks are added (Week 10)"
-                                          ToolTipService.ShowOnDisabled="True"/>
-                                <TextBlock Text="Enable P2P Sharing" VerticalAlignment="Center"/>
+                                <CheckBox DockPanel.Dock="Right" VerticalAlignment="Center"
+                                          IsChecked="{Binding IsSharingEnabled, Mode=TwoWay}"
+                                          Command="{Binding ToggleSharingCommand}"
+                                          ToolTip="Let other computers on your network reach Ventrail (asks Windows for permission the first time)"/>
+                                <StackPanel>
+                                    <TextBlock Text="Enable P2P Sharing" VerticalAlignment="Center"/>
+                                    <TextBlock Style="{StaticResource SubtleText}" FontSize="11"
+                                               Visibility="{Binding CanRemoveFirewallPermission, Converter={StaticResource BoolToVis}}">
+                                        <Hyperlink Command="{Binding RemoveFirewallPermissionCommand}"
+                                                   Foreground="{StaticResource SubtleTextBrush}">Remove firewall permission</Hyperlink>
+                                    </TextBlock>
+                                </StackPanel>
                             </DockPanel>
                         </Border>
                     </StackPanel>
@@ -124,7 +188,7 @@
                 <Border DockPanel.Dock="Top" Style="{StaticResource Card}"
                         Visibility="{Binding HasPeers, Converter={StaticResource InverseBoolToVis}}">
                     <TextBlock Style="{StaticResource SubtleText}"
-                               Text="No peers found yet. Other computers running Ventrail on your network will appear here once peer discovery is added (Week 11)."/>
+                               Text="No peers found yet. Turn on sharing first; other computers running Ventrail on your network will appear here once peer discovery is added (Week 11)."/>
                 </Border>
 
                 <ItemsControl ItemsSource="{Binding ActivePeers}">

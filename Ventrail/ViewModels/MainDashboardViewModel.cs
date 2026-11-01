@@ -359,43 +359,7 @@ public partial class MainDashboardViewModel : ObservableObject
         }
     });
 
-    // Class diagram: ShareRepository(String peerId). Real P2P arrives in Weeks 10-12.
-    // Week 5: the firewall permission prompt from Fig 3.5 (denied = abort, allowed = continue).
-    [RelayCommand(CanExecute = nameof(CanUseRepo))]
-    private Task ShareRepositoryAsync() => RunBusyAsync("Checking network permissions...", async () =>
-    {
-        bool allowed = await AskAsync(
-            "Allow peer-to-peer sharing?",
-            "To share versions directly with other computers, Windows Firewall must let Ventrail use " +
-            "port 4001 (TCP) and port 4002 (UDP).\n\nNothing is uploaded to the cloud. Windows may ask you " +
-            "to confirm, and you can switch sharing off again at any time.",
-            "Allow", "Not now", "\uEA18");
-
-        if (!allowed)
-        {
-            LogActivity("Sharing cancelled: firewall permission not given");
-            ShowToast("Sharing cancelled. Ventrail needs firewall permission to share.");
-            StatusText = "Sharing cancelled.";
-            return;
-        }
-
-        try
-        {
-            await Background(_network.StartListening);
-            var peers = await Background(_network.DiscoverPeers);
-            ActivePeers.Clear();
-            foreach (var p in peers) ActivePeers.Add(p);
-            OnPropertyChanged(nameof(HasPeers));
-            StatusText = $"Found {ActivePeers.Count} peer(s).";
-            LogActivity($"Peer discovery found {ActivePeers.Count} peer(s)");
-        }
-        catch (NotImplementedException)
-        {
-            LogActivity("Share requested (peer-to-peer arrives in Weeks 10-12)");
-            ShowToast("Firewall setup and peer discovery arrive in Weeks 10-12.");
-            StatusText = "Peer-to-peer sharing is coming in Weeks 10-12.";
-        }
-    });
+    // ShareRepository (class diagram) and the Week 10 firewall flow live in MainDashboardViewModel.Network.cs.
 
     private bool CanRestore() => SelectedCommit is not null && SelectedCommitFile is not null;
 

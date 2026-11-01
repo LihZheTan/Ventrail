@@ -29,7 +29,9 @@ public partial class App : Application
         // Week 8: loading ML.NET and the model takes a few seconds the first time, so start it in
         // the background now. By the time a folder is opened the advisor is ready. Never throws.
         _ = System.Threading.Tasks.Task.Run(() => storageEngine.IsModelLoaded);
-        INetworkNodeCoordinator network = new NetworkNodeCoordinator();             // stub until Weeks 10-12
+        INetworkNodeCoordinator network = demoMode
+            ? new MockNetworkNodeCoordinator()                                        // demo: never touches the firewall
+            : new NetworkNodeCoordinator();                                           // Week 10: firewall + listening
         ISpecializedFileHandler fileHandler = new SpecializedFileHandler();         // optional feature
         IRecentRepositoryStore recentStore = demoMode
             ? new InMemoryRecentRepositoryStore()                                    // demo: never touches disk
