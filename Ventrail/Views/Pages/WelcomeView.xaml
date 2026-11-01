@@ -10,7 +10,7 @@
 
     <!-- Welcome screen (proposal Fig: launch screen). -->
     <Grid>
-        <TextBlock Text="v0.5 · CP2 Week 5" Style="{StaticResource SubtleText}" FontSize="11"
+        <TextBlock Text="{Binding AppVersion, Mode=OneTime}" Style="{StaticResource SubtleText}" FontSize="11"
                    HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,18,12"/>
 
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="460">
@@ -45,6 +45,13 @@
                         Command="{Binding OpenFolderCommand}"
                         ToolTip="Pick or create (with 'New folder') an empty folder to start tracking"/>
             </StackPanel>
+
+            <!-- Week 14: getting a repository from another computer doesn't need a folder open first -->
+            <TextBlock HorizontalAlignment="Center" Margin="0,14,0,0" FontSize="12">
+                <Hyperlink Command="{Binding NavigateToNetworkCommand}" Foreground="{StaticResource AccentBrush}">
+                    Get a repository from another computer on your network
+                </Hyperlink>
+            </TextBlock>
 
             <TextBlock Text="Recent Repositories" FontWeight="SemiBold" Margin="0,36,0,8"/>
 

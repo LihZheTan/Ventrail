@@ -364,3 +364,6 @@ FodyWeavers.xsd
 # Ventrail local backups / scratch (never commit)
 Ventrail/_backup_*.zip
 Ventrail/_to_delete/
+
+# Week 14: release packages made by build/package.ps1
+artifacts/

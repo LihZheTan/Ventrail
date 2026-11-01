@@ -9,6 +9,7 @@
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:MainDashboardViewModel}"
         Title="Ventrail" Height="720" Width="1200" MinWidth="720" MinHeight="520"
+        Icon="/Assets/Ventrail.ico"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource WindowBrush}"
         Foreground="{StaticResource TextBrush}"
@@ -72,7 +73,7 @@
                                  ToolTip="History" IsEnabled="{Binding HasRepo}"
                                  IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.History}}"/>
                     <RadioButton Style="{StaticResource NavRailButton}" GroupName="Nav" Content="&#xE72D;"
-                                 ToolTip="Peer-to-peer sharing" IsEnabled="{Binding HasRepo}"
+                                 ToolTip="Peer-to-peer sharing"
                                  IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.Network}}"/>
                     <Button Style="{StaticResource RailButton}" Content="&#xE838;"
                             Command="{Binding OpenFolderCommand}" ToolTip="Open another folder (Ctrl+O)"/>

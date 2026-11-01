@@ -1,4 +1,14 @@
 <Solution>
   <Project Path="Ventrail/Ventrail.csproj" />
   <Project Path="Ventrail.ModelTrainer/Ventrail.ModelTrainer.csproj" />
+  <Folder Name="/tests/">
+    <Project Path="tests/Ventrail.Tests.Week07/Ventrail.Tests.Week07.csproj" />
+    <Project Path="tests/Ventrail.Tests.Week08/Ventrail.Tests.Week08.csproj" />
+    <Project Path="tests/Ventrail.Tests.Week09/Ventrail.Tests.Week09.csproj" />
+    <Project Path="tests/Ventrail.Tests.Week10/Ventrail.Tests.Week10.csproj" />
+    <Project Path="tests/Ventrail.Tests.Week11/Ventrail.Tests.Week11.csproj" />
+    <Project Path="tests/Ventrail.Tests.Week12/Ventrail.Tests.Week12.csproj" />
+    <Project Path="tests/Ventrail.Tests.Week13/Ventrail.Tests.Week13.csproj" />
+    <Project Path="tests/Ventrail.Tests.Benchmark.ClassifierSpeed/Ventrail.Tests.Benchmark.ClassifierSpeed.csproj" />
+  </Folder>
 </Solution>

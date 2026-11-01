@@ -78,6 +78,28 @@ public partial class MainDashboardViewModel
 
     public string LocalDisplayName => _network.DisplayName;
 
+    // Week 14: "THIS-PC (192.168.1.20)", so the other person can type it into "Add".
+    public string LocalComputerText
+    {
+        get
+        {
+            string[] addresses;
+            try
+            {
+                addresses = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                    .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up &&
+                                n.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+                    .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+                    .Where(u => u.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    .Select(u => u.Address.ToString())
+                    .Where(a => !a.StartsWith("169.254."))   // "no network" fallback addresses
+                    .Distinct().Take(2).ToArray();
+            }
+            catch (System.Net.NetworkInformation.NetworkInformationException) { addresses = Array.Empty<string>(); }
+            return addresses.Length == 0 ? LocalDisplayName : $"{LocalDisplayName} ({string.Join(", ", addresses)})";
+        }
+    }
+
     public string PeersSummary =>
         IsSearchingPeers ? "Searching your network..."
         : !IsSharingEnabled ? "Turn on P2P sharing to find other computers running Ventrail on your network."
@@ -256,6 +278,7 @@ public partial class MainDashboardViewModel
                 await Background(() => _repo.InitFromPackage(newCopy, package, manifest.HeadHash, manifest.Branch));
                 DeletePackage(package);
                 LogActivity($"Downloaded a copy of {offer.Name} from {offer.PeerName} into {newCopy}");
+                SessionTransfers++;
                 copied = true;
                 return;
             }
@@ -268,6 +291,7 @@ public partial class MainDashboardViewModel
             StatusText = text;
             ShowToast(text, kind, 7);
             LogActivity($"Get latest from {offer.PeerName}: {result.Outcome} ({result.HeadHash[..7]})");
+            SessionTransfers++;
         });
 
         if (copied && newCopy != null)

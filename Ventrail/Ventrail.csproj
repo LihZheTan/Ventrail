@@ -6,6 +6,16 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+
+    <!-- Week 14: release information (shown on the Welcome page and in the file's Properties) -->
+    <Version>1.0.0</Version>
+    <Product>Ventrail</Product>
+    <Title>Ventrail</Title>
+    <Authors>Tan Lih Zhe</Authors>
+    <Company>Sunway University (Capstone Project 2)</Company>
+    <Description>Version control for non-technical users, with an offline AI storage advisor and peer-to-peer sharing.</Description>
+    <Copyright>© 2026 Tan Lih Zhe</Copyright>
+    <ApplicationIcon>Assets/Ventrail.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +23,12 @@
     <PackageReference Include="LibGit2Sharp" Version="0.32.0" />
     <PackageReference Include="Microsoft.ML" Version="4.0.2" />
     <PackageReference Include="Microsoft.ML.FastTree" Version="4.0.2" />
+  </ItemGroup>
+
+  <!-- Week 14: app icon (window + taskbar) -->
+  <ItemGroup>
+    <Resource Include="Assets/Ventrail.ico" />
+    <None Remove="Assets/Ventrail.png" />
   </ItemGroup>
 
   <!-- Week 8: trained heavy/light classifier (made by Ventrail.ModelTrainer), shipped next to the exe. -->

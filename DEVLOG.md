@@ -923,3 +923,82 @@ get a brand-new copy ("Download a copy").
   paths, not a copy.
 - Class diagram update for the report: `RttEstimator`, `ThroughputEstimator`, `PeerLink`,
   `NetworkConditions`; `PeerNode.RoundTripMs`; `TransferProgress.BytesPerSecond` / `TimeLeft`.
+
+## Week 14 — Clean-up, documentation and packaging
+
+**Goal:** turn the working app into a finished release: tidy the code and UI, write the
+documentation, move the tests into the repository, and package Ventrail so a non-technical user
+can run it without installing anything else.
+
+**Clean-up**
+- The Welcome page showed "v0.5 · CP2 Week 5". It now reads the real version
+  ("Version 1.0.0", plus "· demo data" in demo mode).
+- Release information in `Ventrail.csproj`: version 1.0.0, product, author, company, description.
+  It shows in the exe's Properties.
+- **App icon:** a glowing blue "V" matching the Welcome-page logo, generated as a multi-size `.ico`
+  (16–256 px), used for the exe, window and taskbar.
+- The Summary page's "Transfers" counter was never increased; it now counts downloads from peers.
+- Out-of-date code comments (Week 10/11 "will be replaced in Week 12" notes) were updated.
+- The build has **0 warnings, 0 errors**.
+
+**UX bugs found while writing the user guide** (both fixed)
+- **Peer-to-Peer page unreachable without a folder open.** Its rail button was disabled until a
+  repository was open, so someone who doesn't have the repository yet could never reach
+  "Download a copy". The Week 13 end-to-end test drove the ViewModel directly, so it couldn't
+  catch this.
+  - The page is now always available.
+  - The Welcome page has a "Get a repository from another computer on your network" link.
+- **"Add by address" needs the other PC's IP, but it wasn't shown anywhere.** The Network page now
+  shows "This computer: LAB-PC-02 (192.168.1.24)".
+
+**Tests moved into the repository** (`tests/`)
+- The 7 headless suites (Weeks 7–13) and the Week 8 classifier speed benchmark came out of
+  `%TEMP%` into `tests/Ventrail.Tests.*`, and appear under a `tests` folder in the solution.
+- Hard-coded paths to this PC were replaced by `TestPaths`, which finds the repository from
+  wherever the tests run.
+- `tests\run-all.ps1` builds and runs every suite, prints a summary table, and exits non-zero on
+  any failure. `-Only 12,13` runs some weeks; `-Benchmark` adds the speed check.
+- Result: **all 296 checks pass** (Week 7: 24, 8: 22, 9: 39, 10: 54, 11: 67, 12: 48, 13: 42).
+- The Week 12/13 suites now clean up their temp folders. Git's read-only pack files had blocked
+  that before.
+
+**Packaging** (`build\package.ps1`)
+1. Runs all test suites; any failure stops the release.
+2. `dotnet publish` **self-contained** for win-x64, so users don't need to install .NET.
+3. Checks that the exe, the ML.NET model and the native Git library are in the package, and adds
+   the user guide.
+4. Zips it: **`artifacts\Ventrail-1.0.0-win-x64.zip`, 64.5 MB** (153 MB unzipped).
+5. If Inno Setup 6 is installed, also builds `Ventrail-1.0.0-Setup.exe` from
+   `installer\Ventrail.iss`. Inno Setup isn't installed on this PC, so only the zip was made.
+   - The installer installs per user (no admin needed), with Start menu entries for the app,
+     demo mode and the user guide.
+   - On uninstall it removes Ventrail's two firewall rules (Windows asks first), and never
+     touches repositories.
+- **Checked:** the zip was unzipped into a fresh folder and started.
+  - Demo mode works, with the icon, version and Heavy badges (so the ML.NET model loads from the
+    package).
+  - Real mode works: the native Git library loaded, a folder was initialised with the default
+    `.gitignore`, and its changes were scanned.
+
+**Documentation**
+- `README.md`: what Ventrail is, features, screenshots, how to run, test and package it, and the
+  repository layout.
+- `docs/USER_GUIDE.md`: a step-by-step guide for non-technical users, from starting the app to
+  saving versions, the AI advisor, history, sharing and troubleshooting. It ships inside the
+  package.
+- `docs/ARCHITECTURE.md`: layers, Git core, the AI model and its features, the P2P design
+  (firewall, DHT, transfer protocol, adaptive timeouts), testing, and known limits.
+- `tests/README.md`: what each suite covers and how to run it.
+- 5 screenshots in `docs/images/`, captured from the demo by a script, so only Ventrail's window
+  is in them.
+
+**Known limits** (also in ARCHITECTURE.md)
+- Merging two different saved versions isn't supported; both are kept safely.
+- Each transfer sends the whole history.
+- Sharing works on the local network only, on purpose.
+- Transfers are hash-checked but not encrypted on the wire.
+- The optional specialised-file previews weren't built.
+
+**Notes**
+- `Ventrail/_to_delete/` and `Ventrail/_backup_before_git_core.zip` are old local backups (about
+  136 KB). They're git-ignored and were left in place; deleting them is up to the author.

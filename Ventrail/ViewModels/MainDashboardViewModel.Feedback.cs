@@ -117,8 +117,8 @@ public partial class MainDashboardViewModel
 
     [ObservableProperty] private int _sessionCommits;
     [ObservableProperty] private int _sessionFilesSaved;
-    [ObservableProperty] private int _sessionTransfers;          // real value from Week 12
-    [ObservableProperty] private long _sessionBytesShared;       // real value from Week 12
+    [ObservableProperty] private int _sessionTransfers;          // downloads from peers this session
+    [ObservableProperty] private long _sessionBytesShared;       // bytes received + sent this session
 
     public string SessionSharedDisplay => SessionBytesShared switch
     {

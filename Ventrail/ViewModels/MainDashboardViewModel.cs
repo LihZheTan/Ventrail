@@ -54,6 +54,17 @@ public partial class MainDashboardViewModel : ObservableObject
 
     public bool IsDemoMode { get; }
 
+    // "Version 1.0.0" on the Welcome page (from <Version> in Ventrail.csproj).
+    public string AppVersion
+    {
+        get
+        {
+            var v = typeof(MainDashboardViewModel).Assembly.GetName().Version;
+            string text = v is null ? "Version 1.0" : $"Version {v.Major}.{v.Minor}.{v.Build}";
+            return IsDemoMode ? text + " · demo data" : text;
+        }
+    }
+
     // Class diagram: List<FileAsset> StagedFiles -> all changes, each with an IsStaged flag.
     public ObservableCollection<FileAsset> Changes { get; } = new();
     public ObservableCollection<CommitNode> History { get; } = new();
@@ -257,6 +268,10 @@ public partial class MainDashboardViewModel : ObservableObject
 
     [RelayCommand]
     private void NavigateToHistory() => CurrentPage = AppPage.History;
+
+    // Week 14: also reachable with no folder open, to download a copy from a peer.
+    [RelayCommand]
+    private void NavigateToNetwork() => CurrentPage = AppPage.Network;
 
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
     private Task StageAllAsync() => RunBusyAsync("Staging all changes...", async () =>

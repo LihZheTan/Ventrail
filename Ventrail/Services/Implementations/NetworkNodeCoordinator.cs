@@ -19,8 +19,8 @@ namespace Ventrail.Services.Implementations;
 /// <summary>
 /// P2P node (Fig 3.8).
 /// Week 10: firewall audit + permission (FirewallAuditor) and local listening:
-///  - TCP 4001 accepts connections and answers with a hello line ("VENTRAIL/1 &lt;peer id&gt;").
-///    Week 12 replaces the hello with block streaming.
+///  - TCP 4001 accepts connections and answers with a hello line ("VENTRAIL/1 &lt;peer id&gt;");
+///    Week 12 adds requests after it (see NetworkNodeCoordinator.Transfer.cs).
 ///  - UDP 4002 answers discovery and DHT messages (see DiscoveryMessage).
 /// Week 11: peer discovery, in the two steps libp2p uses on a local network:
 ///  1. a LAN broadcast ("is any Ventrail here?") finds the first peers, like libp2p's mDNS;
@@ -359,8 +359,8 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
 
     /// <summary>
     /// Opens a TCP connection and checks the hello: the computer that answers must have the peer id
-    /// discovery promised, so a wrong or reused address is noticed. Week 12 keeps this connection
-    /// open and streams blocks over it.
+    /// discovery promised, so a wrong or reused address is noticed. (Transfers open their own
+    /// connections with the same check; see OpenSessionAsync.)
     /// </summary>
     public bool EstablishConnection(string targetPeerId)
     {
