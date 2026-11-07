@@ -195,6 +195,7 @@ public class RepositoryManager : IRepositoryManager
                 {
                     Hash = c.Sha,
                     Message = c.MessageShort,
+                    Description = Body(c.Message),
                     Author = c.Author.Name,
                     Timestamp = c.Author.When.LocalDateTime,
                     ParentHashes = c.Parents.Select(p => p.Sha).ToList()
@@ -202,6 +203,13 @@ public class RepositoryManager : IRepositoryManager
                 .ToList();
         });
         return CommitHistory;
+    }
+
+    // Everything after the first line of a commit message (the optional description).
+    private static string Body(string message)
+    {
+        int newline = message.IndexOf('\n');
+        return newline < 0 ? string.Empty : message[(newline + 1)..].Trim();
     }
 
     public string GetCurrentBranchName()

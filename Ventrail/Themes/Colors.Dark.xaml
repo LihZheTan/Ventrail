@@ -1,0 +1,48 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        Dark colours. Light.xaml has the same keys; ThemeManager swaps the two at runtime, and every
+        view uses {DynamicResource ...} for colours so they repaint immediately.
+    -->
+
+    <!-- Surfaces -->
+    <SolidColorBrush x:Key="WindowBrush"      Color="#1C2128"/>   <!-- main content area -->
+    <SolidColorBrush x:Key="PanelBrush"       Color="#22272E"/>   <!-- sidebar, side panes -->
+    <SolidColorBrush x:Key="RailBrush"        Color="#22272E"/>   <!-- menu bar, status bar -->
+    <SolidColorBrush x:Key="CardBrush"        Color="#2D333B"/>
+    <SolidColorBrush x:Key="CardHoverBrush"   Color="#373E47"/>
+    <SolidColorBrush x:Key="InputBrush"       Color="#1C2128"/>
+    <SolidColorBrush x:Key="LineBrush"        Color="#3D444D"/>
+
+    <!-- Text and accents -->
+    <SolidColorBrush x:Key="TextBrush"        Color="#D1D9E0"/>
+    <SolidColorBrush x:Key="SubtleTextBrush"  Color="#8B949E"/>
+    <SolidColorBrush x:Key="AccentBrush"      Color="#4493F8"/>
+    <SolidColorBrush x:Key="OnAccentBrush"    Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="AddedBrush"       Color="#57AB5A"/>
+    <SolidColorBrush x:Key="ModifiedBrush"    Color="#C69026"/>
+    <SolidColorBrush x:Key="DeletedBrush"     Color="#E5534B"/>
+    <SolidColorBrush x:Key="MergeBrush"       Color="#986EE2"/>
+    <SolidColorBrush x:Key="TimelineBrush"    Color="#444C56"/>
+
+    <!-- Faint tints behind badges, diff lines and the selected row -->
+    <SolidColorBrush x:Key="AddedTintBrush"    Color="#2657AB5A"/>
+    <SolidColorBrush x:Key="ModifiedTintBrush" Color="#26C69026"/>
+    <SolidColorBrush x:Key="DeletedTintBrush"  Color="#26E5534B"/>
+    <SolidColorBrush x:Key="AccentTintBrush"   Color="#264493F8"/>
+    <SolidColorBrush x:Key="SelectedRowBrush"  Color="#334493F8"/>
+
+    <!-- Toolbar under the menu: dark in both themes -->
+    <SolidColorBrush x:Key="ToolbarBrush"        Color="#161B22"/>
+    <SolidColorBrush x:Key="ToolbarHoverBrush"   Color="#2D333B"/>
+    <SolidColorBrush x:Key="ToolbarLineBrush"    Color="#30363D"/>
+    <SolidColorBrush x:Key="ToolbarTextBrush"    Color="#F0F6FC"/>
+    <SolidColorBrush x:Key="ToolbarSubtleBrush"  Color="#8B949E"/>
+
+    <!-- See-through layer behind dialogs and loading overlays -->
+    <SolidColorBrush x:Key="BackdropBrush" Color="#B0080B10"/>
+
+    <Color x:Key="AccentColor">#4493F8</Color>
+    <Color x:Key="ShadowColor">#000000</Color>
+</ResourceDictionary>

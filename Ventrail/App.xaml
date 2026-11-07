@@ -6,7 +6,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Dark theme shared by every window and page (Week 3). -->
+                <!-- Colours first (ThemeManager swaps this one for Colors.Light.xaml), then the styles. -->
+                <ResourceDictionary Source="Themes/Colors.Dark.xaml"/>
                 <ResourceDictionary Source="Themes/Theme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

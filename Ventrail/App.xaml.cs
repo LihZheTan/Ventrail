@@ -3,6 +3,7 @@ using System.Windows;
 using Ventrail.Services.Contracts;
 using Ventrail.Services.Implementations;
 using Ventrail.Services.Mock;
+using Ventrail.Themes;
 using Ventrail.ViewModels;
 using Ventrail.Views;
 
@@ -38,7 +39,26 @@ public partial class App : Application
             : new JsonRecentRepositoryStore();
 
         var viewModel = new MainDashboardViewModel(repository, storageEngine, network, fileHandler, recentStore, demoMode);
+
+        // Redesign: menus and drop-downs open left-aligned under their header (like GitHub Desktop),
+        // even on PCs where Windows' "handedness" setting would open them to the left.
+        // (Read it once first: WPF fills its cache on the first read, which would undo the change.)
+        _ = SystemParameters.MenuDropAlignment;
+        typeof(SystemParameters).GetField("_menuDropAlignment",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)?
+            .SetValue(null, false);
+
+        // Redesign: light / dark theme, remembered between sessions (View > Theme in the menu).
+        viewModel.CurrentTheme = ThemeManager.Load();
+        ThemeManager.Apply(viewModel.CurrentTheme, save: false);
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(MainDashboardViewModel.CurrentTheme))
+                ThemeManager.Apply(viewModel.CurrentTheme);
+        };
+
         var window = new MainWindow { DataContext = viewModel };
+        ThemeManager.SetTitleBar(window, ThemeManager.IsDark);
         window.Show();
 
         if (demoMode)

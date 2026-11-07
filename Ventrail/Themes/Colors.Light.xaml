@@ -1,0 +1,44 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Light colours: same keys as Colors.Dark.xaml (see the note there). -->
+
+    <!-- Surfaces -->
+    <SolidColorBrush x:Key="WindowBrush"      Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="PanelBrush"       Color="#F6F8FA"/>
+    <SolidColorBrush x:Key="RailBrush"        Color="#F6F8FA"/>
+    <SolidColorBrush x:Key="CardBrush"        Color="#F6F8FA"/>
+    <SolidColorBrush x:Key="CardHoverBrush"   Color="#EAEEF2"/>
+    <SolidColorBrush x:Key="InputBrush"       Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="LineBrush"        Color="#D0D7DE"/>
+
+    <!-- Text and accents -->
+    <SolidColorBrush x:Key="TextBrush"        Color="#1F2328"/>
+    <SolidColorBrush x:Key="SubtleTextBrush"  Color="#59636E"/>
+    <SolidColorBrush x:Key="AccentBrush"      Color="#0969DA"/>
+    <SolidColorBrush x:Key="OnAccentBrush"    Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="AddedBrush"       Color="#1A7F37"/>
+    <SolidColorBrush x:Key="ModifiedBrush"    Color="#9A6700"/>
+    <SolidColorBrush x:Key="DeletedBrush"     Color="#D1242F"/>
+    <SolidColorBrush x:Key="MergeBrush"       Color="#8250DF"/>
+    <SolidColorBrush x:Key="TimelineBrush"    Color="#D0D7DE"/>
+
+    <!-- Faint tints -->
+    <SolidColorBrush x:Key="AddedTintBrush"    Color="#1F1A7F37"/>
+    <SolidColorBrush x:Key="ModifiedTintBrush" Color="#1F9A6700"/>
+    <SolidColorBrush x:Key="DeletedTintBrush"  Color="#1FD1242F"/>
+    <SolidColorBrush x:Key="AccentTintBrush"   Color="#1A0969DA"/>
+    <SolidColorBrush x:Key="SelectedRowBrush"  Color="#260969DA"/>
+
+    <!-- Toolbar under the menu: dark in both themes -->
+    <SolidColorBrush x:Key="ToolbarBrush"        Color="#24292F"/>
+    <SolidColorBrush x:Key="ToolbarHoverBrush"   Color="#32383F"/>
+    <SolidColorBrush x:Key="ToolbarLineBrush"    Color="#3D444D"/>
+    <SolidColorBrush x:Key="ToolbarTextBrush"    Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ToolbarSubtleBrush"  Color="#9198A1"/>
+
+    <SolidColorBrush x:Key="BackdropBrush" Color="#661F2328"/>
+
+    <Color x:Key="AccentColor">#0969DA</Color>
+    <Color x:Key="ShadowColor">#8C959F</Color>
+</ResourceDictionary>

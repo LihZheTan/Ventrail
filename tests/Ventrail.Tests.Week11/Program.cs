@@ -80,7 +80,9 @@ Check("loopback is local, internet is not", NetworkNodeCoordinator.IsLocalNetwor
       && !NetworkNodeCoordinator.IsLocalNetworkAddress(IPAddress.Parse("8.8.8.8")));
 var myLan = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
     .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && n.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
-    .SelectMany(n => n.GetIPProperties().UnicastAddresses).FirstOrDefault(u => u.Address.AddressFamily == AddressFamily.InterNetwork)?.Address;
+    .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+    // A real LAN (not a VPN's one-address subnet), so the neighbouring address is on it too.
+    .FirstOrDefault(u => u.Address.AddressFamily == AddressFamily.InterNetwork && u.PrefixLength is > 0 and <= 30)?.Address;
 if (myLan != null)
 {
     var neighbour = myLan.GetAddressBytes(); neighbour[3] = (byte)(neighbour[3] == 1 ? 2 : 1);

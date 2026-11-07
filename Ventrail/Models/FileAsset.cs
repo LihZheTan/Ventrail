@@ -10,6 +10,9 @@ public partial class FileAsset : ObservableObject
 {
     public string FileName { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;      // path relative to the repo root (what Git uses)
+
+    // "figures/" for "figures/chart.png", empty at the top level (shown greyed before the name).
+    public string FolderPart => FilePath.Length > FileName.Length ? FilePath[..^FileName.Length] : string.Empty;
     public long SizeInBytes { get; set; }
     public string TrackStatus { get; set; } = "Untracked";    // Added, Modified, Deleted, Renamed
 

@@ -20,29 +20,29 @@
             <Setter Property="ToolTip" Value="{Binding Detail}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Access}" Value="Allowed">
-                    <Setter Property="Background" Value="{StaticResource AddedTintBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource AddedTintBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Access}" Value="NeedsPermission">
-                    <Setter Property="Background" Value="{StaticResource ModifiedTintBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource ModifiedTintBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Access}" Value="Blocked">
-                    <Setter Property="Background" Value="{StaticResource DeletedTintBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource DeletedTintBrush}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
         <Style x:Key="PortPillText" TargetType="TextBlock">
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Text" Value="{Binding Label, FallbackValue='Checking...'}"/>
-            <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubtleTextBrush}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Access}" Value="Allowed">
-                    <Setter Property="Foreground" Value="{StaticResource AddedBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource AddedBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Access}" Value="NeedsPermission">
-                    <Setter Property="Foreground" Value="{StaticResource ModifiedBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource ModifiedBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Access}" Value="Blocked">
-                    <Setter Property="Foreground" Value="{StaticResource DeletedBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource DeletedBrush}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -58,16 +58,16 @@
                     <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center">
                         <Ellipse.Style>
                             <Style TargetType="Ellipse">
-                                <Setter Property="Fill" Value="{StaticResource SubtleTextBrush}"/>
+                                <Setter Property="Fill" Value="{DynamicResource SubtleTextBrush}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsSharingEnabled}" Value="True">
-                                        <Setter Property="Fill" Value="{StaticResource AddedBrush}"/>
+                                        <Setter Property="Fill" Value="{DynamicResource AddedBrush}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Ellipse.Style>
                     </Ellipse>
-                    <TextBlock Text="{Binding NetworkStateText}" Foreground="{StaticResource SubtleTextBrush}"/>
+                    <TextBlock Text="{Binding NetworkStateText}" Foreground="{DynamicResource SubtleTextBrush}"/>
                 </StackPanel>
             </Border>
             <TextBlock Text="Peer-to-Peer Network" Style="{StaticResource PageTitle}"/>
@@ -117,7 +117,7 @@
                                    Margin="18,0,18,12"/>
 
                         <!-- Week 10: live audit result per port (hover a pill for the reason) -->
-                        <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="18,12">
+                        <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="18,12">
                             <DockPanel>
                                 <Border DockPanel.Dock="Right" Style="{StaticResource PortPill}" DataContext="{Binding TcpCheck}">
                                     <TextBlock Style="{StaticResource PortPillText}"/>
@@ -126,7 +126,7 @@
                             </DockPanel>
                         </Border>
 
-                        <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="18,12">
+                        <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="18,12">
                             <DockPanel>
                                 <Border DockPanel.Dock="Right" Style="{StaticResource PortPill}" DataContext="{Binding UdpCheck}">
                                     <TextBlock Style="{StaticResource PortPillText}"/>
@@ -135,7 +135,7 @@
                             </DockPanel>
                         </Border>
 
-                        <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="18,12">
+                        <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="18,12">
                             <DockPanel>
                                 <CheckBox DockPanel.Dock="Right" VerticalAlignment="Center"
                                           IsChecked="{Binding IsSharingEnabled, Mode=TwoWay}"
@@ -146,7 +146,7 @@
                                     <TextBlock Style="{StaticResource SubtleText}" FontSize="11"
                                                Visibility="{Binding CanRemoveFirewallPermission, Converter={StaticResource BoolToVis}}">
                                         <Hyperlink Command="{Binding RemoveFirewallPermissionCommand}"
-                                                   Foreground="{StaticResource SubtleTextBrush}">Remove firewall permission</Hyperlink>
+                                                   Foreground="{DynamicResource SubtleTextBrush}">Remove firewall permission</Hyperlink>
                                     </TextBlock>
                                 </StackPanel>
                             </DockPanel>
@@ -163,7 +163,7 @@
                             <TextBlock Text="Current repository" Style="{StaticResource SubtleText}"/>
                         </DockPanel>
                         <DockPanel Margin="0,0,0,16">
-                            <TextBlock DockPanel.Dock="Right" Text="{Binding LatestVersionHash}" FontFamily="Consolas" FontWeight="SemiBold"/>
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding LatestVersionHash}" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold"/>
                             <TextBlock Text="Latest version to share" Style="{StaticResource SubtleText}"/>
                         </DockPanel>
                         <Button Content="Share via P2P" Style="{StaticResource AccentButton}" Padding="0,9"
@@ -235,7 +235,7 @@
                 <ItemsControl ItemsSource="{Binding ActivePeers}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Background="{StaticResource CardBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,8">
+                            <Border Background="{DynamicResource CardBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,8">
                                 <StackPanel>
                                 <DockPanel>
                                     <Button DockPanel.Dock="Right" VerticalAlignment="Center" Padding="12,4"
@@ -255,19 +255,19 @@
                                         </Button.Style>
                                     </Button>
                                     <Border DockPanel.Dock="Right" Style="{StaticResource Pill}" Margin="0,0,10,0"
-                                            VerticalAlignment="Center" Background="{StaticResource AddedTintBrush}"
+                                            VerticalAlignment="Center" Background="{DynamicResource AddedTintBrush}"
                                             ToolTip="This computer already has a copy of the open repository"
                                             Visibility="{Binding HasCurrentRepository, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock Text="Has a copy" FontSize="11" Foreground="{StaticResource AddedBrush}"/>
+                                        <TextBlock Text="Has a copy" FontSize="11" Foreground="{DynamicResource AddedBrush}"/>
                                     </Border>
-                                    <Ellipse Width="8" Height="8" Fill="{StaticResource AddedBrush}" Margin="0,0,10,0"
+                                    <Ellipse Width="8" Height="8" Fill="{DynamicResource AddedBrush}" Margin="0,0,10,0"
                                              VerticalAlignment="Center"/>
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                         <TextBlock Style="{StaticResource SubtleText}" FontSize="11">
                                             <Run Text="{Binding IPAddress, Mode=OneWay}"/>
                                             <Run Text="·"/>
-                                            <Run Text="{Binding PeerId, Mode=OneWay}" FontFamily="Consolas"/>
+                                            <Run Text="{Binding PeerId, Mode=OneWay}" FontFamily="{StaticResource MonoFont}"/>
                                             <Run Text="{Binding RoundTripText, Mode=OneWay}"
                                                  ToolTip="Round-trip time: how long this computer takes to answer. Ventrail sets its waiting times from it."/>
                                         </TextBlock>
@@ -279,7 +279,7 @@
                                               Visibility="{Binding HasRepositories, Converter={StaticResource BoolToVis}}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,6,0,0" Margin="0,0,0,2">
+                                            <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,6,0,0" Margin="0,0,0,2">
                                                 <DockPanel>
                                                     <Button DockPanel.Dock="Right" Content="{Binding ActionText}" Padding="10,3"
                                                             Command="{Binding DataContext.DownloadOfferCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -289,7 +289,7 @@
                                                         <Run Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets"/>
                                                         <Run Text="{Binding Name, Mode=OneWay}"/>
                                                         <Run Text="{Binding ShortHead, Mode=OneWay, StringFormat='· latest {0}'}"
-                                                             Foreground="{StaticResource SubtleTextBrush}" FontFamily="Consolas"/>
+                                                             Foreground="{DynamicResource SubtleTextBrush}" FontFamily="{StaticResource MonoFont}"/>
                                                     </TextBlock>
                                                 </DockPanel>
                                             </Border>

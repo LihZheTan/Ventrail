@@ -13,6 +13,7 @@ development week that introduced the feature.
 | Week11 | 67 | Kademlia routing table, messages, discovery and DHT on 3 real nodes, provider records |
 | Week12 | 48 | Version packages, block streaming, SHA-256 checks, resume/cancel, safe import |
 | Week13 | 42 | Adaptive timeouts + **end-to-end**: two real nodes through the real ViewModel, slow/frozen/busy peers |
+| Redesign | 22 | Light/dark themes are complete, summary + description commits, inline diff, menu and toolbar commands |
 
 ## Run
 

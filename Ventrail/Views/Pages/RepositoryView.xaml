@@ -1,0 +1,587 @@
+<UserControl x:Class="Ventrail.Views.Pages.RepositoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Ventrail.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:MainDashboardViewModel}"
+             d:DesignHeight="680" d:DesignWidth="1180">
+
+    <!--
+        The repository screen, laid out like GitHub Desktop:
+          LEFT  = sidebar with "Changes | History" tabs.
+                  Changes: changed files with tick boxes, AI suggestion and the commit box (Figs 3.3/3.4).
+                  History: saved versions, newest first, joined by a timeline (the DAG, Week 4).
+          RIGHT = what is selected: a changed file (its diff + the AI advisor's verdict) or a version
+                  (its files + Restore).
+        CurrentPage (Staging or History) decides which tab and which right-hand panel are shown.
+    -->
+    <UserControl.Resources>
+        <!-- Visible only on the Changes tab / only on the History tab -->
+        <Style x:Key="OnChangesTab" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CurrentPage}" Value="{x:Static vm:AppPage.Staging}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="OnHistoryTab" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CurrentPage}" Value="{x:Static vm:AppPage.History}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="350" MinWidth="270" MaxWidth="560"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*" MinWidth="320"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ===================== SIDEBAR ===================== -->
+        <DockPanel Grid.Column="0" Background="{DynamicResource PanelBrush}">
+
+            <!-- Changes | History -->
+            <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+                <UniformGrid Columns="2">
+                    <RadioButton Style="{StaticResource SidebarTab}" GroupName="SidebarTabs"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.Staging}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Changes"/>
+                            <Border Style="{StaticResource Pill}" Margin="8,0,0,0" Padding="7,0"
+                                    Visibility="{Binding HasChanges, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding Changes.Count}" FontSize="11"/>
+                            </Border>
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton Style="{StaticResource SidebarTab}" GroupName="SidebarTabs" Content="History"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.History}}"/>
+                </UniformGrid>
+            </Border>
+
+            <!-- The two tab panels share the space below the tabs -->
+            <Grid>
+            <!-- ============ Changes tab ============ -->
+            <DockPanel Style="{StaticResource OnChangesTab}">
+
+                <!-- "6 changed files" + Tick all -->
+                <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="12,6,6,6">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Command="{Binding StageAllCommand}"
+                                ToolTip="Tick every changed file for the next version">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE73A;" FontSize="12" Margin="0,0,6,0"/>
+                                <TextBlock Text="Tick all"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock VerticalAlignment="Center" Style="{StaticResource SubtleText}">
+                            <Run Text="{Binding Changes.Count, Mode=OneWay}"/> changed ·
+                            <Run Text="{Binding StagedCount, Mode=OneWay}"/> ticked
+                        </TextBlock>
+                    </DockPanel>
+                </Border>
+
+                <!-- Commit area (bottom) -->
+                <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="12">
+                    <StackPanel>
+                        <!-- Week 9: AI suggestion for the ticked files -->
+                        <Border Style="{StaticResource GlowCard}" Padding="12,10" Margin="0,0,0,10"
+                                Visibility="{Binding IsSuggestionVisible, Converter={StaticResource BoolToVis}}">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,4">
+                                    <!-- "Why?" shows the storage advice; hidden by default to leave room for the file list -->
+                                    <ToggleButton x:Name="AdviceToggle" DockPanel.Dock="Right" Cursor="Hand"
+                                                  Background="Transparent" BorderThickness="0" ToolTip="Show the storage advice behind this suggestion">
+                                        <ToggleButton.Template>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <StackPanel Orientation="Horizontal" Background="Transparent">
+                                                    <TextBlock Text="Why?" FontSize="11.5" Foreground="{DynamicResource AccentBrush}"/>
+                                                    <TextBlock x:Name="Chevron" Style="{StaticResource Icon}" Text="&#xE70D;" FontSize="9"
+                                                               Margin="4,1,0,0" Foreground="{DynamicResource AccentBrush}"/>
+                                                </StackPanel>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsChecked" Value="True">
+                                                        <Setter TargetName="Chevron" Property="Text" Value="&#xE70E;"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </ToggleButton.Template>
+                                    </ToggleButton>
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE945;" FontSize="12"
+                                               Foreground="{DynamicResource AccentBrush}" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Suggested message" FontSize="11.5" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AccentBrush}"/>
+                                </DockPanel>
+                                <TextBlock Text="{Binding Suggestion.Message}" TextWrapping="Wrap" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding Suggestion.Summary}" Style="{StaticResource SubtleText}"
+                                           FontSize="11.5" Margin="0,4,0,0"
+                                           Visibility="{Binding IsChecked, ElementName=AdviceToggle, Converter={StaticResource BoolToVis}}"/>
+                                <ScrollViewer MaxHeight="96" VerticalScrollBarVisibility="Auto" Margin="0,2,0,0"
+                                              Visibility="{Binding IsChecked, ElementName=AdviceToggle, Converter={StaticResource BoolToVis}}">
+                                    <ItemsControl ItemsSource="{Binding Suggestion.Advice}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <DockPanel Margin="0,2,0,0" ToolTip="{Binding FilePath}">
+                                                    <TextBlock VerticalAlignment="Top" Margin="0,2,6,0" FontSize="10">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                                                <Setter Property="Text" Value="&#xE946;"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource ModifiedBrush}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsWarning}" Value="True">
+                                                                        <Setter Property="Text" Value="&#xE7BA;"/>
+                                                                        <Setter Property="Foreground" Value="{DynamicResource DeletedBrush}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding Text}" Style="{StaticResource SubtleText}" FontSize="11.5"/>
+                                                </DockPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                                <UniformGrid Columns="2" Margin="0,10,0,0">
+                                    <Button Content="Use suggestion" Style="{StaticResource AccentButton}" Margin="0,0,4,0"
+                                            Command="{Binding AcceptSuggestionCommand}"
+                                            ToolTip="Use this message, and untick any very large file the advisor suggests leaving out"/>
+                                    <Button Content="Write my own" Style="{StaticResource OutlineButton}" Margin="4,0,0,0"
+                                            Command="{Binding EditSuggestionManuallyCommand}" Click="EditManually_Click"
+                                            ToolTip="Write your own message (the suggestion is a starting point if the box is empty)"/>
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Summary (required) -->
+                        <Grid>
+                            <TextBox x:Name="CommitBox" Text="{Binding CommitMessage, UpdateSourceTrigger=PropertyChanged}">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Gesture="Ctrl+Return" Command="{Binding CommitCommand}"/>
+                                </TextBox.InputBindings>
+                            </TextBox>
+                            <TextBlock Text="Summary (required)" Style="{StaticResource Placeholder}"
+                                       Tag="{Binding ElementName=CommitBox}"/>
+                        </Grid>
+                        <!-- Description (optional) -->
+                        <Grid Margin="0,8,0,0">
+                            <TextBox x:Name="DescriptionBox" Text="{Binding CommitDescription, UpdateSourceTrigger=PropertyChanged}"
+                                     Height="66" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Gesture="Ctrl+Return" Command="{Binding CommitCommand}"/>
+                                </TextBox.InputBindings>
+                            </TextBox>
+                            <TextBlock Text="Description" Style="{StaticResource Placeholder}"
+                                       Tag="{Binding ElementName=DescriptionBox}"/>
+                        </Grid>
+                        <DockPanel Margin="0,8,0,10">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE77B;" FontSize="12" Margin="2,0,8,0"
+                                       Foreground="{DynamicResource SubtleTextBrush}" ToolTip="Author of the version"/>
+                            <TextBox Text="{Binding AuthorName}" Padding="6,3" FontSize="12" ToolTip="Author of the version"/>
+                        </DockPanel>
+                        <Button Content="{Binding CommitButtonText}" Style="{StaticResource AccentButton}" Padding="0,8"
+                                Command="{Binding CommitCommand}"
+                                ToolTip="Save the ticked files as a new version (Ctrl+Enter)"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Changed files -->
+                <Grid>
+                    <TextBlock Text="No changes. Everything in this folder is saved."
+                               Style="{StaticResource SubtleText}" TextAlignment="Center" Margin="24"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Visibility="{Binding HasChanges, Converter={StaticResource InverseBoolToVis}}"/>
+
+                    <ListBox ItemsSource="{Binding Changes}" SelectedItem="{Binding SelectedFile}">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource CompactListItem}"/>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Background="Transparent" ToolTip="{Binding DisplaySize}">
+                                    <!-- Double-click: full-size comparison -->
+                                    <DockPanel.InputBindings>
+                                        <MouseBinding MouseAction="LeftDoubleClick"
+                                                      Command="{Binding DataContext.ViewChangesCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"/>
+                                    </DockPanel.InputBindings>
+                                    <CheckBox VerticalAlignment="Center" Margin="0,0,10,0"
+                                              IsChecked="{Binding IsStaged, Mode=TwoWay}"
+                                              Command="{Binding DataContext.ToggleStageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                              CommandParameter="{Binding}"
+                                              ToolTip="Include in the next version"/>
+                                    <!-- Status mark: + added, • modified, − deleted -->
+                                    <Border DockPanel.Dock="Right" Style="{StaticResource StatusBadge}" Margin="8,0,0,0"
+                                            ToolTip="{Binding TrackStatus}">
+                                        <TextBlock Style="{StaticResource StatusGlyph}"/>
+                                    </Border>
+                                    <!-- Week 8: ML.NET "Heavy" verdict -->
+                                    <Border DockPanel.Dock="Right" Style="{StaticResource Pill}" Padding="6,0" Margin="6,0,0,0"
+                                            Background="{DynamicResource ModifiedTintBrush}" BorderThickness="0"
+                                            Visibility="{Binding HasStorageBadge, Converter={StaticResource BoolToVis}}"
+                                            ToolTip="{Binding StorageBadgeTip}">
+                                        <TextBlock Text="{Binding StorageBadge}" FontSize="10.5" Foreground="{DynamicResource ModifiedBrush}"/>
+                                    </Border>
+                                    <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding FolderPart, Mode=OneWay}" Foreground="{DynamicResource SubtleTextBrush}"/><Run Text="{Binding FileName, Mode=OneWay}"/>
+                                    </TextBlock>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </DockPanel>
+
+            <!-- ============ History tab ============ -->
+            <Grid Style="{StaticResource OnHistoryTab}">
+                <TextBlock Text="No versions saved yet. Commit some changes to start your history."
+                           Style="{StaticResource SubtleText}" TextAlignment="Center" Margin="24"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Visibility="{Binding HasHistory, Converter={StaticResource InverseBoolToVis}}"/>
+
+                <!-- Each version on the timeline (Week 4): a line joins the versions like Git's DAG. -->
+                <ListBox ItemsSource="{Binding History}" SelectedItem="{Binding SelectedCommit}"
+                         ItemContainerStyle="{StaticResource TimelineItem}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="34"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid Grid.Column="0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Rectangle Grid.Row="0" Width="2" Fill="{DynamicResource TimelineBrush}" HorizontalAlignment="Center">
+                                        <Rectangle.Style>
+                                            <Style TargetType="Rectangle">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsLatest}" Value="True">
+                                                        <Setter Property="Visibility" Value="Hidden"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Rectangle.Style>
+                                    </Rectangle>
+                                    <Rectangle Grid.Row="1" Width="2" Fill="{DynamicResource TimelineBrush}" HorizontalAlignment="Center">
+                                        <Rectangle.Style>
+                                            <Style TargetType="Rectangle">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsOldest}" Value="True">
+                                                        <Setter Property="Visibility" Value="Hidden"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Rectangle.Style>
+                                    </Rectangle>
+                                    <Ellipse Grid.RowSpan="2" Width="11" Height="11" StrokeThickness="2"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Ellipse.Style>
+                                            <Style TargetType="Ellipse">
+                                                <Setter Property="Fill" Value="{DynamicResource PanelBrush}"/>
+                                                <Setter Property="Stroke" Value="{DynamicResource AccentBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMerge}" Value="True">
+                                                        <Setter Property="Stroke" Value="{DynamicResource MergeBrush}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsLatest}" Value="True">
+                                                        <Setter Property="Fill" Value="{DynamicResource AccentBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Ellipse.Style>
+                                    </Ellipse>
+                                </Grid>
+                                <DockPanel Grid.Column="1" Margin="0,8">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="8,1,0,0">
+                                        <Border Style="{StaticResource Pill}" Background="{DynamicResource AccentTintBrush}" BorderThickness="0"
+                                                Visibility="{Binding IsLatest, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="Latest" FontSize="10.5" Foreground="{DynamicResource AccentBrush}"/>
+                                        </Border>
+                                        <Border Style="{StaticResource Pill}" Margin="4,0,0,0" BorderThickness="0"
+                                                Visibility="{Binding IsMerge, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="Merge" FontSize="10.5" Foreground="{DynamicResource MergeBrush}"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Message}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Style="{StaticResource SubtleText}" FontSize="11.5" TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayTime}" Margin="0,2,0,0">
+                                            <Run Text="{Binding Author, Mode=OneWay}"/> · <Run Text="{Binding RelativeTime, Mode=OneWay}"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DockPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+            </Grid>
+        </DockPanel>
+
+        <!-- Drag to resize the sidebar -->
+        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext"
+                      Cursor="SizeWE" Background="{DynamicResource PanelBrush}"
+                      BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0"/>
+
+        <!-- ===================== RIGHT: Changes ===================== -->
+        <Grid Grid.Column="2" Style="{StaticResource OnChangesTab}">
+
+            <!-- Nothing selected, nothing changed: GitHub Desktop's "No local changes" screen -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer.Style>
+                    <Style TargetType="ScrollViewer">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding HasSelectedFile}" Value="False"/>
+                                    <Condition Binding="{Binding HasChanges}" Value="False"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ScrollViewer.Style>
+                <StackPanel MaxWidth="560" Margin="32,48,32,32">
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE73E;" FontSize="34" HorizontalAlignment="Left"
+                               Foreground="{DynamicResource AddedBrush}" Margin="0,0,0,14"/>
+                    <TextBlock Text="No local changes" Style="{StaticResource PageTitle}"/>
+                    <TextBlock Style="{StaticResource SubtleText}" Margin="0,6,0,24" FontSize="13.5">
+                        Everything in <Run Text="{Binding RepoName, Mode=OneWay}" FontWeight="SemiBold"/> is saved. Here are some
+                        friendly suggestions for what to do next.
+                    </TextBlock>
+
+                    <Border Style="{StaticResource Card}" Padding="16,12" Margin="0,0,0,10">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Show in Explorer" Command="{Binding ShowInExplorerCommand}"
+                                    VerticalAlignment="Center"/>
+                            <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="Open the folder in File Explorer" FontWeight="SemiBold"/>
+                                <TextBlock Text="Edit your files as usual; changes appear here automatically when you scan."
+                                           Style="{StaticResource SubtleText}" FontSize="12" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Padding="16,12" Margin="0,0,0,10">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Share on network" Command="{Binding NavigateToNetworkCommand}"
+                                    VerticalAlignment="Center"/>
+                            <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="Share your versions" FontWeight="SemiBold"/>
+                                <TextBlock Text="Send this repository to a computer on the same network, with every block checked."
+                                           Style="{StaticResource SubtleText}" FontSize="12" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Padding="16,12">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="View history" Command="{Binding NavigateToHistoryCommand}"
+                                    VerticalAlignment="Center"/>
+                            <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="Look back at earlier versions" FontWeight="SemiBold"/>
+                                <TextBlock Text="See what each version contains and bring any old file back."
+                                           Style="{StaticResource SubtleText}" FontSize="12" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Changes but nothing selected: hint + the workspace tree -->
+            <DockPanel Margin="24,20">
+                <DockPanel.Style>
+                    <Style TargetType="DockPanel">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding HasSelectedFile}" Value="False"/>
+                                    <Condition Binding="{Binding HasChanges}" Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DockPanel.Style>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+                    <TextBlock Text="Select a file to see what changed" Style="{StaticResource SectionTitle}"/>
+                    <TextBlock Text="Tick the files to include in the next version, then write a summary and commit."
+                               Style="{StaticResource SubtleText}" Margin="0,4,0,0"/>
+                </StackPanel>
+                <Border Style="{StaticResource Card}" Padding="12,10">
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                            <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Command="{Binding RefreshCommand}"
+                                    ToolTip="Scan again (F5)">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" FontSize="12"/>
+                            </Button>
+                            <TextBlock Text="FILES IN THIS REPOSITORY" Style="{StaticResource PaneTitle}" Margin="0" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <TreeView ItemsSource="{Binding WorkspaceTree}" Margin="-4,0,0,0">
+                            <TreeView.ItemTemplate>
+                                <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="{Binding Icon}" FontSize="13"
+                                                   Foreground="{DynamicResource SubtleTextBrush}" Margin="0,0,7,0"/>
+                                        <TextBlock Text="{Binding Name}" ToolTip="{Binding RelativePath}"/>
+                                    </StackPanel>
+                                </HierarchicalDataTemplate>
+                            </TreeView.ItemTemplate>
+                        </TreeView>
+                    </DockPanel>
+                </Border>
+            </DockPanel>
+
+            <!-- A file is selected: header, AI verdict, then the diff -->
+            <DockPanel Visibility="{Binding HasSelectedFile, Converter={StaticResource BoolToVis}}">
+                <Border DockPanel.Dock="Top" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}"
+                        BorderThickness="0,0,0,1" Padding="16,8,10,8">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Style="{StaticResource OutlineButton}" Command="{Binding ViewChangesCommand}" Margin="0,0,6,0"
+                                    ToolTip="Show the comparison full-size (or double-click the file)">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE740;" FontSize="12" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Expand"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource DangerButton}" Command="{Binding DiscardSelectedFileCommand}"
+                                    ToolTip="Go back to the last saved version. The current copy goes to the Recycle Bin.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE7A7;" FontSize="12" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Discard"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <Border Style="{StaticResource StatusBadge}" DataContext="{Binding SelectedFile}" Margin="0,0,10,0">
+                            <TextBlock Style="{StaticResource StatusGlyph}"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding SelectedFile.FilePath}" FontFamily="{StaticResource MonoFont}" FontSize="12.5"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Style="{StaticResource SubtleText}" FontSize="11.5" TextWrapping="NoWrap">
+                                <Run Text="{Binding SelectedFile.TrackStatus, Mode=OneWay}"/> ·
+                                <Run Text="{Binding SelectedFile.FileType, Mode=OneWay}"/> ·
+                                <Run Text="{Binding SelectedFile.DisplaySize, Mode=OneWay}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- Week 8-9: the storage advisor's verdict for this file -->
+                <Border DockPanel.Dock="Top" Style="{StaticResource GlowCard}" Margin="14,12,14,4" Padding="12,9">
+                    <DockPanel>
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE945;" FontSize="13" VerticalAlignment="Top" Margin="0,2,10,0"
+                                   Foreground="{DynamicResource AccentBrush}"/>
+                        <StackPanel>
+                            <TextBlock Text="{Binding RecommendationText}" TextWrapping="Wrap" FontSize="12.5"/>
+                            <TextBlock Text="{Binding RecommendationTip}" Style="{StaticResource SubtleText}" FontSize="11.5" Margin="0,4,0,0"
+                                       Visibility="{Binding HasRecommendationTip, Converter={StaticResource BoolToVis}}"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <TextBlock DockPanel.Dock="Top" Margin="16,8,16,4" FontSize="12" Foreground="{DynamicResource AccentBrush}"
+                           Text="{Binding InlineDiff.Summary}"
+                           Visibility="{Binding HasInlineDiffLines, Converter={StaticResource BoolToVis}}"/>
+
+                <Grid>
+                    <TextBlock Text="Comparing with the last saved version..." Style="{StaticResource SubtleText}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Visibility="{Binding IsInlineDiffLoading, Converter={StaticResource BoolToVis}}"/>
+                    <ContentControl Content="{Binding InlineDiff}" ContentTemplate="{StaticResource DiffTemplate}" Margin="0,4,0,0"
+                                    Visibility="{Binding IsInlineDiffLoading, Converter={StaticResource InverseBoolToVis}}"/>
+                </Grid>
+            </DockPanel>
+        </Grid>
+
+        <!-- ===================== RIGHT: History ===================== -->
+        <Grid Grid.Column="2" Style="{StaticResource OnHistoryTab}">
+            <TextBlock Text="Select a version on the left to see what it contains." Style="{StaticResource SubtleText}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Visibility="{Binding HasSelectedCommit, Converter={StaticResource InverseBoolToVis}}"/>
+
+            <DockPanel Visibility="{Binding HasSelectedCommit, Converter={StaticResource BoolToVis}}">
+                <Border DockPanel.Dock="Top" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}"
+                        BorderThickness="0,0,0,1" Padding="20,16">
+                    <StackPanel>
+                        <TextBlock Text="{Binding SelectedCommit.Message}" Style="{StaticResource SectionTitle}" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding SelectedCommit.Description}" Style="{StaticResource SubtleText}" Margin="0,6,0,0"
+                                   Visibility="{Binding SelectedCommit.HasDescription, Converter={StaticResource BoolToVis}}"/>
+                        <WrapPanel Margin="0,8,0,0">
+                            <TextBlock Style="{StaticResource SubtleText}" Margin="0,0,14,0">
+                                <Run Text="&#xE77B;" FontFamily="{StaticResource IconFont}"/>
+                                <Run Text="{Binding SelectedCommit.Author, Mode=OneWay}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                            <TextBlock Style="{StaticResource SubtleText}" Margin="0,0,14,0">
+                                <Run Text="&#xE787;" FontFamily="{StaticResource IconFont}"/>
+                                <Run Text="{Binding SelectedCommit.DisplayTime, Mode=OneWay}"/>
+                            </TextBlock>
+                            <TextBlock Style="{StaticResource MonoText}" ToolTip="{Binding SelectedCommit.Hash}">
+                                <Run Text="&#xE8EC;" FontFamily="{StaticResource IconFont}"/>
+                                <Run Text="{Binding SelectedCommit.ShortHash, Mode=OneWay}"/>
+                            </TextBlock>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="20,12">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Restore selected file" Style="{StaticResource AccentButton}"
+                                Command="{Binding RestoreSelectedFileCommand}" Margin="16,0,0,0"
+                                ToolTip="Bring this file back exactly as it was in this version"/>
+                        <TextBlock Text="Restoring never deletes history. The old file comes back as a new change you can save."
+                                   Style="{StaticResource SubtleText}" FontSize="12" VerticalAlignment="Center"/>
+                    </DockPanel>
+                </Border>
+
+                <DockPanel Margin="20,14,20,0">
+                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource PaneTitle}">
+                        <Run Text="{Binding CommitFiles.Count, Mode=OneWay}"/> FILE(S) CHANGED IN THIS VERSION
+                    </TextBlock>
+                    <Border Style="{StaticResource Card}" Padding="0" VerticalAlignment="Top">
+                        <ListBox ItemsSource="{Binding CommitFiles}" SelectedItem="{Binding SelectedCommitFile}"
+                                 ItemContainerStyle="{StaticResource CompactListItem}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel>
+                                        <Ellipse Style="{StaticResource StatusDot}" Margin="0,0,10,0"/>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding TrackStatus}" Style="{StaticResource StatusText}"
+                                                   FontSize="11.5" Margin="10,0,0,0"/>
+                                        <TextBlock TextTrimming="CharacterEllipsis">
+                                            <Run Text="{Binding FolderPart, Mode=OneWay}" Foreground="{DynamicResource SubtleTextBrush}"/><Run Text="{Binding FileName, Mode=OneWay}"/>
+                                        </TextBlock>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
+                </DockPanel>
+            </DockPanel>
+        </Grid>
+
+        <!-- ===================== No repository open ===================== -->
+        <Grid Grid.ColumnSpan="3" Background="{DynamicResource WindowBrush}"
+              Visibility="{Binding HasRepo, Converter={StaticResource InverseBoolToVis}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="420">
+                <TextBlock Style="{StaticResource Icon}" Text="&#xE8B7;" FontSize="34" HorizontalAlignment="Center"
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="0,0,0,14"/>
+                <TextBlock Text="No repository open" Style="{StaticResource PageTitle}" HorizontalAlignment="Center"/>
+                <TextBlock Text="Open or create a folder to start saving versions, or get one from another computer."
+                           Style="{StaticResource SubtleText}" TextAlignment="Center" Margin="0,6,0,18"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Content="Add or create..." Style="{StaticResource AccentButton}" Command="{Binding OpenFolderCommand}" Margin="0,0,8,0"/>
+                    <Button Content="From network..." Command="{Binding NavigateToNetworkCommand}"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

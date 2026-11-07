@@ -13,7 +13,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$suites = Get-ChildItem $here -Directory -Filter 'Ventrail.Tests.Week*' | Sort-Object Name
+$suites = Get-ChildItem $here -Directory -Filter 'Ventrail.Tests.*' |
+    Where-Object { $_.Name -notlike '*Benchmark*' } |
+    Sort-Object { $_.Name -notlike '*Week*' }, Name   # weeks in order, then Redesign
 if ($Only) {
     $suites = $suites | Where-Object { $Only -contains [int]($_.Name -replace '\D', '') }
 }

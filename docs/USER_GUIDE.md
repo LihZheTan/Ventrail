@@ -19,38 +19,58 @@ You don't need to know anything about Git. Ventrail uses it underneath.
 
 ![Welcome page](images/welcome.png)
 
+### Finding your way around
+If you've used GitHub Desktop, the layout will feel familiar:
+- **Menu bar:** *File*, *View*, *Repository* and *Help*. Every action is also in a menu, with its
+  keyboard shortcut next to it.
+- **Toolbar** under the menu:
+  - **Current repository ▾** switches between your recent folders, or opens a new one;
+  - **Current branch** shows which line of history you're on;
+  - **Scan for changes** looks for changed files again;
+  - **Share on network** opens peer-to-peer sharing, with a badge for how many computers were found;
+  - the **sun/moon** button on the far right switches between light and dark.
+- **Left:** **Changes** and **History** tabs. **Right:** whatever you selected on the left.
+
+### Light or dark
+Click the sun/moon in the toolbar, or choose **View → Theme → Light**, **Dark** or **Match
+Windows**. Ventrail remembers your choice.
+
 ## 2. Track a folder
 
-- **Create New Repository** or **Open Repository**: pick the folder that holds your work.
-  Ventrail starts keeping its history. Your files stay exactly where they are.
-- Your recent folders are listed on the Welcome page for one-click access.
+- **Create a new repository** or **Add an existing repository** (File menu, the Welcome page, or
+  **Current repository ▾**): pick the folder that holds your work. Ventrail starts keeping its
+  history, and your files stay exactly where they are.
+- Your recent folders are listed on the Welcome page and in **Current repository ▾**.
 - Ventrail refuses whole drives or system folders (like `C:\` or `Windows`), so you never track
   far more than you meant to.
 
 ## 3. Save a version
 
-![Staging area](images/staging.png)
+![Changes](images/staging.png)
 
-1. The **Staging Area** lists every file that changed since the last version:
-   - **Added** (new), **Modified** (changed) or **Deleted**;
+1. The **Changes** tab lists every file that changed since the last version. The small square at
+   the end of each row shows how it changed:
+   - **+** added (new), **•** modified (changed), **−** deleted;
    - a **Heavy** badge marks a file that will make your history grow a lot (see 4).
-2. **Tick** the files you want in this version, or click **Stage All**.
-3. Describe what changed, for example *"Finished chapter 3"*, and click **Commit Changes**
-   (or press **Ctrl+Enter**).
+2. Click a file to see **exactly which lines changed** on the right. **Expand** shows the
+   comparison full-size; you can also double-click the file.
+3. **Tick** the files you want in this version, or click **Tick all**.
+4. At the bottom, write a short **Summary** (for example *"Finished chapter 3"*) and, if you like,
+   a longer **Description**. Then click **Commit to main** (or press **Ctrl+Enter**).
 
-Useful buttons in the **File Inspector** on the right:
-- **View changes** shows exactly which lines changed in a text file.
-- **Discard** throws away your unsaved changes to a file and goes back to the last saved version.
-  The current copy goes to the **Recycle Bin** first, so you can still get it back.
+**Discard** (above the comparison) throws away your unsaved changes to a file and goes back to
+the last saved version. The current copy goes to the **Recycle Bin** first, so you can still get
+it back.
 
 ## 4. The AI storage advisor
 
 Ventrail includes a small AI model that runs entirely on your computer and never uploads anything.
 - It marks **heavy** files: files whose every saved version adds a lot to your history (big
   images, videos, scans, archives).
-- It explains each file's verdict in the File Inspector.
-- It suggests a **version message** for you; click **Accept AI Suggestions** to use it, or
-  **Edit Manually**.
+- It explains each file's verdict above the comparison when you select the file.
+- It suggests a **version message** for you, above the Summary box.
+  - Click **Use suggestion** to use it, or **Write my own**.
+  - **Why?** shows the storage advice behind the suggestion.
 - For very large files it may suggest **leaving them out** of a version. Accepting unticks them;
   nothing is deleted.
 
@@ -58,9 +78,9 @@ Ventrail includes a small AI model that runs entirely on your computer and never
 
 ![History](images/history.png)
 
-- **History** shows every saved version, newest first.
-- Click a version to see which files it contains.
-- Select a file and click **Restore Selected File** to bring that old copy back. History is
+- The **History** tab shows every saved version, newest first.
+- Click a version to see its description (if one was written) and which files it contains.
+- Select a file and click **Restore selected file** to bring that old copy back. History is
   never deleted: the restored file simply shows up as a new change that you can save.
 
 ## 6. Share with other computers (peer-to-peer)
@@ -69,7 +89,7 @@ Ventrail can send versions **directly** between computers on the **same network*
 home Wi-Fi or a phone hotspot. Nothing goes through the internet or the cloud.
 
 ### Allow sharing (once per computer)
-1. Open the **Peer-to-Peer** page (the share icon on the left).
+1. Click **Share on network** in the toolbar (or press **Ctrl+3**).
 2. Tick **Enable P2P Sharing**, or click **Share via P2P**.
 3. Ventrail explains what it needs. Click **Allow**, then **Yes** on the Windows prompt.
    - This adds two Windows Firewall rules: only for Ventrail, only for its two ports, and only
@@ -115,9 +135,12 @@ home Wi-Fi or a phone hotspot. Nothing goes through the internet or the cloud.
 
 | Keys | Does |
 |---|---|
-| **Ctrl+O** | Open another folder |
-| **F5** | Look for changes again |
-| **Ctrl+Enter** | Save the version (in the message box) |
+| **Ctrl+N** / **Ctrl+O** | Create a new repository / add an existing one |
+| **Ctrl+1** / **Ctrl+2** / **Ctrl+3** | Changes / History / Peer-to-peer |
+| **F5** | Scan for changes |
+| **Ctrl+Enter** | Commit (in the Summary or Description box) |
+| **Ctrl+Shift+F** | Show the repository in File Explorer |
+| **F1** | Open this user guide |
 | **Esc** | Close a dialog |
 
 ## 8. Good to know

@@ -20,6 +20,19 @@ Views (XAML)  ──binding──▶  MainDashboardViewModel  ──interfaces�
 - The ViewModel uses CommunityToolkit.Mvvm (`[ObservableProperty]`, `[RelayCommand]`). All slow
   work runs on background threads; errors become plain-language `VentrailException`s, shown as
   toasts and written to the activity log.
+- **Views, redesigned in a GitHub Desktop style:**
+  - `MainWindow` holds the menu bar, the toolbar (repository drop-down, branch, scan, share, theme
+    switch), the pages and the overlays.
+  - `RepositoryView` holds the Changes/History sidebar and the detail pane (inline diff, version
+    details). `WelcomeView`, `NetworkView` and `SummaryView` are the other pages.
+- **Themes:**
+  - `Themes/Colors.Dark.xaml` and `Colors.Light.xaml` define the same colour keys, and
+    `Themes/Theme.xaml` holds every style.
+  - Views only use colours through `{DynamicResource}`, so `ThemeManager` can swap the colour
+    dictionary at runtime: Light, Dark, or Match Windows (it follows Windows while open).
+    It also matches the title bar and saves the choice in `%AppData%\Ventrail\settings.json`.
+  - The ViewModel only holds `CurrentTheme`; `App.xaml.cs` applies it.
+  - Fonts: Segoe UI Variable (Text and Display) and Cascadia Mono, with Windows 10 fallbacks.
 - `RepositoryManager` opens the Git repository for each operation and closes it afterwards
   (LibGit2Sharp objects aren't thread-safe), so the `.git` folder is never left locked.
 
@@ -108,8 +121,9 @@ receiver                                  sender (TCP 4001)
 ## 5. Testing
 
 Headless console test suites live in [tests/](../tests). Run them all with
-`powershell -ExecutionPolicy Bypass -File tests\run-all.ps1`: 296 checks, from Week 7's discard
-and diff up to Week 13's end-to-end runs.
+`powershell -ExecutionPolicy Bypass -File tests\run-all.ps1`: 318 checks, from Week 7's discard
+and diff up to Week 13's end-to-end runs, plus the redesign suite (it also checks that both colour
+themes define every colour the views use).
 - The **end-to-end suite** drives two real nodes, each through its own real ViewModel and Git
   repository on loopback.
 - It covers slow links, a frozen peer, a busy sender, peer health and switching sharing off.

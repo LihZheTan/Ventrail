@@ -9,6 +9,7 @@
     <Project Path="tests/Ventrail.Tests.Week11/Ventrail.Tests.Week11.csproj" />
     <Project Path="tests/Ventrail.Tests.Week12/Ventrail.Tests.Week12.csproj" />
     <Project Path="tests/Ventrail.Tests.Week13/Ventrail.Tests.Week13.csproj" />
+    <Project Path="tests/Ventrail.Tests.Redesign/Ventrail.Tests.Redesign.csproj" />
     <Project Path="tests/Ventrail.Tests.Benchmark.ClassifierSpeed/Ventrail.Tests.Benchmark.ClassifierSpeed.csproj" />
   </Folder>
 </Solution>

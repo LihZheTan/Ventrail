@@ -87,7 +87,8 @@ public partial class MainDashboardViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRepo), nameof(RepoName))]
     [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(StageAllCommand),
-                                nameof(CommitCommand), nameof(ShareRepositoryCommand), nameof(AcceptSuggestionCommand))]
+                                nameof(CommitCommand), nameof(ShareRepositoryCommand), nameof(AcceptSuggestionCommand),
+                                nameof(ShowInExplorerCommand))]
     private string _currentDirectory = string.Empty;
 
     [ObservableProperty] private string _branchName = string.Empty;
@@ -120,7 +121,8 @@ public partial class MainDashboardViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(StageAllCommand),
-                                nameof(CommitCommand), nameof(ShareRepositoryCommand), nameof(AcceptSuggestionCommand))]
+                                nameof(CommitCommand), nameof(ShareRepositoryCommand), nameof(AcceptSuggestionCommand),
+                                nameof(ShowInExplorerCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -157,6 +159,7 @@ public partial class MainDashboardViewModel : ObservableObject
     partial void OnSelectedFileChanged(FileAsset? value)
     {
         if (value != null) CheckFileRecommendation(value.FilePath);
+        _ = LoadInlineDiffAsync(value);   // Redesign: the diff shows next to the list, like GitHub Desktop
     }
 
     partial void OnSelectedCommitChanged(CommitNode? value)
@@ -326,7 +329,11 @@ public partial class MainDashboardViewModel : ObservableObject
             }
         }
 
-        string message = CommitMessage, author = AuthorName, root = CurrentDirectory;
+        // Redesign: a one-line summary plus an optional description, joined the way Git expects.
+        string message = string.IsNullOrWhiteSpace(CommitDescription)
+            ? CommitMessage.Trim()
+            : $"{CommitMessage.Trim()}\n\n{CommitDescription.Trim()}";
+        string author = AuthorName, root = CurrentDirectory;
         CommitProgress = 0;
         IsCommitting = true;
         try
@@ -359,6 +366,7 @@ public partial class MainDashboardViewModel : ObservableObject
             CommitProgress = 100;
             CommitProgressText = "Done";
             CommitMessage = string.Empty;
+            CommitDescription = string.Empty;
             await ReloadAsync();
 
             string hash = History.FirstOrDefault()?.ShortHash ?? string.Empty;
@@ -528,6 +536,7 @@ public partial class MainDashboardViewModel : ObservableObject
         OnPropertyChanged(nameof(HasHistory));
         OnPropertyChanged(nameof(LatestVersionHash));
         if (!IsBusy) StatusText = $"{Changes.Count} changed file(s), {StagedCount} staged.";
+        LastScanText = $"Last scanned at {DateTime.Now:HH:mm}";
 
         UpdateSuggestion();
         RefreshPeerList();   // Week 12: "Get latest" vs "Download a copy" depends on this history

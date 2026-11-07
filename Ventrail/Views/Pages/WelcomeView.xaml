@@ -4,83 +4,141 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Ventrail.ViewModels"
+             xmlns:conv="clr-namespace:Ventrail.Converters"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:MainDashboardViewModel}"
              d:DesignHeight="640" d:DesignWidth="1100">
 
-    <!-- Welcome screen (proposal Fig: launch screen). -->
-    <Grid>
-        <TextBlock Text="{Binding AppVersion, Mode=OneTime}" Style="{StaticResource SubtleText}" FontSize="11"
-                   HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,18,12"/>
+    <!--
+        Welcome screen (proposal Fig: launch screen), redesigned like GitHub Desktop's
+        "Let's get started": the ways to begin on the left, recent repositories on the right.
+    -->
+    <UserControl.Resources>
+        <conv:FolderNameConverter x:Key="FolderName"/>
 
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="460">
+        <!-- A big option row: icon, title, one-line explanation -->
+        <Style x:Key="StartOption" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{DynamicResource PanelBrush}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="16,12"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+    </UserControl.Resources>
 
-            <!-- Logo: a glowing "V" -->
-            <TextBlock Text="V" FontSize="88" FontWeight="Bold" HorizontalAlignment="Center"
-                       Foreground="{StaticResource AccentBrush}" Margin="0,0,0,-6">
-                <TextBlock.Effect>
-                    <DropShadowEffect Color="{StaticResource AccentColor}" BlurRadius="40" ShadowDepth="0" Opacity="0.8"/>
-                </TextBlock.Effect>
-            </TextBlock>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid MaxWidth="980" Margin="40,48,40,32">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="40"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-            <TextBlock Text="Ventrail" FontSize="40" FontWeight="Bold" HorizontalAlignment="Center"/>
-            <TextBlock Text="AI-Enhanced Local Version Control" Style="{StaticResource SubtleText}"
-                       FontSize="16" HorizontalAlignment="Center" Margin="0,4,0,28"/>
-
-            <!-- Already tracking a folder? Offer a way back in. -->
-            <Button Style="{StaticResource AccentButton}" HorizontalAlignment="Center" Margin="0,0,0,12"
-                    Padding="22,9" Command="{Binding NavigateToStagingCommand}"
-                    Visibility="{Binding HasRepo, Converter={StaticResource BoolToVis}}">
-                <TextBlock>
-                    <Run Text="Continue with"/>
-                    <Run Text="{Binding RepoName, Mode=OneWay}"/>
+            <!-- ===================== Start ===================== -->
+            <StackPanel Grid.Column="0">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Image Source="/Assets/Ventrail.ico" Width="40" Height="40" Margin="0,0,14,0"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Let's get started!" Style="{StaticResource PageTitle}" FontSize="26"/>
+                    </StackPanel>
+                </StackPanel>
+                <TextBlock Style="{StaticResource SubtleText}" FontSize="14" Margin="0,0,0,26">
+                    Ventrail keeps every version of your work, on your own computer. Pick a folder to begin.
                 </TextBlock>
-            </Button>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <Button Style="{StaticResource OutlineButton}" Content="Open Repository" Width="170" Padding="0,9"
-                        Margin="0,0,12,0" Command="{Binding OpenFolderCommand}"
-                        ToolTip="Pick a folder that Ventrail already tracks, or any folder to start tracking"/>
-                <Button Style="{StaticResource AccentButton}" Content="Create New Repository" Width="190" Padding="0,9"
-                        Command="{Binding OpenFolderCommand}"
-                        ToolTip="Pick or create (with 'New folder') an empty folder to start tracking"/>
+                <!-- Already tracking a folder? Offer a way back in. -->
+                <Button Style="{StaticResource AccentButton}" HorizontalAlignment="Left" Margin="0,0,0,18" Padding="18,8"
+                        Command="{Binding NavigateToStagingCommand}"
+                        Visibility="{Binding HasRepo, Converter={StaticResource BoolToVis}}">
+                    <TextBlock>
+                        <Run Text="Continue with"/>
+                        <Run Text="{Binding RepoName, Mode=OneWay}"/>
+                    </TextBlock>
+                </Button>
+
+                <Button Style="{StaticResource StartOption}" Command="{Binding OpenFolderCommand}"
+                        ToolTip="Pick or create (with 'New folder') a folder to start tracking (Ctrl+N)">
+                    <DockPanel>
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="18" Margin="0,0,14,0"
+                                   Foreground="{DynamicResource AccentBrush}"/>
+                        <StackPanel>
+                            <TextBlock Text="Create a new repository" FontWeight="SemiBold"/>
+                            <TextBlock Text="Start saving versions of a folder of documents, images or data."
+                                       Style="{StaticResource SubtleText}" FontSize="12"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Button>
+                <Button Style="{StaticResource StartOption}" Command="{Binding OpenFolderCommand}"
+                        ToolTip="Pick a folder Ventrail (or Git) already tracks (Ctrl+O)">
+                    <DockPanel>
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE838;" FontSize="18" Margin="0,0,14,0"
+                                   Foreground="{DynamicResource AccentBrush}"/>
+                        <StackPanel>
+                            <TextBlock Text="Add an existing repository" FontWeight="SemiBold"/>
+                            <TextBlock Text="Open a folder you already track to see its changes and history."
+                                       Style="{StaticResource SubtleText}" FontSize="12"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Button>
+                <Button Style="{StaticResource StartOption}" Command="{Binding NavigateToNetworkCommand}"
+                        ToolTip="Download a repository from a computer on the same network">
+                    <DockPanel>
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE968;" FontSize="18" Margin="0,0,14,0"
+                                   Foreground="{DynamicResource AccentBrush}"/>
+                        <StackPanel>
+                            <TextBlock Text="Get a repository from another computer" FontWeight="SemiBold"/>
+                            <TextBlock Text="Download a copy from a computer on your network, checked block by block."
+                                       Style="{StaticResource SubtleText}" FontSize="12"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Button>
+
+                <TextBlock Style="{StaticResource SubtleText}" FontSize="12" Margin="0,12,0,0">
+                    New to Ventrail? <Hyperlink Command="{Binding OpenUserGuideCommand}" Foreground="{DynamicResource AccentBrush}">Read the user guide</Hyperlink>
+                    (F1), or switch between light and dark in <Run FontWeight="SemiBold" Text="View > Theme"/>.
+                </TextBlock>
             </StackPanel>
 
-            <!-- Week 14: getting a repository from another computer doesn't need a folder open first -->
-            <TextBlock HorizontalAlignment="Center" Margin="0,14,0,0" FontSize="12">
-                <Hyperlink Command="{Binding NavigateToNetworkCommand}" Foreground="{StaticResource AccentBrush}">
-                    Get a repository from another computer on your network
-                </Hyperlink>
-            </TextBlock>
+            <!-- ===================== Recent ===================== -->
+            <DockPanel Grid.Column="2">
+                <TextBlock DockPanel.Dock="Top" Text="Recent repositories" Style="{StaticResource SectionTitle}" Margin="0,8,0,12"/>
+                <Border Style="{StaticResource Card}" Padding="0" VerticalAlignment="Top">
+                    <Grid>
+                        <StackPanel Margin="20,26" HorizontalAlignment="Center"
+                                    Visibility="{Binding HasRecentRepositories, Converter={StaticResource InverseBoolToVis}}">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8B7;" FontSize="26" HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource SubtleTextBrush}" Margin="0,0,0,10"/>
+                            <TextBlock Text="Folders you open will be listed here." Style="{StaticResource SubtleText}"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
 
-            <TextBlock Text="Recent Repositories" FontWeight="SemiBold" Margin="0,36,0,8"/>
-
-            <Border Style="{StaticResource Card}" Padding="14,12"
-                    Visibility="{Binding HasRecentRepositories, Converter={StaticResource InverseBoolToVis}}">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Style="{StaticResource Icon}" Text="&#xE8B7;" Foreground="{StaticResource SubtleTextBrush}"
-                               Margin="0,0,10,0"/>
-                    <TextBlock Style="{StaticResource SubtleText}" Text="Folders you open will be listed here."/>
-                </StackPanel>
-            </Border>
-
-            <!-- Each recent folder is a button: one click reopens it (Week 4) -->
-            <ItemsControl ItemsSource="{Binding RecentRepositories}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Button Command="{Binding DataContext.OpenRecentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                CommandParameter="{Binding}" HorizontalContentAlignment="Left"
-                                Background="Transparent" BorderThickness="0" Padding="10,7" Margin="0,0,0,2"
-                                ToolTip="Open this folder">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource Icon}" Text="&#xE8B7;" Foreground="{StaticResource ModifiedBrush}"
-                                           Margin="0,0,10,0"/>
-                                <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" MaxWidth="400"/>
-                            </StackPanel>
-                        </Button>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </StackPanel>
-    </Grid>
+                        <!-- Each recent folder is a row: one click reopens it (Week 4) -->
+                        <ItemsControl ItemsSource="{Binding RecentRepositories}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+                                        <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Stretch" Padding="16,10"
+                                                Foreground="{DynamicResource TextBrush}"
+                                                Command="{Binding DataContext.OpenRecentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}" ToolTip="Open this folder">
+                                            <DockPanel>
+                                                <TextBlock DockPanel.Dock="Right" Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="10"
+                                                           Foreground="{DynamicResource SubtleTextBrush}"/>
+                                                <TextBlock Style="{StaticResource Icon}" Text="&#xE8B7;" FontSize="16" Margin="0,0,12,0"
+                                                           Foreground="{DynamicResource SubtleTextBrush}"/>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Converter={StaticResource FolderName}}" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding}" Style="{StaticResource SubtleText}" FontSize="11.5"
+                                                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Button>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Border>
+            </DockPanel>
+        </Grid>
+    </ScrollViewer>
 </UserControl>

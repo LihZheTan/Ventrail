@@ -8,9 +8,17 @@ on the same network. No account, no cloud, no command line.
 Windows desktop app: C# · .NET 8 · WPF (MVVM) · LibGit2Sharp · ML.NET · TCP/UDP sockets with a
 Kademlia DHT.
 
-![Ventrail staging area](docs/images/staging.png)
+| Dark | Light |
+|---|---|
+| ![Ventrail, dark theme](docs/images/staging.png) | ![Ventrail, light theme](docs/images/staging-light.png) |
 
 ## Features
+
+- **Familiar layout.** A GitHub Desktop-style window:
+  - a menu bar, then a toolbar with the current repository, branch, *Scan for changes* and
+    *Share on network*;
+  - Changes and History tabs, with the diff of the selected file beside them.
+  - **Light and dark themes**, or follow Windows. Uses Segoe UI Variable, with Cascadia Mono for code.
 
 - **Save versions without Git knowledge.** Pick a folder, tick the changed files and describe
   the change.
@@ -57,7 +65,7 @@ Studio, choose the **Ventrail (Demo data)** launch profile in the ▼ next to th
 powershell -ExecutionPolicy Bypass -File tests\run-all.ps1
 ```
 
-This runs 296 checks in 7 suites, up to an end-to-end run of two real nodes on slow, frozen and
+This runs 318 checks in 8 suites, up to an end-to-end run of two real nodes on slow, frozen and
 busy networks. See [tests/README.md](tests/README.md).
 
 ## Build a release

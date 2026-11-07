@@ -5,8 +5,8 @@
 
     <!-- Loading spinner (Week 5): a blue arc turning around a faint ring. -->
     <Grid>
-        <Ellipse Stroke="{StaticResource LineBrush}" StrokeThickness="4"/>
-        <Path Stroke="{StaticResource AccentBrush}" StrokeThickness="4"
+        <Ellipse Stroke="{DynamicResource LineBrush}" StrokeThickness="4"/>
+        <Path Stroke="{DynamicResource AccentBrush}" StrokeThickness="4"
               StrokeStartLineCap="Round" StrokeEndLineCap="Round"
               Data="M 20,2 A 18,18 0 0 1 38,20"
               RenderTransformOrigin="0.5,0.5">

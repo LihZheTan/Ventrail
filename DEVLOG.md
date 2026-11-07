@@ -1002,3 +1002,73 @@ can run it without installing anything else.
 **Notes**
 - `Ventrail/_to_delete/` and `Ventrail/_backup_before_git_core.zip` are old local backups (about
   136 KB). They're git-ignored and were left in place; deleting them is up to the author.
+
+## After Week 14 — Redesign: GitHub Desktop-style layout, light and dark themes
+
+**Goal (user request):** make Ventrail look and work like GitHub Desktop's menus and layout, with
+slightly different fonts, and offer light and dark themes.
+
+**What changed**
+- **Shell** (`MainWindow`):
+  - a **menu bar** (File / View / Repository / Help, every item with its shortcut);
+  - a **toolbar** with *Current repository ▾* (a drop-down of recent repositories, plus "Add or
+    create…" and "From network…"), *Current branch*, *Scan for changes* (with "Last scanned at…"),
+    *Share on network* (Online/Offline and a peer-count badge) and a sun/moon theme switch;
+  - a slim status bar showing the version. The old icon rail is gone; the menus and toolbar
+    replace it.
+- **`RepositoryView`** replaces StagingView and HistoryView:
+  - a resizable left sidebar with **Changes | History** tabs;
+  - Changes has tick boxes, rows showing the folder in grey before the file name, a square status
+    mark (+ • −), the AI suggestion (with a "Why?" toggle for the advice) and a **Summary +
+    Description** commit box with a "Commit to *branch*" button;
+  - the right pane shows the **diff of the selected file inline** (GitHub Desktop's main feature),
+    under a header with Expand and Discard and the AI verdict;
+  - when nothing has changed, a "No local changes" screen with suggestions;
+  - History keeps the timeline (Week 4 DAG) and shows the version's description, files and Restore.
+- **Welcome page:** "Let's get started!", with three start options and the recent repositories.
+- **Themes:**
+  - `Colors.Dark.xaml` / `Colors.Light.xaml` hold the same colour keys, and every view uses them
+    through `DynamicResource`;
+  - `ThemeManager` swaps them at runtime: Light / Dark / Match Windows, which keeps following
+    Windows. It also matches the window's title bar and remembers the choice in
+    `%AppData%\Ventrail\settings.json`.
+  - In both themes the toolbar stays dark, as in GitHub Desktop.
+- **Fonts:** Segoe UI Variable Text for text, Variable Display for headings and Cascadia Mono for
+  hashes, paths and diffs. Windows 10 falls back to Segoe UI / Consolas.
+- **ViewModel** (`MainDashboardViewModel.Shell.cs`, still UI-free):
+  - `CurrentTheme` / `SetTheme`, `CommitDescription` (joined to the summary with a blank line, as
+    Git expects), `CommitButtonText`, `LastScanText`;
+  - the inline diff, with only the latest selection's diff kept;
+  - Show in Explorer, User guide (F1), About.
+- `CommitNode.Description` loads the rest of a commit message, so a description written in
+  Ventrail is shown in History.
+
+**Testing**
+- New suite `tests/Ventrail.Tests.Redesign` (**22 checks**):
+  - light and dark define the same colour keys;
+  - every `{DynamicResource}` the views use exists in both themes;
+  - no colour is used as a `StaticResource` (it wouldn't change with the theme);
+  - summary + description become one Git message, and the description shows in History;
+  - the inline diff follows the latest selection;
+  - the theme, navigation and About commands work.
+- **All 318 checks pass** (8 suites).
+- Visual check of every screen in both themes: Changes with inline diff, History, the repository
+  drop-down, the View → Theme menu, Network mid-transfer, the permission dialog, Welcome and the
+  Session Summary.
+
+**Issues found and fixed**
+- The Changes panel didn't fill the sidebar's width: it was docked left inside a DockPanel instead
+  of filling it.
+- Menus opened to the left of their header on this PC, because of Windows' "handedness" setting
+  (`MenuDropAlignment`). Ventrail now opens them left-aligned like GitHub Desktop. WPF caches the
+  setting on first read, so it must be read once before it's overridden.
+- The AI suggestion card squeezed the file list to three rows; its advice now sits behind "Why?".
+- A Week 11 test assumed the PC's first network adapter is a normal LAN. With a VPN connected
+  (a one-address subnet), that assumption failed; the test now picks a real LAN adapter.
+
+**Notes**
+- The redesign keeps every feature and binding, so the proposal's figures map onto the new screens:
+  - Staging area → Changes tab;
+  - File Inspector → the right pane;
+  - Version history → History tab.
+- The old views stay in git history (Week 14 commit) for the report.

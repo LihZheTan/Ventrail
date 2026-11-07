@@ -15,9 +15,9 @@
             <!-- Title -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,26">
                 <Border Width="34" Height="34" CornerRadius="17" BorderThickness="2"
-                        BorderBrush="{StaticResource SubtleTextBrush}" Margin="0,0,12,0">
+                        BorderBrush="{DynamicResource SubtleTextBrush}" Margin="0,0,12,0">
                     <TextBlock Style="{StaticResource Icon}" Text="&#xE73E;" FontSize="15" HorizontalAlignment="Center"
-                               Foreground="{StaticResource SubtleTextBrush}"/>
+                               Foreground="{DynamicResource SubtleTextBrush}"/>
                 </Border>
                 <TextBlock Text="Session Summary" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center"/>
             </StackPanel>
@@ -26,7 +26,7 @@
             <UniformGrid Columns="4" Margin="0,0,0,30">
                 <UniformGrid.Resources>
                     <Style TargetType="Border">
-                        <Setter Property="Background" Value="{StaticResource PanelBrush}"/>
+                        <Setter Property="Background" Value="{DynamicResource PanelBrush}"/>
                         <Setter Property="BorderThickness" Value="1.5"/>
                         <Setter Property="CornerRadius" Value="10"/>
                         <Setter Property="Padding" Value="12,16"/>
@@ -43,25 +43,25 @@
                     </Style>
                 </UniformGrid.Resources>
 
-                <Border BorderBrush="{StaticResource AccentBrush}">
+                <Border BorderBrush="{DynamicResource AccentBrush}">
                     <StackPanel>
                         <TextBlock Style="{StaticResource StatNumber}" Text="{Binding SessionCommits}"/>
                         <TextBlock Style="{StaticResource StatLabel}" Text="Versions saved"/>
                     </StackPanel>
                 </Border>
-                <Border BorderBrush="{StaticResource AddedBrush}">
+                <Border BorderBrush="{DynamicResource AddedBrush}">
                     <StackPanel>
                         <TextBlock Style="{StaticResource StatNumber}" Text="{Binding SessionFilesSaved}"/>
                         <TextBlock Style="{StaticResource StatLabel}" Text="Files saved"/>
                     </StackPanel>
                 </Border>
-                <Border BorderBrush="{StaticResource MergeBrush}">
+                <Border BorderBrush="{DynamicResource MergeBrush}">
                     <StackPanel>
                         <TextBlock Style="{StaticResource StatNumber}" Text="{Binding SessionTransfers}"/>
                         <TextBlock Style="{StaticResource StatLabel}" Text="P2P transfers"/>
                     </StackPanel>
                 </Border>
-                <Border BorderBrush="{StaticResource ModifiedBrush}">
+                <Border BorderBrush="{DynamicResource ModifiedBrush}">
                     <StackPanel>
                         <TextBlock Style="{StaticResource StatNumber}" Text="{Binding SessionSharedDisplay}"/>
                         <TextBlock Style="{StaticResource StatLabel}" Text="Shared"/>
@@ -79,10 +79,10 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <DockPanel Margin="0,0,0,10">
-                                    <Ellipse Width="8" Height="8" Fill="{StaticResource AccentBrush}"
+                                    <Ellipse Width="8" Height="8" Fill="{DynamicResource AccentBrush}"
                                              VerticalAlignment="Top" Margin="0,6,12,0"/>
                                     <TextBlock Text="{Binding DisplayTime}" Style="{StaticResource SubtleText}"
-                                               Width="44" FontFamily="Consolas" Margin="0,1,0,0"/>
+                                               Width="44" FontFamily="{StaticResource MonoFont}" Margin="0,1,0,0"/>
                                     <TextBlock Text="{Binding Text}" TextWrapping="Wrap"/>
                                 </DockPanel>
                             </DataTemplate>
@@ -100,7 +100,7 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <TextBlock Style="{StaticResource Icon}" Text="&#xE72E;" FontSize="11"
-                           Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,6,0"/>
+                           Foreground="{DynamicResource SubtleTextBrush}" Margin="0,0,6,0"/>
                 <TextBlock Text="All data saved locally" Style="{StaticResource SubtleText}" FontSize="12"/>
             </StackPanel>
         </StackPanel>
