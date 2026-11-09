@@ -20,27 +20,26 @@ You don't need to know anything about Git. Ventrail uses it underneath.
 ![Welcome page](images/welcome.png)
 
 ### Finding your way around
-If you've used GitHub Desktop, the layout will feel familiar:
-- **Menu bar:** *File*, *View*, *Repository* and *Help*. Every action is also in a menu, with its
-  keyboard shortcut next to it.
-- **Toolbar** under the menu:
-  - **Current repository ▾** switches between your recent folders, or opens a new one;
-  - **Current branch** shows which line of history you're on;
-  - **Scan for changes** looks for changed files again;
-  - **Share on network** opens peer-to-peer sharing, with a badge for how many computers were found;
-  - the **sun/moon** button on the far right switches between light and dark.
-- **Left:** **Changes** and **History** tabs. **Right:** whatever you selected on the left.
+Everything starts from the **sidebar** on the left:
+- **Repository** shows the folder you're working on and its branch. Click it to switch to a
+  recent folder, add a new one, or get one from another computer.
+- **Home**, **Changes**, **History** and **Network** take you to each page. A blue badge shows how
+  many files changed, or how many computers were found.
+- At the bottom: **Light/Dark mode**, **Help** (this guide), **About** and **Exit**.
+
+Each page has a header with its own buttons. For example, Changes has **Scan for changes** (look
+for changed files again) and **Show in Explorer**.
 
 ### Light or dark
-Click the sun/moon in the toolbar, or choose **View → Theme → Light**, **Dark** or **Match
-Windows**. Ventrail remembers your choice.
+Click **Light mode** / **Dark mode** at the bottom of the sidebar. Right-click it for **Match
+Windows**, which follows your Windows setting. Ventrail remembers your choice.
 
 ## 2. Track a folder
 
-- **Create a new repository** or **Add an existing repository** (File menu, the Welcome page, or
-  **Current repository ▾**): pick the folder that holds your work. Ventrail starts keeping its
-  history, and your files stay exactly where they are.
-- Your recent folders are listed on the Welcome page and in **Current repository ▾**.
+- **Create a new repository** or **Add an existing repository** (on the Home page, or click the
+  **Repository** card in the sidebar): pick the folder that holds your work. Ventrail starts
+  keeping its history, and your files stay exactly where they are.
+- Your recent folders are listed on the Home page and under the sidebar's **Repository** card.
 - Ventrail refuses whole drives or system folders (like `C:\` or `Windows`), so you never track
   far more than you meant to.
 
@@ -89,7 +88,7 @@ Ventrail can send versions **directly** between computers on the **same network*
 home Wi-Fi or a phone hotspot. Nothing goes through the internet or the cloud.
 
 ### Allow sharing (once per computer)
-1. Click **Share on network** in the toolbar (or press **Ctrl+3**).
+1. Click **Network** in the sidebar (or press **Ctrl+3**).
 2. Tick **Enable P2P Sharing**, or click **Share via P2P**.
 3. Ventrail explains what it needs. Click **Allow**, then **Yes** on the Windows prompt.
    - This adds two Windows Firewall rules: only for Ventrail, only for its two ports, and only

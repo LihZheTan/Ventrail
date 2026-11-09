@@ -9,13 +9,14 @@
              d:DesignHeight="680" d:DesignWidth="1180">
 
     <!--
-        The repository screen, laid out like GitHub Desktop:
-          LEFT  = sidebar with "Changes | History" tabs.
+        The repository screen (Changes and History pages, chosen in the app sidebar):
+          TOP   = page header: title, repository and branch, Scan for changes, Show in Explorer.
+          LEFT  = the list for the current page.
                   Changes: changed files with tick boxes, AI suggestion and the commit box (Figs 3.3/3.4).
                   History: saved versions, newest first, joined by a timeline (the DAG, Week 4).
           RIGHT = what is selected: a changed file (its diff + the AI advisor's verdict) or a version
                   (its files + Restore).
-        CurrentPage (Staging or History) decides which tab and which right-hand panel are shown.
+        CurrentPage (Staging or History) decides which list and which right-hand panel are shown.
     -->
     <UserControl.Resources>
         <!-- Visible only on the Changes tab / only on the History tab -->
@@ -37,6 +38,48 @@
         </Style>
     </UserControl.Resources>
 
+    <DockPanel>
+    <!-- ===================== Page header ===================== -->
+    <Border DockPanel.Dock="Top" Padding="28,22,24,18" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+        <DockPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Style="{StaticResource OutlineButton}" Command="{Binding ShowInExplorerCommand}" Margin="0,0,8,0"
+                        ToolTip="Open this repository in File Explorer (Ctrl+Shift+F)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE838;" Margin="0,0,8,0"/>
+                        <TextBlock Text="Show in Explorer"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource AccentButton}" Command="{Binding RefreshCommand}"
+                        ToolTip="{Binding LastScanText}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" Margin="0,0,8,0"/>
+                        <TextBlock Text="Scan for changes"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+            <StackPanel>
+                <TextBlock>
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource PageTitle}">
+                            <Setter Property="Text" Value="Changes"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentPage}" Value="{x:Static vm:AppPage.History}">
+                                    <Setter Property="Text" Value="History"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Style="{StaticResource SubtleText}" Margin="0,4,0,0">
+                    <Run Text="{Binding RepoName, Mode=OneWay}" FontWeight="SemiBold"/> ·
+                    <Run Text="&#xE8AB;" FontFamily="{StaticResource IconFont}"/> <Run Text="{Binding BranchName, Mode=OneWay}"/> ·
+                    <Run Text="{Binding LastScanText, Mode=OneWay}"/>
+                </TextBlock>
+            </StackPanel>
+        </DockPanel>
+    </Border>
+
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="350" MinWidth="270" MaxWidth="560"/>
@@ -46,24 +89,6 @@
 
         <!-- ===================== SIDEBAR ===================== -->
         <DockPanel Grid.Column="0" Background="{DynamicResource PanelBrush}">
-
-            <!-- Changes | History -->
-            <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
-                <UniformGrid Columns="2">
-                    <RadioButton Style="{StaticResource SidebarTab}" GroupName="SidebarTabs"
-                                 IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.Staging}}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Changes"/>
-                            <Border Style="{StaticResource Pill}" Margin="8,0,0,0" Padding="7,0"
-                                    Visibility="{Binding HasChanges, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="{Binding Changes.Count}" FontSize="11"/>
-                            </Border>
-                        </StackPanel>
-                    </RadioButton>
-                    <RadioButton Style="{StaticResource SidebarTab}" GroupName="SidebarTabs" Content="History"
-                                 IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.History}}"/>
-                </UniformGrid>
-            </Border>
 
             <!-- The two tab panels share the space below the tabs -->
             <Grid>
@@ -584,4 +609,5 @@
             </StackPanel>
         </Grid>
     </Grid>
+    </DockPanel>
 </UserControl>

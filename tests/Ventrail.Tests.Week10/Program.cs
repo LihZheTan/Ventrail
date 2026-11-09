@@ -51,19 +51,34 @@ Check("public network detected", pub.IsPublicNetwork && pub.NetworkProfile == "P
 Check("env-var paths in rules are expanded", Tcp(FirewallAuditor.Evaluate(Environment.ExpandEnvironmentVariables(@"%SystemRoot%\x.exe"), 2, true, false, false,
       new[] { Rule("x", app: @"%SystemRoot%\x.exe") }, ports)) == PortAccess.Allowed);
 
-// ---- netsh scripts ----
-string allowScript = FirewallAuditor.BuildAllowScript(Exe, ports, includePublic: false, replaceOwnBlockRules: false);
-Console.WriteLine("   " + allowScript);
-Check("allow script: both rules, local network only, private/domain",
-      allowScript.Contains("name=\"Ventrail P2P (TCP 4001)\" dir=in action=allow protocol=TCP localport=4001")
-      && allowScript.Contains("protocol=UDP localport=4002") && allowScript.Contains("remoteip=localsubnet")
-      && allowScript.Contains("profile=private,domain ") && allowScript.Contains($"program=\"{Exe}\""));
-Check("allow script replaces old Ventrail rules first", allowScript.IndexOf("delete rule name=\"Ventrail P2P (TCP 4001)\"") < allowScript.IndexOf("add rule"));
-Check("allow script never deletes by program unless asked", !allowScript.Contains("name=all"));
-string pubScript = FirewallAuditor.BuildAllowScript(Exe, ports, true, true);
-Check("public + replace own blocks", pubScript.Contains("profile=private,domain,public") && pubScript.StartsWith($"netsh advfirewall firewall delete rule name=all dir=in program=\"{Exe}\""));
-Check("remove script deletes only Ventrail's rules", FirewallAuditor.BuildRemoveScript(ports) ==
-      "netsh advfirewall firewall delete rule name=\"Ventrail P2P (TCP 4001)\" & netsh advfirewall firewall delete rule name=\"Ventrail P2P (UDP 4002)\"");
+// ---- the rules Ventrail adds (applied by its elevated helper through the firewall API) ----
+var allow = FirewallAuditor.BuildAllowRules(Exe, ports, includePublic: false);
+Console.WriteLine("   " + string.Join(" | ", allow));
+Check("allow rules: both ports, Ventrail's exe only, local network only, private/domain",
+      allow.Count == 2
+      && allow[0] is { Name: "Ventrail P2P (TCP 4001)", Protocol: 6, Port: 4001, Profiles: 3, RemoteAddresses: "LocalSubnet" } && allow[0].Program == Exe
+      && allow[1] is { Name: "Ventrail P2P (UDP 4002)", Protocol: 17, Port: 4002, Profiles: 3, RemoteAddresses: "LocalSubnet" } && allow[1].Program == Exe);
+Check("public network included only when asked", FirewallAuditor.BuildAllowRules(Exe, ports, true).All(r => r.Profiles == 7));
+
+// ---- helper mode: the prompt elevates Ventrail.exe itself, not cmd.exe ----
+string allowArgs = FirewallAuditor.HelperArguments(allow: true, ports);
+Check("helper arguments", allowArgs == "--firewall-allow --tcp 4001 --udp 4002", allowArgs);
+Check("helper arguments with public + replace own blocks",
+      FirewallAuditor.HelperArguments(true, ports, true, true) == "--firewall-allow --tcp 4001 --udp 4002 --public --replace-own-blocks");
+Check("remove arguments", FirewallAuditor.HelperArguments(false, ports) == "--firewall-remove --tcp 4001 --udp 4002");
+var parsed = FirewallAuditor.ParseHelperArguments(FirewallAuditor.HelperArguments(true, ports, true, true).Split(' '));
+Check("helper reads back exactly what was asked", parsed is { Allow: true, IncludePublic: true, ReplaceOwnBlockRules: true }
+      && parsed.Ports.SequenceEqual(ports));
+Check("helper mode is recognised (and normal starts are not)", FirewallAuditor.IsHelperCommand(new[] { "--firewall-remove", "--tcp", "4001" })
+      && !FirewallAuditor.IsHelperCommand(new[] { "--demo" }) && !FirewallAuditor.IsHelperCommand(Array.Empty<string>()));
+Check("helper refuses anything unexpected (it runs as admin)", new[]
+{
+    "--firewall-allow", "--firewall-allow --tcp 0", "--firewall-allow --tcp 70000", "--firewall-allow --tcp abc",
+    "--firewall-allow --tcp 4001 --program C:\\evil.exe", "--firewall-remove --tcp 4001 --public",
+    "--firewall-allow --tcp 1 --tcp 2 --tcp 3 --tcp 4 --tcp 5"
+}.All(a => FirewallAuditor.ParseHelperArguments(a.Split(' ')) is null));
+Check("helper with bad arguments exits with code 2 and changes nothing",
+      FirewallAuditor.RunHelper(new[] { "--firewall-allow", "--tcp", "oops" }) == FirewallAuditor.HelperBadArguments);
 
 // ---- real audit on this PC (read only) ----
 var sw = System.Diagnostics.Stopwatch.StartNew();

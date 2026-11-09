@@ -45,9 +45,10 @@ Name: "{autodesktop}\Ventrail"; Filename: "{app}\Ventrail.exe"; Tasks: desktopic
 Filename: "{app}\Ventrail.exe"; Description: "Start Ventrail"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-; Remove Ventrail's two firewall rules (only exist if peer-to-peer sharing was allowed).
-; Windows asks for admin permission; saying No just leaves the two harmless rules behind.
-Filename: "{cmd}"; Parameters: "/c netsh advfirewall firewall delete rule name=""Ventrail P2P (TCP 4001)"" & netsh advfirewall firewall delete rule name=""Ventrail P2P (UDP 4002)"""; \
+; Remove Ventrail's two firewall rules (only exist if peer-to-peer sharing was allowed), using
+; Ventrail's own helper mode, so the Windows admin prompt names Ventrail (not cmd.exe).
+; Saying No just leaves the two harmless rules behind.
+Filename: "{app}\Ventrail.exe"; Parameters: "--firewall-remove --tcp 4001 --udp 4002"; \
   Flags: shellexec runhidden waituntilterminated; Verb: "runas"; RunOnceId: "RemoveFirewallRules"
 
 ; Your repositories, their history and %LocalAppData%\Ventrail (peer id, recent folders) are never

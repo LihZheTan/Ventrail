@@ -113,11 +113,13 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
     {
         var before = CheckFirewall();
         bool ownBlocks = before.Ports.Exists(p => p.BlockedByOwnRule);
-        return FirewallAuditor.RunElevated(
-            FirewallAuditor.BuildAllowScript(ExePath, Ports, includePublicNetworks, ownBlocks));
+        // The admin prompt names Ventrail: it elevates a copy of Ventrail.exe in helper mode.
+        return FirewallAuditor.RunElevatedHelper(
+            FirewallAuditor.HelperArguments(allow: true, Ports, includePublicNetworks, ownBlocks), ExePath);
     }
 
-    public bool RemoveFirewallPermission() => FirewallAuditor.RunElevated(FirewallAuditor.BuildRemoveScript(Ports));
+    public bool RemoveFirewallPermission() =>
+        FirewallAuditor.RunElevatedHelper(FirewallAuditor.HelperArguments(allow: false, Ports), ExePath);
 
     // ---------- Week 10: listening ----------
 

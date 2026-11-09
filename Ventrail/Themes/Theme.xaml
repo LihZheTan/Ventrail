@@ -3,7 +3,7 @@
                     xmlns:conv="clr-namespace:Ventrail.Converters">
 
     <!--
-        Ventrail styles (redesign: a GitHub Desktop-style layout with light and dark themes).
+        Ventrail styles (redesign: a game-launcher-style layout with a navigation sidebar, light and dark themes).
         Colours come from Colors.Dark.xaml / Colors.Light.xaml, merged by ThemeManager, and are
         always used through {DynamicResource ...} so switching themes repaints the whole app.
     -->
@@ -26,8 +26,8 @@
     <!-- ===================== Text ===================== -->
     <Style x:Key="PageTitle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource HeadingFont}"/>
-        <Setter Property="FontSize" Value="22"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="28"/>
+        <Setter Property="FontWeight" Value="Bold"/>
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
     </Style>
 
@@ -161,7 +161,7 @@
         <Setter Property="Background" Value="{DynamicResource PanelBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="CornerRadius" Value="12"/>
         <Setter Property="Padding" Value="16"/>
     </Style>
 
@@ -187,7 +187,8 @@
         <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="12,5"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -198,7 +199,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="6"
+                            CornerRadius="8"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
@@ -247,92 +248,98 @@
         <Setter Property="Foreground" Value="{DynamicResource SubtleTextBrush}"/>
     </Style>
 
-    <!-- ===================== Toolbar (GitHub Desktop style) ===================== -->
-    <!-- A toolbar segment: small grey caption above a bold value, e.g. "Current repository / Thesis". -->
-    <Style x:Key="ToolbarButtonBase" TargetType="ButtonBase">
-        <Setter Property="Foreground" Value="{DynamicResource ToolbarTextBrush}"/>
-        <Setter Property="Background" Value="Transparent"/>
+    <!-- ===================== App sidebar (game-launcher style) ===================== -->
+    <!-- A navigation entry: icon (in Tag) + label, a soft highlight when selected. -->
+    <Style x:Key="NavItem" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{DynamicResource NavSubtleBrush}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="Padding" Value="14,0"/>
+        <Setter Property="Margin" Value="0,0,0,4"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="12,10">
+                        <DockPanel>
+                            <TextBlock x:Name="Glyph" Text="{TemplateBinding Tag}" FontFamily="{StaticResource IconFont}"
+                                       FontSize="17" Width="24" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </DockPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource NavHoverBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource NavTextBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource NavSelectedBrush}"/>
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource NavTextBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The same look for one-off actions at the bottom of the sidebar (theme, help, exit). -->
+    <Style x:Key="NavAction" TargetType="ButtonBase">
+        <Setter Property="Foreground" Value="{DynamicResource NavSubtleBrush}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ButtonBase">
-                    <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"
-                            BorderBrush="{DynamicResource ToolbarLineBrush}" BorderThickness="0,0,1,0">
+                    <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="12,8">
                         <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ToolbarHoverBrush}"/>
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ToolbarHoverBrush}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource NavHoverBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource NavTextBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.5"/>
+                            <Setter Property="Opacity" Value="0.4"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
-    <Style x:Key="ToolbarButton" TargetType="Button" BasedOn="{StaticResource ToolbarButtonBase}"/>
-    <Style x:Key="ToolbarToggle" TargetType="ToggleButton" BasedOn="{StaticResource ToolbarButtonBase}">
+    <Style x:Key="NavActionButton" TargetType="Button" BasedOn="{StaticResource NavAction}"/>
+    <Style x:Key="NavActionToggle" TargetType="ToggleButton" BasedOn="{StaticResource NavAction}">
         <Style.Triggers>
             <Trigger Property="IsChecked" Value="True">
-                <Setter Property="Background" Value="{DynamicResource ToolbarHoverBrush}"/>
+                <Setter Property="Background" Value="{DynamicResource NavHoverBrush}"/>
             </Trigger>
         </Style.Triggers>
     </Style>
 
-    <Style x:Key="ToolbarCaption" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="11"/>
-        <Setter Property="Foreground" Value="{DynamicResource ToolbarSubtleBrush}"/>
-    </Style>
-    <Style x:Key="ToolbarValue" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="13.5"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="{DynamicResource ToolbarTextBrush}"/>
-        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-    </Style>
-    <Style x:Key="ToolbarIcon" TargetType="TextBlock" BasedOn="{StaticResource Icon}">
-        <Setter Property="FontSize" Value="16"/>
-        <Setter Property="Foreground" Value="{DynamicResource ToolbarSubtleBrush}"/>
-        <Setter Property="Margin" Value="0,0,12,0"/>
+    <!-- Small grey uppercase heading in the sidebar ("REPOSITORY", "LIBRARY"). -->
+    <Style x:Key="NavHeading" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="10.5"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource NavSubtleBrush}"/>
+        <Setter Property="Margin" Value="12,0,0,8"/>
     </Style>
 
-    <!-- "Changes | History" tabs at the top of the sidebar: underline on the selected one. -->
-    <Style x:Key="SidebarTab" TargetType="RadioButton">
-        <Setter Property="Foreground" Value="{DynamicResource SubtleTextBrush}"/>
-        <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="RadioButton">
-                    <Grid Background="Transparent">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,10"/>
-                        <Border x:Name="Underline" Height="2" VerticalAlignment="Bottom" Margin="12,0"
-                                Background="{DynamicResource AccentBrush}" Visibility="Hidden"/>
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-                        </Trigger>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Underline" Property="Visibility" Value="Visible"/>
-                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.45"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
+    <!-- Count bubble next to a navigation label (changed files, peers found). -->
+    <Style x:Key="NavBadge" TargetType="Border">
+        <Setter Property="CornerRadius" Value="9"/>
+        <Setter Property="Padding" Value="7,1"/>
+        <Setter Property="MinWidth" Value="20"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource OnAccentBrush}"/>
+        <Setter Property="TextElement.FontSize" Value="11"/>
+        <Setter Property="TextElement.FontWeight" Value="Bold"/>
     </Style>
 
-    <!-- ===================== Menu bar ===================== -->
+    <!-- ===================== Menus (context menus; the app has no menu bar) ===================== -->
     <Style TargetType="Menu">
         <Setter Property="Background" Value="{DynamicResource RailBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>

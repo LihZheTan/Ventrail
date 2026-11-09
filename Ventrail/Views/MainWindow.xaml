@@ -18,10 +18,10 @@
         FontFamily="{StaticResource UiFont}" FontSize="13">
 
     <!--
-        App shell, redesigned in the style of GitHub Desktop:
-          menu bar (File / View / Repository / Help)
-          toolbar: current repository ▾ | current branch | scan for changes | share on network
-          the current page (Welcome, Changes/History, Peer-to-peer, Session summary)
+        App shell, in the style of a game launcher:
+          a navigation sidebar on the left (logo, current repository ▾ and branch, Home / Changes /
+          History / Network, then theme, help, about and exit at the bottom)
+          the current page on the right (Welcome, Changes/History, Peer-to-peer, Session summary)
           a slim status bar, and the overlays (loading, committing, diff, dialog, toast) on top.
     -->
     <Window.Resources>
@@ -43,78 +43,28 @@
     <Grid>
     <DockPanel>
 
-        <!-- ===================== Menu bar ===================== -->
-        <Menu DockPanel.Dock="Top">
-            <MenuItem Header="_File">
-                <MenuItem Header="_New repository..." InputGestureText="Ctrl+N" Command="{Binding OpenFolderCommand}"/>
-                <MenuItem Header="_Add local repository..." InputGestureText="Ctrl+O" Command="{Binding OpenFolderCommand}"/>
-                <MenuItem Header="_Get from another computer..." Command="{Binding NavigateToNetworkCommand}"/>
-                <Separator/>
-                <MenuItem Header="_Recent repositories" ItemsSource="{Binding RecentRepositories}"
-                          IsEnabled="{Binding HasRecentRepositories}">
-                    <MenuItem.ItemContainerStyle>
-                        <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
-                            <Setter Property="Header" Value="{Binding}"/>
-                            <Setter Property="Command" Value="{Binding DataContext.OpenRecentCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                            <Setter Property="CommandParameter" Value="{Binding}"/>
-                        </Style>
-                    </MenuItem.ItemContainerStyle>
-                </MenuItem>
-                <Separator/>
-                <MenuItem Header="E_xit" InputGestureText="Alt+F4" Command="{Binding ShowSessionSummaryCommand}"/>
-            </MenuItem>
-            <MenuItem Header="_View">
-                <MenuItem Header="_Changes" InputGestureText="Ctrl+1" Command="{Binding NavigateToStagingCommand}"
-                          IsEnabled="{Binding HasRepo}"/>
-                <MenuItem Header="_History" InputGestureText="Ctrl+2" Command="{Binding NavigateToHistoryCommand}"
-                          IsEnabled="{Binding HasRepo}"/>
-                <MenuItem Header="_Peer-to-peer" InputGestureText="Ctrl+3" Command="{Binding NavigateToNetworkCommand}"/>
-                <MenuItem Header="Ho_me" Command="{Binding NavigateToWelcomeCommand}"/>
-                <Separator/>
-                <MenuItem Header="_Theme">
-                    <MenuItem Header="Match _Windows" Command="{Binding SetThemeCommand}" CommandParameter="{x:Static themes:AppTheme.System}"
-                              IsChecked="{Binding CurrentTheme, Mode=OneWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static themes:AppTheme.System}}"/>
-                    <MenuItem Header="_Light" Command="{Binding SetThemeCommand}" CommandParameter="{x:Static themes:AppTheme.Light}"
-                              IsChecked="{Binding CurrentTheme, Mode=OneWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static themes:AppTheme.Light}}"/>
-                    <MenuItem Header="_Dark" Command="{Binding SetThemeCommand}" CommandParameter="{x:Static themes:AppTheme.Dark}"
-                              IsChecked="{Binding CurrentTheme, Mode=OneWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static themes:AppTheme.Dark}}"/>
-                </MenuItem>
-            </MenuItem>
-            <MenuItem Header="_Repository">
-                <MenuItem Header="_Scan for changes" InputGestureText="F5" Command="{Binding RefreshCommand}"/>
-                <MenuItem Header="Stage _all" Command="{Binding StageAllCommand}"/>
-                <MenuItem Header="Share via _P2P" Command="{Binding ShareRepositoryCommand}"/>
-                <Separator/>
-                <MenuItem Header="Show in _Explorer" InputGestureText="Ctrl+Shift+F" Command="{Binding ShowInExplorerCommand}"/>
-            </MenuItem>
-            <MenuItem Header="_Help">
-                <MenuItem Header="_User guide" InputGestureText="F1" Command="{Binding OpenUserGuideCommand}"/>
-                <MenuItem Header="_About Ventrail" Command="{Binding ShowAboutCommand}"/>
-            </MenuItem>
-        </Menu>
+        <!-- ===================== App sidebar ===================== -->
+        <Border DockPanel.Dock="Left" Width="236" Background="{DynamicResource SidebarBrush}"
+                BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0">
+            <DockPanel Margin="12,18,12,12">
 
-        <!-- ===================== Toolbar ===================== -->
-        <Border DockPanel.Dock="Top" Height="54" Background="{DynamicResource ToolbarBrush}">
-            <DockPanel>
-                <!-- Quick light/dark switch (also View > Theme) -->
-                <Button DockPanel.Dock="Right" Style="{StaticResource ToolbarButton}" Width="54" Padding="0"
-                        HorizontalContentAlignment="Center" Click="ToggleTheme_Click"
-                        ToolTip="Switch between light and dark (View > Theme for more)">
-                    <TextBlock x:Name="ThemeIcon" Style="{StaticResource ToolbarIcon}" Margin="0" Text="&#xE793;"/>
-                </Button>
+                <!-- Logo -->
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,0,0,22">
+                    <Image Source="/Assets/Ventrail.png" Width="34" Height="34" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock Text="Ventrail" FontFamily="{StaticResource HeadingFont}" FontSize="21" FontWeight="Bold"
+                               Foreground="{DynamicResource NavTextBrush}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                </StackPanel>
 
-                <!-- Current repository ▾ -->
-                <ToggleButton x:Name="RepoToggle" Style="{StaticResource ToolbarToggle}" Width="290"
-                              ToolTip="{Binding CurrentDirectory}">
+                <!-- Current repository (click: switch, add, or get one from the network) -->
+                <TextBlock DockPanel.Dock="Top" Text="REPOSITORY" Style="{StaticResource NavHeading}"/>
+                <ToggleButton x:Name="RepoToggle" DockPanel.Dock="Top" Style="{StaticResource NavActionToggle}" Margin="0,0,0,18"
+                              ToolTip="{Binding CurrentDirectory}" Background="{DynamicResource NavSelectedBrush}">
                     <DockPanel>
-                        <TextBlock DockPanel.Dock="Right" Style="{StaticResource ToolbarIcon}" FontSize="10" Margin="10,0,0,0"
-                                   Text="&#xE70D;"/>
-                        <TextBlock Style="{StaticResource ToolbarIcon}" Text="&#xE8B7;"/>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Current repository" Style="{StaticResource ToolbarCaption}"/>
-                            <TextBlock>
+                        <TextBlock DockPanel.Dock="Right" Style="{StaticResource Icon}" FontSize="10" Margin="8,0,0,0" Text="&#xE70D;"/>
+                        <StackPanel>
+                            <TextBlock FontSize="14" FontWeight="Bold" Foreground="{DynamicResource NavTextBrush}" TextTrimming="CharacterEllipsis">
                                 <TextBlock.Style>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource ToolbarValue}">
+                                    <Style TargetType="TextBlock">
                                         <Setter Property="Text" Value="{Binding RepoName}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding HasRepo}" Value="False">
@@ -124,81 +74,118 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
+                            <TextBlock FontSize="11.5" Margin="0,2,0,0" Foreground="{DynamicResource NavSubtleBrush}"
+                                       Visibility="{Binding HasRepo, Converter={StaticResource BoolToVis}}">
+                                <Run Text="&#xE8AB;" FontFamily="{StaticResource IconFont}"/> <Run Text="{Binding BranchName, Mode=OneWay}"/>
+                            </TextBlock>
                         </StackPanel>
                     </DockPanel>
                 </ToggleButton>
 
-                <!-- Current branch -->
-                <Button Style="{StaticResource ToolbarButton}" Width="210" Command="{Binding NavigateToHistoryCommand}"
-                        IsEnabled="{Binding HasRepo}"
-                        ToolTip="Ventrail saves versions on one branch at a time. Click to see its history.">
-                    <DockPanel>
-                        <TextBlock Style="{StaticResource ToolbarIcon}" Text="&#xE8AB;"/>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Current branch" Style="{StaticResource ToolbarCaption}"/>
-                            <TextBlock Text="{Binding BranchName, FallbackValue='-', TargetNullValue='-'}" Style="{StaticResource ToolbarValue}"/>
+                <!-- Bottom: theme, help, about, exit -->
+                <StackPanel DockPanel.Dock="Bottom">
+                    <Border Height="1" Background="{DynamicResource LineBrush}" Margin="4,0,4,8"/>
+                    <Button Style="{StaticResource NavActionButton}" Click="ToggleTheme_Click"
+                            ToolTip="Switch between light and dark (Match Windows is in the theme menu: right-click)">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Match _Windows" Command="{Binding SetThemeCommand}" CommandParameter="{x:Static themes:AppTheme.System}"
+                                          IsChecked="{Binding CurrentTheme, Mode=OneWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static themes:AppTheme.System}}"/>
+                                <MenuItem Header="_Light" Command="{Binding SetThemeCommand}" CommandParameter="{x:Static themes:AppTheme.Light}"
+                                          IsChecked="{Binding CurrentTheme, Mode=OneWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static themes:AppTheme.Light}}"/>
+                                <MenuItem Header="_Dark" Command="{Binding SetThemeCommand}" CommandParameter="{x:Static themes:AppTheme.Dark}"
+                                          IsChecked="{Binding CurrentTheme, Mode=OneWay, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static themes:AppTheme.Dark}}"/>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="ThemeIcon" Style="{StaticResource Icon}" FontSize="15" Width="24" Margin="0,0,12,0" Text="&#xE706;"/>
+                            <TextBlock x:Name="ThemeLabel" Text="Light mode" VerticalAlignment="Center"/>
                         </StackPanel>
-                    </DockPanel>
-                </Button>
+                    </Button>
+                    <Button Style="{StaticResource NavActionButton}" Command="{Binding OpenUserGuideCommand}" ToolTip="User guide (F1)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" FontSize="15" Width="24" Margin="0,0,12,0" Text="&#xE897;"/>
+                            <TextBlock Text="Help" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource NavActionButton}" Command="{Binding ShowAboutCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" FontSize="15" Width="24" Margin="0,0,12,0" Text="&#xE946;"/>
+                            <TextBlock Text="About" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource NavActionButton}" Command="{Binding ShowSessionSummaryCommand}"
+                            ToolTip="Shows the session summary before closing">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" FontSize="15" Width="24" Margin="0,0,12,0" Text="&#xE7E8;"/>
+                            <TextBlock Text="Exit" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
 
-                <!-- Scan for changes -->
-                <Button Style="{StaticResource ToolbarButton}" Width="210" Command="{Binding RefreshCommand}"
-                        ToolTip="Look for files that changed since the last scan (F5)">
-                    <DockPanel>
-                        <TextBlock Style="{StaticResource ToolbarIcon}" Text="&#xE72C;"/>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Scan for changes" Style="{StaticResource ToolbarValue}"/>
-                            <TextBlock Text="{Binding LastScanText}" Style="{StaticResource ToolbarCaption}"/>
-                        </StackPanel>
-                    </DockPanel>
-                </Button>
-
-                <!-- Share on network -->
-                <Button Style="{StaticResource ToolbarButton}" Width="210" Command="{Binding NavigateToNetworkCommand}"
-                        HorizontalAlignment="Left"
-                        ToolTip="Find computers on your network and share versions with them (Ctrl+3)">
-                    <DockPanel>
-                        <Border DockPanel.Dock="Right" CornerRadius="9" Padding="7,1" Margin="8,0,0,0" VerticalAlignment="Center"
-                                Background="{DynamicResource ToolbarHoverBrush}"
-                                Visibility="{Binding HasPeers, Converter={StaticResource BoolToVis}}">
-                            <TextBlock Text="{Binding ActivePeers.Count}" FontSize="11" Foreground="{DynamicResource ToolbarTextBrush}"/>
-                        </Border>
-                        <TextBlock Style="{StaticResource ToolbarIcon}" Text="&#xE72D;"/>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Share on network" Style="{StaticResource ToolbarValue}"/>
-                            <TextBlock Text="{Binding NetworkStateText}" Style="{StaticResource ToolbarCaption}"/>
-                        </StackPanel>
-                    </DockPanel>
-                </Button>
+                <!-- Navigation: checking one sets CurrentPage -->
+                <StackPanel>
+                    <TextBlock Text="LIBRARY" Style="{StaticResource NavHeading}"/>
+                    <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" Tag="&#xE80F;" Content="Home"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.Welcome}}"/>
+                    <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" Tag="&#xE8A5;" IsEnabled="{Binding HasRepo}"
+                                 ToolTip="Changed files and saving a new version (Ctrl+1)"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.Staging}}">
+                        <DockPanel>
+                            <Border DockPanel.Dock="Right" Style="{StaticResource NavBadge}"
+                                    Visibility="{Binding HasChanges, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding Changes.Count}" HorizontalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="Changes"/>
+                        </DockPanel>
+                    </RadioButton>
+                    <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" Tag="&#xE81C;" Content="History" IsEnabled="{Binding HasRepo}"
+                                 ToolTip="Saved versions (Ctrl+2)"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.History}}"/>
+                    <RadioButton Style="{StaticResource NavItem}" GroupName="Nav" Tag="&#xE72D;"
+                                 ToolTip="Share versions with computers on your network (Ctrl+3)"
+                                 IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBool}, ConverterParameter={x:Static vm:AppPage.Network}}">
+                        <DockPanel>
+                            <Border DockPanel.Dock="Right" Style="{StaticResource NavBadge}"
+                                    Visibility="{Binding HasPeers, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding ActivePeers.Count}" HorizontalAlignment="Center"/>
+                            </Border>
+                            <StackPanel>
+                                <TextBlock Text="Network"/>
+                                <TextBlock Text="{Binding NetworkStateText}" FontSize="11" FontWeight="Normal"
+                                           Foreground="{DynamicResource NavSubtleBrush}"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </RadioButton>
+                </StackPanel>
             </DockPanel>
         </Border>
 
-        <!-- Repository list that drops down from "Current repository" -->
+        <!-- Repository list that drops down from the sidebar's repository card -->
         <Popup IsOpen="{Binding IsChecked, ElementName=RepoToggle, Mode=TwoWay}" PlacementTarget="{Binding ElementName=RepoToggle}"
-               Placement="Bottom" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
-            <Border Width="340" Margin="0,0,12,12" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}"
-                    BorderThickness="1" CornerRadius="0,0,8,8">
+               Placement="Bottom" VerticalOffset="4" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+            <Border Width="320" Margin="0,0,12,12" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource LineBrush}"
+                    BorderThickness="1" CornerRadius="12">
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="16" ShadowDepth="4" Opacity="0.3" Color="Black"/>
+                    <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.35" Color="Black"/>
                 </Border.Effect>
                 <StackPanel>
-                    <TextBlock Text="Recent repositories" Style="{StaticResource PaneTitle}" Margin="14,12,14,6"/>
-                    <TextBlock Text="Folders you open will be listed here." Style="{StaticResource SubtleText}" Margin="14,0,14,8"
+                    <TextBlock Text="RECENT REPOSITORIES" Style="{StaticResource NavHeading}" Margin="16,14,16,6"/>
+                    <TextBlock Text="Folders you open will be listed here." Style="{StaticResource SubtleText}" Margin="16,0,16,8"
                                Visibility="{Binding HasRecentRepositories, Converter={StaticResource InverseBoolToVis}}"/>
-                    <ItemsControl ItemsSource="{Binding RecentRepositories}">
+                    <ItemsControl ItemsSource="{Binding RecentRepositories}" Margin="6,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Left" Padding="14,6"
-                                        Foreground="{DynamicResource TextBrush}" Click="ClosePopup_Click"
+                                <Button Style="{StaticResource NavActionButton}" Foreground="{DynamicResource TextBrush}" Click="ClosePopup_Click"
                                         Command="{Binding DataContext.OpenRecentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                         CommandParameter="{Binding}" ToolTip="{Binding}">
                                     <DockPanel>
-                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE8B7;" Margin="0,0,10,0"
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE8B7;" Margin="0,0,12,0"
                                                    Foreground="{DynamicResource SubtleTextBrush}"/>
                                         <StackPanel>
                                             <TextBlock Text="{Binding Converter={StaticResource FolderName}}" FontWeight="SemiBold"/>
                                             <TextBlock Text="{Binding}" Style="{StaticResource SubtleText}" FontSize="11"
-                                                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="280"/>
+                                                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="240"/>
                                         </StackPanel>
                                     </DockPanel>
                                 </Button>
@@ -206,10 +193,10 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <Border Height="1" Background="{DynamicResource LineBrush}" Margin="0,6,0,0"/>
-                    <UniformGrid Columns="2" Margin="10">
-                        <Button Content="Add or create..." Margin="0,0,5,0" Click="ClosePopup_Click"
+                    <UniformGrid Columns="2" Margin="12">
+                        <Button Content="Add or create" Style="{StaticResource AccentButton}" Margin="0,0,5,0" Click="ClosePopup_Click"
                                 Command="{Binding OpenFolderCommand}" ToolTip="Open a folder to track (Ctrl+O)"/>
-                        <Button Content="From network..." Margin="5,0,0,0" Click="ClosePopup_Click"
+                        <Button Content="From network" Margin="5,0,0,0" Click="ClosePopup_Click"
                                 Command="{Binding NavigateToNetworkCommand}"
                                 ToolTip="Download a repository from another computer"/>
                     </UniformGrid>

@@ -19,22 +19,25 @@ public partial class MainWindow : Window
             if (e.NewValue is INotifyPropertyChanged vm)
                 vm.PropertyChanged += (_, args) =>
                 {
-                    if (args.PropertyName == nameof(MainDashboardViewModel.CurrentTheme)) UpdateThemeIcon();
+                    if (args.PropertyName == nameof(MainDashboardViewModel.CurrentTheme)) UpdateThemeButton();
                 };
-            UpdateThemeIcon();
+            UpdateThemeButton();
         };
     }
 
-    // The toolbar's sun/moon button flips between light and dark (View > Theme has "Match Windows").
+    // The sidebar's theme button flips between light and dark; right-click it for "Match Windows".
     private void ToggleTheme_Click(object sender, RoutedEventArgs e)
     {
         if (DataContext is MainDashboardViewModel vm)
             vm.CurrentTheme = ThemeManager.IsDark ? AppTheme.Light : AppTheme.Dark;
     }
 
-    // Shows where a click takes you: a sun while dark, a moon while light.
-    private void UpdateThemeIcon() =>
+    // Shows where a click takes you: "Light mode" with a sun while dark, "Dark mode" with a moon while light.
+    private void UpdateThemeButton()
+    {
         ThemeIcon.Text = ThemeManager.IsDark ? "" : "";
+        ThemeLabel.Text = ThemeManager.IsDark ? "Light mode" : "Dark mode";
+    }
 
     // Choosing something in the repository drop-down closes it.
     private void ClosePopup_Click(object sender, RoutedEventArgs e) => RepoToggle.IsChecked = false;

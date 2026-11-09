@@ -2,47 +2,52 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!--
-        Dark colours. Light.xaml has the same keys; ThemeManager swaps the two at runtime, and every
-        view uses {DynamicResource ...} for colours so they repaint immediately.
+        Dark colours: flat, neutral near-black surfaces in the style of a game launcher.
+        Colors.Light.xaml has the same keys; ThemeManager swaps the two at runtime, and every view
+        uses {DynamicResource ...} for colours so they repaint immediately.
     -->
 
     <!-- Surfaces -->
-    <SolidColorBrush x:Key="WindowBrush"      Color="#1C2128"/>   <!-- main content area -->
-    <SolidColorBrush x:Key="PanelBrush"       Color="#22272E"/>   <!-- sidebar, side panes -->
-    <SolidColorBrush x:Key="RailBrush"        Color="#22272E"/>   <!-- menu bar, status bar -->
-    <SolidColorBrush x:Key="CardBrush"        Color="#2D333B"/>
-    <SolidColorBrush x:Key="CardHoverBrush"   Color="#373E47"/>
-    <SolidColorBrush x:Key="InputBrush"       Color="#1C2128"/>
-    <SolidColorBrush x:Key="LineBrush"        Color="#3D444D"/>
+    <SolidColorBrush x:Key="WindowBrush"      Color="#121214"/>   <!-- main content area -->
+    <SolidColorBrush x:Key="PanelBrush"       Color="#18181B"/>   <!-- side panes inside a page -->
+    <SolidColorBrush x:Key="RailBrush"        Color="#0E0E10"/>   <!-- status bar -->
+    <SolidColorBrush x:Key="CardBrush"        Color="#202024"/>
+    <SolidColorBrush x:Key="CardHoverBrush"   Color="#2A2A2F"/>
+    <SolidColorBrush x:Key="InputBrush"       Color="#18181B"/>
+    <SolidColorBrush x:Key="LineBrush"        Color="#2C2C32"/>
 
     <!-- Text and accents -->
-    <SolidColorBrush x:Key="TextBrush"        Color="#D1D9E0"/>
-    <SolidColorBrush x:Key="SubtleTextBrush"  Color="#8B949E"/>
-    <SolidColorBrush x:Key="AccentBrush"      Color="#4493F8"/>
+    <SolidColorBrush x:Key="TextBrush"        Color="#F2F2F3"/>
+    <SolidColorBrush x:Key="SubtleTextBrush"  Color="#9C9CA5"/>
+    <SolidColorBrush x:Key="AccentBrush"      Color="#3D8BFD"/>
     <SolidColorBrush x:Key="OnAccentBrush"    Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="AddedBrush"       Color="#57AB5A"/>
-    <SolidColorBrush x:Key="ModifiedBrush"    Color="#C69026"/>
-    <SolidColorBrush x:Key="DeletedBrush"     Color="#E5534B"/>
-    <SolidColorBrush x:Key="MergeBrush"       Color="#986EE2"/>
-    <SolidColorBrush x:Key="TimelineBrush"    Color="#444C56"/>
+    <SolidColorBrush x:Key="AddedBrush"       Color="#45C46A"/>
+    <SolidColorBrush x:Key="ModifiedBrush"    Color="#E8A93A"/>
+    <SolidColorBrush x:Key="DeletedBrush"     Color="#F2605A"/>
+    <SolidColorBrush x:Key="MergeBrush"       Color="#A87BF0"/>
+    <SolidColorBrush x:Key="TimelineBrush"    Color="#3A3A42"/>
 
     <!-- Faint tints behind badges, diff lines and the selected row -->
-    <SolidColorBrush x:Key="AddedTintBrush"    Color="#2657AB5A"/>
-    <SolidColorBrush x:Key="ModifiedTintBrush" Color="#26C69026"/>
-    <SolidColorBrush x:Key="DeletedTintBrush"  Color="#26E5534B"/>
-    <SolidColorBrush x:Key="AccentTintBrush"   Color="#264493F8"/>
-    <SolidColorBrush x:Key="SelectedRowBrush"  Color="#334493F8"/>
+    <SolidColorBrush x:Key="AddedTintBrush"    Color="#2645C46A"/>
+    <SolidColorBrush x:Key="ModifiedTintBrush" Color="#26E8A93A"/>
+    <SolidColorBrush x:Key="DeletedTintBrush"  Color="#26F2605A"/>
+    <SolidColorBrush x:Key="AccentTintBrush"   Color="#263D8BFD"/>
+    <SolidColorBrush x:Key="SelectedRowBrush"  Color="#333D8BFD"/>
 
-    <!-- Toolbar under the menu: dark in both themes -->
-    <SolidColorBrush x:Key="ToolbarBrush"        Color="#161B22"/>
-    <SolidColorBrush x:Key="ToolbarHoverBrush"   Color="#2D333B"/>
-    <SolidColorBrush x:Key="ToolbarLineBrush"    Color="#30363D"/>
-    <SolidColorBrush x:Key="ToolbarTextBrush"    Color="#F0F6FC"/>
-    <SolidColorBrush x:Key="ToolbarSubtleBrush"  Color="#8B949E"/>
+    <!-- App sidebar (logo, repository, navigation) -->
+    <SolidColorBrush x:Key="SidebarBrush"      Color="#0E0E10"/>
+    <SolidColorBrush x:Key="NavHoverBrush"     Color="#1E1E22"/>
+    <SolidColorBrush x:Key="NavSelectedBrush"  Color="#2A2A30"/>
+    <SolidColorBrush x:Key="NavTextBrush"      Color="#F2F2F3"/>
+    <SolidColorBrush x:Key="NavSubtleBrush"    Color="#8E8E97"/>
+
+    <!-- Welcome banner gradient -->
+    <Color x:Key="HeroStartColor">#1D3F78</Color>
+    <Color x:Key="HeroEndColor">#18181B</Color>
 
     <!-- See-through layer behind dialogs and loading overlays -->
-    <SolidColorBrush x:Key="BackdropBrush" Color="#B0080B10"/>
+    <SolidColorBrush x:Key="BackdropBrush" Color="#B0050506"/>
 
-    <Color x:Key="AccentColor">#4493F8</Color>
+    <Color x:Key="AccentColor">#3D8BFD</Color>
     <Color x:Key="ShadowColor">#000000</Color>
 </ResourceDictionary>

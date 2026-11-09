@@ -1,3 +1,5 @@
+<img src="Ventrail/Assets/Ventrail.png" alt="Ventrail logo: a friendly blue dog" width="96" align="right">
+
 # Ventrail
 
 **Version control for people who don't use Git**: keep every version of your thesis, designs or
@@ -14,10 +16,12 @@ Kademlia DHT.
 
 ## Features
 
-- **Familiar layout.** A GitHub Desktop-style window:
-  - a menu bar, then a toolbar with the current repository, branch, *Scan for changes* and
-    *Share on network*;
-  - Changes and History tabs, with the diff of the selected file beside them.
+- **Launcher-style layout.** A dark navigation sidebar holds:
+  - the dog logo, the current repository and branch;
+  - *Home*, *Changes*, *History* and *Network*, with counts for changed files and peers found.
+
+  Each page has a bold header with its own actions, and the Changes page shows the diff of the
+  selected file beside the list.
   - **Light and dark themes**, or follow Windows. Uses Segoe UI Variable, with Cascadia Mono for code.
 
 - **Save versions without Git knowledge.** Pick a folder, tick the changed files and describe
@@ -65,7 +69,7 @@ Studio, choose the **Ventrail (Demo data)** launch profile in the ▼ next to th
 powershell -ExecutionPolicy Bypass -File tests\run-all.ps1
 ```
 
-This runs 318 checks in 8 suites, up to an end-to-end run of two real nodes on slow, frozen and
+This runs 322 checks in 8 suites, up to an end-to-end run of two real nodes on slow, frozen and
 busy networks. See [tests/README.md](tests/README.md).
 
 ## Build a release

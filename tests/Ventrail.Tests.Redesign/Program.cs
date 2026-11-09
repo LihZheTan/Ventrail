@@ -10,7 +10,7 @@ using Ventrail.Services.Mock;
 using Ventrail.Themes;
 using Ventrail.ViewModels;
 
-// Redesign (GitHub Desktop-style shell, light/dark themes): the ViewModel parts behind it, and a
+// Redesign (launcher-style sidebar shell, light/dark themes): the ViewModel parts behind it, and a
 // static check that both colour themes are complete.
 
 int pass = 0, fail = 0;
@@ -59,7 +59,7 @@ MainDashboardViewModel NewVm(Ventrail.Services.Contracts.IRepositoryManager repo
 var vm = NewVm(new MockRepositoryManager());
 await vm.InitializeDashboardAsync(@"C:\Demo\Thesis");
 Check("commit button names the branch", vm.CommitButtonText == "Commit to main", vm.CommitButtonText);
-Check("toolbar shows when the folder was last scanned", vm.LastScanText.StartsWith("Last scanned at "), vm.LastScanText);
+Check("page header shows when the folder was last scanned", vm.LastScanText.StartsWith("Last scanned at "), vm.LastScanText);
 
 vm.SelectedFile = vm.Changes.First(f => f.FileName == "todo.md");
 await WaitFor(() => !vm.IsInlineDiffLoading && vm.InlineDiff != null);
@@ -73,18 +73,18 @@ vm.SelectedFile = null;
 Check("nothing selected -> no diff", vm.InlineDiff is null && !vm.HasInlineDiffLines);
 
 vm.SetThemeCommand.Execute(AppTheme.Light);
-Check("View > Theme > Light sets the theme", vm.CurrentTheme == AppTheme.Light);
+Check("theme switch: Light sets the theme", vm.CurrentTheme == AppTheme.Light);
 vm.SetThemeCommand.Execute(AppTheme.System);
-Check("View > Theme > Match Windows", vm.CurrentTheme == AppTheme.System);
+Check("theme switch: Match Windows", vm.CurrentTheme == AppTheme.System);
 
 vm.NavigateToNetworkCommand.Execute(null);
-Check("toolbar 'Share on network' opens the Peer-to-peer page", vm.CurrentPage == AppPage.Network);
+Check("sidebar 'Network' opens the Peer-to-peer page", vm.CurrentPage == AppPage.Network);
 vm.NavigateToWelcomeCommand.Execute(null);
-Check("View > Home opens the Welcome page", vm.CurrentPage == AppPage.Welcome);
+Check("sidebar 'Home' opens the Welcome page", vm.CurrentPage == AppPage.Welcome);
 
 var about = vm.ShowAboutCommand.ExecuteAsync(null);
 await WaitFor(() => vm.IsDialogOpen);
-Check("Help > About shows an info dialog (no cancel button)", vm.DialogTitle == "About Ventrail" && vm.DialogCancelText == ""
+Check("sidebar 'About' shows an info dialog (no cancel button)", vm.DialogTitle == "About Ventrail" && vm.DialogCancelText == ""
       && vm.DialogMessage.Contains("Version 1.0"), vm.DialogMessage.Split('\n')[0]);
 vm.ConfirmDialogCommand.Execute(null);
 await about;

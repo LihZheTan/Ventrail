@@ -28,7 +28,7 @@
   <!-- Week 14: app icon (window + taskbar) -->
   <ItemGroup>
     <Resource Include="Assets/Ventrail.ico" />
-    <None Remove="Assets/Ventrail.png" />
+    <Resource Include="Assets/Ventrail.png" />
   </ItemGroup>
 
   <!-- Week 8: trained heavy/light classifier (made by Ventrail.ModelTrainer), shipped next to the exe. -->

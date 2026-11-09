@@ -20,6 +20,14 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Helper mode: Ventrail started itself with admin rights to change the Windows Firewall
+        // rules (Peer-to-Peer page, Allow / Remove permission). Do just that, with no window, and exit.
+        if (FirewallAuditor.IsHelperCommand(e.Args))
+        {
+            Shutdown(FirewallAuditor.RunHelper(e.Args));
+            return;
+        }
+
         // "--demo" (the "Ventrail (Demo data)" launch profile) uses fake data: handy for
         // building the UI, testing, and showing the supervisor without a real repository.
         bool demoMode = e.Args.Contains("--demo");

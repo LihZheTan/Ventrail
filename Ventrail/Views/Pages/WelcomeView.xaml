@@ -10,15 +10,16 @@
              d:DesignHeight="640" d:DesignWidth="1100">
 
     <!--
-        Welcome screen (proposal Fig: launch screen), redesigned like GitHub Desktop's
-        "Let's get started": the ways to begin on the left, recent repositories on the right.
+        Welcome screen (proposal Fig: launch screen), redesigned launcher-style: a hero banner, then
+        the ways to begin on the left and recent repositories on the right.
     -->
     <UserControl.Resources>
         <conv:FolderNameConverter x:Key="FolderName"/>
 
         <!-- A big option row: icon, title, one-line explanation -->
         <Style x:Key="StartOption" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="{DynamicResource PanelBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+            <Setter Property="FontWeight" Value="Normal"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Padding" Value="16,12"/>
             <Setter Property="Margin" Value="0,0,0,10"/>
@@ -26,34 +27,55 @@
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Grid MaxWidth="980" Margin="40,48,40,32">
+        <Grid MaxWidth="1040" Margin="36,32,36,32">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="40"/>
+                <ColumnDefinition Width="32"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- ===================== Hero banner ===================== -->
+            <Border Grid.ColumnSpan="3" CornerRadius="16" Padding="32,28" Margin="0,0,0,28"
+                    BorderBrush="{DynamicResource LineBrush}" BorderThickness="1">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="{DynamicResource HeroStartColor}" Offset="0"/>
+                        <GradientStop Color="{DynamicResource HeroEndColor}" Offset="0.85"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <DockPanel>
+                    <Image DockPanel.Dock="Right" Source="/Assets/Ventrail.png" Width="112" Height="112" VerticalAlignment="Center"
+                           Margin="24,0,8,0" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Let's get started!" Style="{StaticResource PageTitle}" FontSize="34"/>
+                        <TextBlock Style="{StaticResource SubtleText}" FontSize="15" Margin="0,8,0,20" MaxWidth="560" HorizontalAlignment="Left">
+                            Ventrail keeps every version of your work, on your own computer, and sniffs out what changed.
+                            Pick a folder to begin.
+                        </TextBlock>
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Already tracking a folder? Offer a way back in. -->
+                            <Button Style="{StaticResource AccentButton}" Margin="0,0,10,0" Padding="22,10" FontSize="14"
+                                    Command="{Binding NavigateToStagingCommand}"
+                                    Visibility="{Binding HasRepo, Converter={StaticResource BoolToVis}}">
+                                <TextBlock>
+                                    <Run Text="Continue with"/>
+                                    <Run Text="{Binding RepoName, Mode=OneWay}"/>
+                                </TextBlock>
+                            </Button>
+                            <Button Content="Open a folder" Padding="22,10" FontSize="14" Command="{Binding OpenFolderCommand}"
+                                    ToolTip="Pick a folder to track (Ctrl+O)"/>
+                        </StackPanel>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
 
             <!-- ===================== Start ===================== -->
-            <StackPanel Grid.Column="0">
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <Image Source="/Assets/Ventrail.ico" Width="40" Height="40" Margin="0,0,14,0"/>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Let's get started!" Style="{StaticResource PageTitle}" FontSize="26"/>
-                    </StackPanel>
-                </StackPanel>
-                <TextBlock Style="{StaticResource SubtleText}" FontSize="14" Margin="0,0,0,26">
-                    Ventrail keeps every version of your work, on your own computer. Pick a folder to begin.
-                </TextBlock>
-
-                <!-- Already tracking a folder? Offer a way back in. -->
-                <Button Style="{StaticResource AccentButton}" HorizontalAlignment="Left" Margin="0,0,0,18" Padding="18,8"
-                        Command="{Binding NavigateToStagingCommand}"
-                        Visibility="{Binding HasRepo, Converter={StaticResource BoolToVis}}">
-                    <TextBlock>
-                        <Run Text="Continue with"/>
-                        <Run Text="{Binding RepoName, Mode=OneWay}"/>
-                    </TextBlock>
-                </Button>
+            <StackPanel Grid.Row="1" Grid.Column="0">
+                <TextBlock Text="Get started" Style="{StaticResource SectionTitle}" Margin="0,0,0,12"/>
 
                 <Button Style="{StaticResource StartOption}" Command="{Binding OpenFolderCommand}"
                         ToolTip="Pick or create (with 'New folder') a folder to start tracking (Ctrl+N)">
@@ -94,13 +116,13 @@
 
                 <TextBlock Style="{StaticResource SubtleText}" FontSize="12" Margin="0,12,0,0">
                     New to Ventrail? <Hyperlink Command="{Binding OpenUserGuideCommand}" Foreground="{DynamicResource AccentBrush}">Read the user guide</Hyperlink>
-                    (F1), or switch between light and dark in <Run FontWeight="SemiBold" Text="View > Theme"/>.
+                    (F1). Light and dark mode are at the bottom of the sidebar.
                 </TextBlock>
             </StackPanel>
 
             <!-- ===================== Recent ===================== -->
-            <DockPanel Grid.Column="2">
-                <TextBlock DockPanel.Dock="Top" Text="Recent repositories" Style="{StaticResource SectionTitle}" Margin="0,8,0,12"/>
+            <DockPanel Grid.Row="1" Grid.Column="2">
+                <TextBlock DockPanel.Dock="Top" Text="Recent repositories" Style="{StaticResource SectionTitle}" Margin="0,0,0,12"/>
                 <Border Style="{StaticResource Card}" Padding="0" VerticalAlignment="Top">
                     <Grid>
                         <StackPanel Margin="20,26" HorizontalAlignment="Center"

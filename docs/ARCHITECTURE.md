@@ -20,11 +20,13 @@ Views (XAML)  ──binding──▶  MainDashboardViewModel  ──interfaces�
 - The ViewModel uses CommunityToolkit.Mvvm (`[ObservableProperty]`, `[RelayCommand]`). All slow
   work runs on background threads; errors become plain-language `VentrailException`s, shown as
   toasts and written to the activity log.
-- **Views, redesigned in a GitHub Desktop style:**
-  - `MainWindow` holds the menu bar, the toolbar (repository drop-down, branch, scan, share, theme
-    switch), the pages and the overlays.
-  - `RepositoryView` holds the Changes/History sidebar and the detail pane (inline diff, version
-    details). `WelcomeView`, `NetworkView` and `SummaryView` are the other pages.
+- **Views, in a game-launcher style:**
+  - `MainWindow` holds the navigation sidebar, the pages and the overlays. The sidebar has the
+    logo, the repository card with its drop-down, Home / Changes / History / Network with badges,
+    and theme / help / about / exit at the bottom.
+  - `RepositoryView` is the Changes and History pages: a page header (title, scan, show in
+    Explorer), the list, and the detail pane (inline diff, version details).
+  - `WelcomeView` (hero banner), `NetworkView` and `SummaryView` are the other pages.
 - **Themes:**
   - `Themes/Colors.Dark.xaml` and `Colors.Light.xaml` define the same colour keys, and
     `Themes/Theme.xaml` holds every style.
@@ -68,8 +70,15 @@ Views (XAML)  ──binding──▶  MainDashboardViewModel  ──interfaces�
 - `FirewallAuditor` reads Windows Firewall rules through its COM API (no admin needed) and works
   out what Windows would do with each port: block rules win, then allow rules, then the network's
   default.
-- Permission is two `netsh` allow rules, run through the normal UAC prompt after Ventrail explains
-  why. The rules are limited to Ventrail's exe, its two ports and `remoteip=localsubnet`.
+- Permission is two allow rules, limited to Ventrail's exe, its two ports and `LocalSubnet`.
+  - After Ventrail explains why, it starts **a copy of itself** with the normal UAC prompt, in
+    *helper mode* (`--firewall-allow` / `--firewall-remove`). So the prompt names Ventrail, not
+    cmd.exe.
+  - The helper adds or removes the rules through the Windows Firewall API and exits without
+    opening a window.
+  - It only accepts its exact expected arguments, and always uses its own exe path, so it can't be
+    used to open the firewall for another program.
+  - The prompt says "Publisher: Unknown" unless the exe is code-signed.
 
 ### Discovery: LAN broadcast + Kademlia DHT
 - **Broadcast** `VENTRAIL?` to 255.255.255.255 and to each network's own broadcast address
@@ -121,7 +130,7 @@ receiver                                  sender (TCP 4001)
 ## 5. Testing
 
 Headless console test suites live in [tests/](../tests). Run them all with
-`powershell -ExecutionPolicy Bypass -File tests\run-all.ps1`: 318 checks, from Week 7's discard
+`powershell -ExecutionPolicy Bypass -File tests\run-all.ps1`: 322 checks, from Week 7's discard
 and diff up to Week 13's end-to-end runs, plus the redesign suite (it also checks that both colour
 themes define every colour the views use).
 - The **end-to-end suite** drives two real nodes, each through its own real ViewModel and Git

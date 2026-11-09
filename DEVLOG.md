@@ -1032,7 +1032,9 @@ slightly different fonts, and offer light and dark themes.
   - `ThemeManager` swaps them at runtime: Light / Dark / Match Windows, which keeps following
     Windows. It also matches the window's title bar and remembers the choice in
     `%AppData%\Ventrail\settings.json`.
-  - In both themes the toolbar stays dark, as in GitHub Desktop.
+  - At first the toolbar stayed dark in both themes, as in GitHub Desktop. After feedback ("why is
+    this part still dark in light mode?") the light theme now has a white toolbar with grey
+    dividers, and a thin line above and below separates it from the menu bar.
 - **Fonts:** Segoe UI Variable Text for text, Variable Display for headings and Cascadia Mono for
   hashes, paths and diffs. Windows 10 falls back to Segoe UI / Consolas.
 - **ViewModel** (`MainDashboardViewModel.Shell.cs`, still UI-free):
@@ -1072,3 +1074,80 @@ slightly different fonts, and offer light and dark themes.
   - File Inspector → the right pane;
   - Version history → History tab.
 - The old views stay in git history (Week 14 commit) for the report.
+
+**Follow-up: a dog logo**
+- **Request:** "redesign the Ventrail logo to something like a dog, the opposite of GitHub's cat".
+  Three original concepts were drawn and compared at real sizes (256, 64, 32 and 16 px, on dark
+  and light backgrounds):
+  - A: a friendly front-facing dog;
+  - B: a dog in profile following a trail of saved versions;
+  - C: a white dog on a blue tile.
+- **Chosen: A.** A blue dog face with floppy ears, a light muzzle and a dark nose, on the dark
+  rounded tile. It's Ventrail's own mascot rather than a variation of the Octocat style: a dog
+  follows a trail, and Ventrail follows the trail of your versions.
+- **Generated in code:**
+  - `Assets/Ventrail.ico` with 9 sizes (16–256 px) for the exe, window, taskbar and installer;
+  - `Assets/Ventrail.png` (256 px), now also included in the app.
+- The Welcome page now shows the PNG instead of the `.ico`, so the logo stays sharp; WPF can pick
+  a small frame from an `.ico` and enlarge it.
+- The README shows the logo, and the Welcome and main screenshots were retaken with it.
+
+**Follow-up: from a GitHub Desktop look to a game-launcher look**
+- **Feedback:** the layout felt too much like a GitHub Desktop copy; lean towards the Epic Games
+  launcher instead (an original design in that spirit, not a copy).
+- **Shell:**
+  - the menu bar and toolbar are gone; a **navigation sidebar** replaces them;
+  - top of the sidebar: the dog logo and "Ventrail", then a **repository card** (name and branch;
+    click for recent repositories, "Add or create" and "From network");
+  - middle: **Home / Changes / History / Network** as large icon-and-label items, with an accent
+    count badge for changed files and peers found, and "Online/Offline" under Network;
+  - bottom: Light/Dark mode (right-click for Match Windows), Help, About and Exit.
+- **Pages:**
+  - Changes and History get a **page header**: a big bold title, "repository · branch · last
+    scanned", and *Show in Explorer* / *Scan for changes* buttons;
+  - the Changes | History tabs inside the page are gone, since the sidebar does that now;
+  - the Welcome page opens with a **hero banner** (rounded gradient card, large dog logo,
+    "Continue with …" and "Open a folder"), then the start options and recent repositories.
+- **Look:**
+  - flat neutral near-black surfaces in dark mode, instead of GitHub's blue-greys; soft greys and
+    white cards in light mode;
+  - 12 px rounded cards, 8 px rounded **semibold** buttons, 28 px bold page titles.
+  - The sidebar has its own colour keys (`SidebarBrush`, `NavHoverBrush`, `NavSelectedBrush`,
+    `NavTextBrush`, `NavSubtleBrush`, `HeroStart/EndColor`), replacing the toolbar keys.
+- **Unchanged:**
+  - every feature, command and keyboard shortcut (Ctrl+1/2/3, F5, Ctrl+O/N, F1, Ctrl+Shift+F);
+  - the ViewModel and the dog logo.
+- **Testing:**
+  - all 318 checks pass;
+  - the redesign suite confirms both palettes still define every colour the views use;
+  - every page was checked in both themes;
+  - the docs (README, user guide, architecture) and screenshots were updated.
+
+**Follow-up: the admin prompt now names Ventrail, not "Windows Command Processor"**
+- **Feedback:** "why does cmd show up as the permission-asking app and not Ventrail itself?"
+- **Cause:** Week 10 changed the firewall by elevating `cmd.exe /c netsh …`. The Windows prompt
+  always names the program being elevated, so it said *Windows Command Processor*. That's
+  confusing for non-technical users, and it looks suspicious.
+- **Fix: Ventrail elevates itself.**
+  - On **Allow** (or **Remove firewall permission**), Ventrail starts a copy of `Ventrail.exe` with
+    the admin prompt and `--firewall-allow --tcp 4001 --udp 4002 [--public] [--replace-own-blocks]`
+    (or `--firewall-remove …`). The prompt now shows **Ventrail** with the dog icon.
+  - In helper mode, `App.OnStartup` does only that and exits with a code (0 ok, 2 bad arguments,
+    3 failed), without opening a window.
+  - The rules are added and removed through the **Windows Firewall API** (`HNetCfg.FWRule`), the
+    same API the audit reads, with no netsh or cmd. The rules themselves are unchanged:
+    Ventrail's exe, its two ports, `LocalSubnet`, private/domain (+ public when asked).
+  - **Safety, because the helper runs as admin:** it accepts only the exact arguments Ventrail
+    produces (ports 1–65535, at most 4, no other options), and the program in the rules is always
+    its own exe path, never one passed in. "Replace own blocks" only removes a rule name if every
+    rule with that name belongs to Ventrail's exe.
+  - The installer's uninstall step uses the same helper (`Ventrail.exe --firewall-remove`).
+  - The prompt still shows "Publisher: Unknown": a verified publisher needs a paid code-signing
+    certificate.
+- **Testing:**
+  - the Week 10 suite now checks the exact rule list and the helper's arguments, round-trip and
+    refusals, instead of netsh text (**58 checks**, all 322 pass);
+  - checked live without changing the firewall: run without admin, the helper exits with code 3
+    in about 1 s with no window; an injected `--program` argument is refused with code 2; the PC
+    still has 0 Ventrail rules.
+  - The real prompt with Ventrail's name is for the user to see (Network page → Allow).
