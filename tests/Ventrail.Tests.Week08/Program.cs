@@ -65,7 +65,6 @@ Check("40 MB text log -> heavy", hugeLog.IsHeavy);
 Check("2 KB note -> light", !note.IsHeavy);
 Check("real files are not estimates", !photoBig.IsEstimate);
 
-// Files that are not on disk (demo data) -> estimate from extension + size
 var demoSvs = engine.ClassifyFile(@"C:\Demo\Thesis\slides\scan_sample.svs", 2_400_000_000)!;
 var demoDocx = engine.ClassifyFile(@"C:\Demo\Thesis\Chapter3_Methodology.docx", 482_000)!;
 Show("demo 2.4 GB .svs (estimate)", demoSvs);
@@ -73,7 +72,7 @@ Show("demo 482 KB .docx (estimate)", demoDocx);
 Check("demo .svs -> heavy estimate", demoSvs.IsHeavy && demoSvs.IsEstimate);
 Check("demo .docx -> light estimate", !demoDocx.IsHeavy && demoDocx.IsEstimate);
 
-foreach (var f0 in Enumerable.Range(0, 1)) { } // Speed: second scan of the same 500 files (cache) after a first cold scan
+foreach (var f0 in Enumerable.Range(0, 1)) { }
 var files = Enumerable.Range(0, 500).Select(i => MakeText($"f{i}.txt", 5_000)).ToList();
 sw.Restart();
 foreach (var f in files) engine.ClassifyFile(f, 0);
@@ -85,19 +84,16 @@ Check("rescan of 500 unchanged files under 1 s (cache)", sw.ElapsedMilliseconds 
 File.AppendAllText(files[0], "changed");
 Check("changed file is re-read", engine.ClassifyFile(files[0], 0)!.SizeInBytes == 5_007);
 
-// Parallel calls (scan on background thread while user selects) must not crash
 var tasks = Enumerable.Range(0, 8).Select(_ => Task.Run(() => files.Take(50).Select(f => engine.ClassifyFile(f, 0)!.IsHeavy).ToList())).ToArray();
 Task.WaitAll(tasks);
 Check("thread-safe under parallel calls", tasks.All(t => t.Result.Count == 50));
 
-// Missing model: no crash, advisor switched off
 var missing = new IntelligentStorageEngine(Path.Combine(dir, "nope.zip"));
 Check("missing model -> not loaded, no crash", !missing.IsModelLoaded && missing.ClassifyFile(files[0], 0) == null);
 File.WriteAllText(Path.Combine(dir, "broken.zip"), "not a model");
 var broken = new IntelligentStorageEngine(Path.Combine(dir, "broken.zip"));
 Check("corrupt model -> not loaded, no crash", !broken.IsModelLoaded, broken.LoadError ?? "");
 
-// ---- End to end: ViewModel + demo repository + real engine ----
 var vm = new Ventrail.ViewModels.MainDashboardViewModel(new Ventrail.Services.Mock.MockRepositoryManager(), engine,
     new NetworkNodeCoordinator(), new SpecializedFileHandler(), new Ventrail.Services.Mock.InMemoryRecentRepositoryStore(), true);
 await vm.InitializeDashboardAsync(@"C:\Demo\Thesis");

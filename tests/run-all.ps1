@@ -7,17 +7,24 @@
 # Exit code 0 = everything passed. Nothing here changes the Windows Firewall or needs admin rights:
 # network tests use loopback (127.0.0.1) ports 45100-48199 only.
 param(
-    [int[]]$Only,
+    [string[]]$Only,
     [switch]$Benchmark
 )
+
+# With -File, "-Only 11,12,13" arrives as the single string "11,12,13", so split it ourselves.
+$weeks = @($Only | ForEach-Object { $_ -split '[,\s]+' } | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ })
 
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $suites = Get-ChildItem $here -Directory -Filter 'Ventrail.Tests.*' |
     Where-Object { $_.Name -notlike '*Benchmark*' } |
     Sort-Object { $_.Name -notlike '*Week*' }, Name   # weeks in order, then Redesign
-if ($Only) {
-    $suites = $suites | Where-Object { $Only -contains [int]($_.Name -replace '\D', '') }
+if ($weeks.Count -gt 0) {
+    $suites = @($suites | Where-Object { $weeks -contains [int]($_.Name -replace '\D', '') })
+}
+if (-not $suites) {
+    Write-Host "No test suites matched -Only $($Only -join ','). Use week numbers like: -Only 11,12,13" -ForegroundColor Red
+    exit 1
 }
 
 $results = @()

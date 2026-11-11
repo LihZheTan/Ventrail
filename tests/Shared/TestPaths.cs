@@ -1,12 +1,10 @@
 using System;
 using System.IO;
 
-/// <summary>Finds the repository from wherever the test runs, so no test depends on one PC's folders.</summary>
 static class TestPaths
 {
     public static string RepoRoot { get; } = Find();
 
-    // The Ventrail project folder and its trained ML.NET model.
     public static string Project => Path.Combine(RepoRoot, "Ventrail");
     public static string Model => Path.Combine(Project, "MLModels", "ventrail_classifier.zip");
 
