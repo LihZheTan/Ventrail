@@ -34,9 +34,13 @@ public class FileDiff
     public string? Message { get; set; }
     public bool IsTruncated { get; set; }
 
+    // Extra line for special formats, e.g. "Notebook (Python): 2 cells changed, 1 new".
+    public string? Note { get; set; }
+
     public bool CanShowLines => Lines.Count > 0;
 
     public string Summary => CanShowLines
-        ? $"{LinesAdded} line(s) added, {LinesRemoved} line(s) removed" + (IsTruncated ? " (first part shown)" : "")
+        ? (Note != null ? Note + " · " : "") +
+          $"{LinesAdded} line(s) added, {LinesRemoved} line(s) removed" + (IsTruncated ? " (first part shown)" : "")
         : Message ?? "No differences.";
 }

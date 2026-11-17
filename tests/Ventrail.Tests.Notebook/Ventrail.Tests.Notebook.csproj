@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Headless test console app: prints PASS/FAIL per check and "N passed, M failed." (see tests/README.md) -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Ventrail\Ventrail.csproj" />
+    <Compile Include="..\Shared\TestPaths.cs" Link="TestPaths.cs" />
+  </ItemGroup>
+</Project>

@@ -17,6 +17,10 @@ public static class SafeDelete
     /// <summary>Returns where the file went ("the Recycle Bin" or a backup folder path).</summary>
     public static string MoveAway(string fullPath, string relativePath)
     {
+        // A read-only file can still be discarded: the user asked for it, and a copy is kept.
+        if (File.GetAttributes(fullPath).HasFlag(FileAttributes.ReadOnly))
+            File.SetAttributes(fullPath, FileAttributes.Normal);
+
         // Fail early with the normal "being used by another process" error if another program
         // has the file open, instead of half-finishing.
         using (new FileStream(fullPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }

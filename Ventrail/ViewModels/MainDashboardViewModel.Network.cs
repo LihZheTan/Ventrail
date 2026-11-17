@@ -257,7 +257,8 @@ public partial class MainDashboardViewModel
         {
             string? parent = PickFolder($"Choose where to put the copy of {offer.Name}");
             if (parent is null) return;
-            newCopy = FreeFolderName(Path.Combine(parent, offer.Name));
+            // The name came from the other computer: use it as one folder name only, inside the chosen folder.
+            newCopy = FreeFolderName(Path.Combine(parent, OfferedRepository.SafeFolderName(offer.Name)));
         }
         else if (History.Count > 0 && History[0].Hash == offer.HeadHash)
         {

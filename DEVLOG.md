@@ -1151,3 +1151,62 @@ slightly different fonts, and offer light and dark themes.
     in about 1 s with no window; an injected `--program` argument is refused with code 2; the PC
     still has 0 Ventrail rules.
   - The real prompt with Ventrail's name is for the user to see (Network page → Allow).
+
+**Follow-up: Jupyter Notebook tracking (supervisor feedback)**
+- **Feedback:** "Test if Jupyter Notebook content can be tracked."
+- **Finding:** a `.ipynb` file was already saved, restored and shared like any other file. But
+  its comparison was close to useless:
+  - a notebook is one JSON file, so the diff showed JSON syntax, not the user's code;
+  - outputs (results, charts as base64 pictures) are in the same file, so just running the
+    notebook again changed hundreds of lines;
+  - notebooks with charts often pass the 2 MB text limit, and then nothing was shown at all.
+- **Added: a cell-by-cell comparison** (`NotebookReader`, `NotebookDiff`).
+  - Reads the cells of nbformat 4 and the older format 3 (worksheets).
+  - Pairs the cells of the saved version and the file on disk: identical cells first (longest
+    common subsequence), then by cell id (nbformat 4.5+), then in order.
+  - Shows only cells whose source changed, under headings like *Cell 3 · Code · changed*,
+    *new cell* or *removed*, with the line changes inside the cell.
+  - Outputs are never shown. They are fingerprinted, so the summary can say "results changed in
+    2 cells (not shown)", or "only the results changed" after a plain re-run.
+  - Limit raised to 25 MB for notebooks. A notebook that can't be read (half-written) falls back
+    to the plain text comparison.
+  - No new library: it uses .NET's own JSON reader. The same diff view is reused.
+- **Not changed:** Git still stores the whole notebook, outputs included, so a restored version
+  is exactly what was saved.
+- **Testing:** new `Ventrail.Tests.Notebook` suite, **40 checks**: reading, tracking in a real
+  repository (scan, commit, history), cell-by-cell comparison, re-run only, cell ids, a 4 MB
+  notebook, a broken notebook, restore and delete.
+
+**Follow-up: bug check (six bugs fixed)**
+- **How:** a scratch program ran awkward cases against the real `RepositoryManager` (odd file
+  names, nested folders, read-only files, parallel calls), and the network code was read for
+  anything a peer controls.
+- **1. File names with `[ ]` changed other files (data loss).**
+  - Git commands read a file name as a pattern, so `report[1].txt` also matched `report1.txt`.
+  - Ticking one ticked both. Worse, **restoring or discarding `report[1].txt` also reverted
+    `report1.txt`**, with no Recycle Bin copy of its unsaved edits.
+  - Browsers create such names all the time ("report[1].docx").
+  - **Fix:** Ventrail no longer passes names to `Commands.Stage`, `Commands.Unstage` or
+    `CheckoutPaths`. It works on the exact path through the index (`StageExact`, `WriteFromCommit`).
+- **2. Another computer could choose where a downloaded copy is written (security).**
+  - The repository name in a peer's `LIST` / `MANIFEST` answer was used directly as the folder
+    name. A name such as `..\..\Startup` or `C:\somewhere` would have put the copy outside the
+    folder the user picked.
+  - **Fix:** `OfferedRepository.SafeFolderName` turns any received name into one plain folder
+    name (no `\ / :`, no `..`, no Windows device names, at most 60 characters). It is applied when
+    the name is received and again when the folder is created.
+- **3. "Tick all" failed in a folder that contains another Git project.**
+  - A downloaded GitHub project inside the tracked folder made every Tick all fail with
+    `invalid path: 'folder/'`.
+  - **Fix:** such folders are skipped in the scan and in Tick all. Git can't save their files
+    into this history.
+- **4. Ticking files quickly gave "Another program is using the version history".**
+  - Two operations at once fought over Git's index lock: 7 of 12 parallel ticks failed.
+  - **Fix:** `RepositoryManager` runs one operation at a time (a lock in `Use`).
+- **5. Comparing a file that was ticked and then deleted crashed** with a null reference.
+  It now shows a clear message. A new empty file now says "This new file is empty."
+- **6. A read-only file couldn't be discarded or restored.** The read-only mark is now cleared
+  first (the safety copy is still made).
+- **Testing:** new `Ventrail.Tests.Regression` suite, **38 checks**, one group per bug.
+  All 400 checks pass.
+- **Not covered by this check:** the firewall, DHT and AI code were not re-read.

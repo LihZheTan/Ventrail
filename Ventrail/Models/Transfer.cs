@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Ventrail.Models;
 
@@ -16,6 +17,25 @@ public class OfferedRepository
     // Set by the Network page: same repository as the one open here, so the button reads
     // "Get latest" instead of "Download a copy".
     public bool IsCurrentRepository { get; set; }
+
+    /// <summary>
+    /// A repository name sent by another computer, made safe to use as ONE folder name. Without
+    /// this, a name such as "..\..\Startup" or "C:\somewhere" would let the other computer choose
+    /// where the downloaded copy is written.
+    /// </summary>
+    public static string SafeFolderName(string? name)
+    {
+        var invalid = System.IO.Path.GetInvalidFileNameChars();   // includes \ / : * ? " < > |
+        string clean = new string((name ?? string.Empty).Select(ch => invalid.Contains(ch) || char.IsControl(ch) ? '-' : ch).ToArray());
+        clean = clean.Trim(' ', '.', '-');                         // no "..", no trailing dot or space
+        if (clean.Length > 60) clean = clean[..60].TrimEnd(' ', '.');
+
+        // Windows device names (CON, NUL, COM1...) can't be folders, with or without an extension.
+        string stem = clean.Split('.')[0].Trim().ToUpperInvariant();
+        bool reserved = stem is "CON" or "PRN" or "AUX" or "NUL" ||
+                        (stem.Length == 4 && (stem.StartsWith("COM") || stem.StartsWith("LPT")) && char.IsDigit(stem[3]));
+        return clean.Length == 0 || reserved ? "Shared folder" : clean;
+    }
 
     public string ShortHead => HeadHash.Length >= 7 ? HeadHash[..7] : HeadHash;
     public string ActionText => IsCurrentRepository ? "Get latest" : "Download a copy";

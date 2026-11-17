@@ -14,6 +14,8 @@ development week that introduced the feature.
 | Week12 | 48 | Version packages, block streaming, SHA-256 checks, resume/cancel, safe import |
 | Week13 | 42 | Adaptive timeouts + **end-to-end**: two real nodes through the real ViewModel, slow/frozen/busy peers |
 | Redesign | 22 | Light/dark themes are complete, summary + description commits, inline diff, navigation and theme commands |
+| Notebook | 40 | Jupyter notebooks (`.ipynb`): reading cells, tracking, cell-by-cell diff without outputs, restore |
+| Regression | 38 | Bugs found in the bug check: names with `[ ]`, names sent by peers, nested Git folders, quick ticks, read-only files |
 
 ## Run
 

@@ -118,7 +118,7 @@ public class RepositoryManager : IRepositoryManager
         foreach (StatusEntry entry in repo.RetrieveStatus(options))
         {
             FileStatus s = entry.State;
-            if (s == FileStatus.Unaltered || s.HasFlag(FileStatus.Ignored))
+            if (s == FileStatus.Unaltered || s.HasFlag(FileStatus.Ignored) || IsNestedRepository(entry.FilePath))
                 continue;
 
             result.Add(new FileAsset
@@ -134,13 +134,71 @@ public class RepositoryManager : IRepositoryManager
         return result.OrderBy(f => f.FilePath).ToList();
     });
 
-    // Commands.Stage also handles deleted files (stages the removal).
-    public void Stage(string filePath) => Use(repo => Commands.Stage(repo, filePath), filePath);
+    // Git's own commands read a file name as a pattern: in "report[1].docx" the [1] means "the
+    // character 1", so staging, restoring or discarding that file also hit "report1.docx".
+    // Ventrail therefore never passes names to those commands. It works on the exact path instead.
 
-    public void StageAll() => Use(repo => Commands.Stage(repo, "*"));
+    public void Stage(string filePath) => Use(repo =>
+    {
+        StageExact(repo, filePath);
+        repo.Index.Write();
+    }, filePath);
+
+    public void StageAll() => Use(repo =>
+    {
+        var options = new StatusOptions { IncludeUntracked = true, RecurseUntrackedDirs = true, IncludeIgnored = false };
+        foreach (StatusEntry entry in repo.RetrieveStatus(options).ToList())
+        {
+            if (entry.State == FileStatus.Unaltered || entry.State.HasFlag(FileStatus.Ignored) ||
+                IsNestedRepository(entry.FilePath))
+                continue;
+            StageExact(repo, entry.FilePath);
+            // A renamed file is listed under its new name: the old name leaves the next version too.
+            if (entry.IndexToWorkDirRenameDetails?.OldFilePath is { } oldPath && oldPath != entry.FilePath)
+                StageExact(repo, oldPath);
+        }
+        repo.Index.Write();
+    });
 
     // Works even before the first commit exists.
-    public void Unstage(string filePath) => Use(repo => Commands.Unstage(repo, filePath), filePath);
+    public void Unstage(string filePath) => Use(repo =>
+    {
+        // Back to what the last saved version has for this exact path (or nothing, for a new file).
+        TreeEntry? saved = repo.Head.Tip?[filePath];
+        if (saved?.Target is Blob blob) repo.Index.Add(blob, filePath, saved.Mode);
+        else if (repo.Index[filePath] != null) repo.Index.Remove(filePath);
+        repo.Index.Write();
+    }, filePath);
+
+    // Stages one exact path: the file as it is on disk, or its removal if it is gone.
+    private void StageExact(Repository repo, string filePath)
+    {
+        if (File.Exists(Path.Combine(RepoPath, filePath))) repo.Index.Add(filePath);
+        else if (repo.Index[filePath] != null) repo.Index.Remove(filePath);
+    }
+
+    // A folder inside this one that has its own Git history (for example a project downloaded from
+    // GitHub) is listed by Git as "folder/". Git can't save its files into this history, so
+    // Ventrail leaves it alone instead of failing.
+    private static bool IsNestedRepository(string statusPath) => statusPath.EndsWith('/');
+
+    // Writes one file exactly as it is in a saved version, and stages it (like
+    // "git checkout <version> -- file", but for the exact path only).
+    private void WriteFromCommit(Repository repo, Commit commit, string filePath)
+    {
+        if (commit[filePath]?.Target is not Blob blob)
+            throw new VentrailException($"\"{filePath}\" is not part of that version.");
+
+        string full = Path.Combine(RepoPath, filePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        if (File.Exists(full) && File.GetAttributes(full).HasFlag(FileAttributes.ReadOnly))
+            File.SetAttributes(full, FileAttributes.Normal);
+
+        using (Stream content = blob.GetContentStream(new FilteringOptions(filePath)))
+        using (var file = new FileStream(full, FileMode.Create, FileAccess.Write, FileShare.None))
+            content.CopyTo(file);
+        repo.Index.Add(filePath);
+    }
 
     // ---------- Fig 3.4: commit execution + DAG history ----------
 
@@ -245,13 +303,14 @@ public class RepositoryManager : IRepositoryManager
     {
         // Same as "git checkout <commit> -- <file>": the old version replaces the file
         // on disk and is staged. Nothing in history is lost, and the user can still undo.
-        repo.CheckoutPaths(commitHash, new[] { filePath },
-            new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
+        Commit commit = repo.Lookup<Commit>(commitHash)
+            ?? throw new VentrailException($"Version {commitHash[..Math.Min(7, commitHash.Length)]} was not found.");
+        WriteFromCommit(repo, commit, filePath);
+        repo.Index.Write();
 
-        // Week 6: if another program holds the file open, libgit2 can skip it without an error.
-        // Check the file on disk really matches the old version so the user is never told
-        // "Restored" when nothing changed. (Reading a locked file throws, which Use() translates.)
-        if (repo.Lookup<Commit>(commitHash)?[filePath]?.Target is Blob blob &&
+        // Week 6: check the file on disk really matches the old version so the user is never told
+        // "Restored" when nothing changed. (Writing or reading a locked file throws, which Use() translates.)
+        if (commit[filePath]?.Target is Blob blob &&
             !FileMatchesBlob(Path.Combine(RepoPath, filePath), blob, filePath))
             throw new VentrailException(
                 $"\"{filePath}\" could not be replaced. If it is open in another program, close it and try again.");
@@ -277,17 +336,13 @@ public class RepositoryManager : IRepositoryManager
         // 2. Files that were never saved are simply taken out of the staging area.
         if (head?[filePath] == null)
         {
-            repo.Index.Remove(filePath);
-            repo.Index.Write();
+            if (repo.Index[filePath] != null) repo.Index.Remove(filePath);
         }
 
         // 3. Files that have a saved version get it back, like "git checkout HEAD -- file".
-        var restore = new[] { filePath, oldPath }
-            .Where(p => p != null && head?[p] != null)
-            .Select(p => p!)
-            .ToList();
-        if (restore.Count > 0)
-            repo.CheckoutPaths(head!.Sha, restore, new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
+        foreach (string path in new[] { filePath, oldPath }.Where(p => p != null && head?[p] != null).Select(p => p!).Distinct())
+            WriteFromCommit(repo, head!, path);
+        repo.Index.Write();
 
         return movedTo;
     }, filePath);
@@ -295,6 +350,7 @@ public class RepositoryManager : IRepositoryManager
     // Bigger files are not compared line by line (too slow, and too long to read anyway).
     private const long MaxDiffBytes = 2 * 1024 * 1024;
     private const int MaxDiffLines = 3000;
+    private const long MaxNotebookBytes = 25 * 1024 * 1024;
 
     public FileDiff GetFileDiff(string filePath) => Use(repo =>
     {
@@ -302,8 +358,19 @@ public class RepositoryManager : IRepositoryManager
         string full = Path.Combine(RepoPath, filePath);
         Blob? saved = repo.Head.Tip?[filePath]?.Target as Blob;
         bool onDisk = File.Exists(full);
+        long size = Math.Max(onDisk ? SafeFileSize(full) : 0, saved?.Size ?? 0);
 
-        if (Math.Max(onDisk ? SafeFileSize(full) : 0, saved?.Size ?? 0) > MaxDiffBytes)
+        // Jupyter notebooks are compared cell by cell, without their outputs. They get a higher size
+        // limit because most of a notebook's size is embedded results (charts), which are skipped.
+        if (NotebookReader.IsNotebook(filePath) && size <= MaxNotebookBytes && (saved != null || onDisk))
+        {
+            FileDiff? notebook = NotebookDiff.Build(filePath,
+                saved?.GetContentText(), onDisk ? File.ReadAllText(full) : null, MaxDiffLines);
+            if (notebook != null) return notebook;
+            // Not a readable notebook (for example half-written): compare it as plain text below.
+        }
+
+        if (size > MaxDiffBytes)
         {
             diff.Message = "This file is too large to compare line by line. You can still restore or discard the whole file.";
             return diff;
@@ -312,6 +379,13 @@ public class RepositoryManager : IRepositoryManager
         {
             diff.Message = "This kind of file (for example a Word document, spreadsheet or picture) can't be " +
                            "compared line by line. You can still restore or discard the whole file.";
+            return diff;
+        }
+
+        if (saved == null && !onDisk)
+        {
+            // Ticked as a new file, then deleted from the folder before it was ever saved.
+            diff.Message = "This file was added and then removed from the folder again, so there is nothing to compare.";
             return diff;
         }
 
@@ -350,7 +424,9 @@ public class RepositoryManager : IRepositoryManager
         diff.LinesAdded = diff.Lines.Count(l => l.Kind == DiffLineKind.Added);
         diff.LinesRemoved = diff.Lines.Count(l => l.Kind == DiffLineKind.Removed);
         if (diff.Lines.Count == 0)
-            diff.Message = "No text changes (only the file's details, such as line endings, changed).";
+            diff.Message = saved == null ? "This new file is empty."
+                         : !onDisk ? "The deleted file was empty."
+                         : "No text changes (only the file's details, such as line endings, changed).";
         return diff;
     }, filePath);
 
@@ -510,14 +586,21 @@ public class RepositoryManager : IRepositoryManager
     // ---------- Week 6: error handling ----------
 
     // Opens the repository for one operation and translates errors into plain language.
+    // One operation at a time: two at once (for example ticking two files quickly) would fight over
+    // Git's index lock and one of them would fail with "another program is using...".
+    private readonly object _gate = new();
+
     private T Use<T>(Func<Repository, T> work, string? filePath = null)
     {
         EnsureOpen();
-        return Translate(() =>
+        lock (_gate)
         {
-            using var repo = new Repository(RepoPath);
-            return work(repo);
-        }, RepoPath, filePath);
+            return Translate(() =>
+            {
+                using var repo = new Repository(RepoPath);
+                return work(repo);
+            }, RepoPath, filePath);
+        }
     }
 
     private void Use(Action<Repository> work, string? filePath = null) =>

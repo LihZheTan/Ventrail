@@ -81,7 +81,8 @@ public partial class NetworkNodeCoordinator
             if (w.Length == 4 && DhtKey.IsValid(w[0]) && w[0].StartsWith("rp-") && IsCommitHash(w[1]))
                 list.Add(new OfferedRepository
                 {
-                    PeerId = peerId, PeerName = session.Peer.Title, Key = w[0], HeadHash = w[1], Branch = w[2], Name = w[3]
+                    PeerId = peerId, PeerName = session.Peer.Title, Key = w[0], HeadHash = w[1], Branch = w[2],
+                    Name = OfferedRepository.SafeFolderName(w[3])
                 });
         }
         await session.SendAsync("BYE", timeout.Token);
@@ -107,7 +108,7 @@ public partial class NetworkNodeCoordinator
         var manifest = new TransferManifest
         {
             PeerId = peerId, RepositoryKey = repositoryKey, PackageHash = w[1], Size = size, BlockSize = blockSize,
-            HeadHash = w[5], Branch = w[6], Name = w[7]
+            HeadHash = w[5], Branch = w[6], Name = OfferedRepository.SafeFolderName(w[7])
         };
         for (int i = 0; i < blocks; i++)
         {

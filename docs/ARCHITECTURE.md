@@ -47,7 +47,22 @@ Views (XAML)  ──binding──▶  MainDashboardViewModel  ──interfaces�
 | Scan, stage, commit, history | `ScanWorkingDirectory`, `Stage`, `Commit`, `GetCommitHistory` |
 | Restore an old file (history is never rewritten) | `RestoreFileFromCommit` |
 | Discard changes, with a safety copy in the Recycle Bin | `DiscardChanges`, `SafeDelete` |
+| Exact file paths only (names like `report[1].docx` are never read as patterns) | `StageExact`, `WriteFromCommit` |
 | Line-by-line diff | `GetFileDiff` |
+| Jupyter notebooks compared cell by cell | `NotebookReader`, `NotebookDiff` |
+
+**Jupyter notebooks.** A `.ipynb` file is one JSON document that mixes the cells the user wrote
+with their outputs (results, charts as embedded pictures), so a line-by-line diff is mostly noise.
+- `NotebookReader` reads the cells (nbformat 4, and the older format 3): kind, source lines, and a
+  SHA-256 of the outputs.
+- `NotebookDiff` pairs the cells of both versions: identical cells first (longest common
+  subsequence), then cells with the same id (nbformat 4.5+), then in order.
+- It shows only cells whose source changed, each under a heading such as *Cell 3 · Code · changed*.
+  Outputs are counted ("results changed in 2 cells") but never shown.
+- Notebooks up to 25 MB are compared this way (plain text stops at 2 MB), because most of a
+  notebook's size is outputs. A notebook that can't be parsed falls back to the text diff.
+- Git still stores the whole file, outputs included, so restoring a version brings back exactly
+  what was saved.
 
 ## 3. AI storage advisor (Weeks 8-9)
 
@@ -92,6 +107,8 @@ Views (XAML)  ──binding──▶  MainDashboardViewModel  ──interfaces�
   a repository has the same key and the key reveals nothing about its contents.
 - Only addresses on this computer's own subnets are accepted. This matches the firewall rule and
   protects against peers listing internet addresses.
+- A repository name received from a peer is reduced to one plain folder name
+  (`OfferedRepository.SafeFolderName`), so a peer can never choose where a copy is written.
 - One-line text messages (`DiscoveryMessage`): `VENTRAIL?` / `VENTRAIL!`, `VENTRAIL-FIND` /
   `VENTRAIL-PEERS`, `VENTRAIL-PROVIDE`, `VENTRAIL-GETPROV` / `VENTRAIL-PROVIDERS`.
 
@@ -130,9 +147,10 @@ receiver                                  sender (TCP 4001)
 ## 5. Testing
 
 Headless console test suites live in [tests/](../tests). Run them all with
-`powershell -ExecutionPolicy Bypass -File tests\run-all.ps1`: 322 checks, from Week 7's discard
-and diff up to Week 13's end-to-end runs, plus the redesign suite (it also checks that both colour
-themes define every colour the views use).
+`powershell -ExecutionPolicy Bypass -File tests\run-all.ps1`: 400 checks, from Week 7's discard
+and diff up to Week 13's end-to-end runs, plus the redesign, notebook and regression suites (the
+redesign
+suite also checks that both colour themes define every colour the views use).
 - The **end-to-end suite** drives two real nodes, each through its own real ViewModel and Git
   repository on loopback.
 - It covers slow links, a frozen peer, a busy sender, peer health and switching sharing off.

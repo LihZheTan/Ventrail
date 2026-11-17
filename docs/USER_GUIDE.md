@@ -53,6 +53,10 @@ Windows**, which follows your Windows setting. Ventrail remembers your choice.
    - a **Heavy** badge marks a file that will make your history grow a lot (see 4).
 2. Click a file to see **exactly which lines changed** on the right. **Expand** shows the
    comparison full-size; you can also double-click the file.
+   - **Jupyter notebooks** (`.ipynb`) are compared **cell by cell**: you see *"Cell 3 · Code ·
+     changed"* with the lines you edited, and new or removed cells.
+   - Results and charts inside the notebook aren't shown. If you only ran the notebook again,
+     Ventrail says that only the results changed.
 3. **Tick** the files you want in this version, or click **Tick all**.
 4. At the bottom, write a short **Summary** (for example *"Finished chapter 3"*) and, if you like,
    a longer **Description**. Then click **Commit to main** (or press **Ctrl+Enter**).
@@ -148,5 +152,7 @@ home Wi-Fi or a phone hotspot. Nothing goes through the internet or the cloud.
   and versions waiting to be sent or received.
 - Your history is stored in a hidden `.git` folder inside your project. **Don't delete it**, or
   your saved versions are gone. The folder also works with any normal Git tool.
+- A folder inside your project that has **its own Git history** (for example a project downloaded
+  from GitHub) is left out: Ventrail doesn't list or save its files.
 - To uninstall, remove the program (or delete the unzipped folder). Your projects and their
   history are never touched.

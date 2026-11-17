@@ -29,6 +29,8 @@ Kademlia DHT.
   - Restore any old file at any time, without history ever being rewritten.
   - Discard changes, with a safety copy kept in the Recycle Bin.
   - Line-by-line diff view.
+  - **Jupyter notebooks** (`.ipynb`) are compared cell by cell: only the code and text you
+    changed, without the results and embedded charts.
 - **Offline AI storage advisor.** An ML.NET model (99.9 % accuracy on held-out data) flags
   *heavy* files that would bloat the history.
   - It writes the commit message for you and suggests leaving out huge files.
@@ -69,7 +71,7 @@ Studio, choose the **Ventrail (Demo data)** launch profile in the ▼ next to th
 powershell -ExecutionPolicy Bypass -File tests\run-all.ps1
 ```
 
-This runs 322 checks in 8 suites, up to an end-to-end run of two real nodes on slow, frozen and
+This runs 400 checks in 10 suites, up to an end-to-end run of two real nodes on slow, frozen and
 busy networks. See [tests/README.md](tests/README.md).
 
 ## Build a release
