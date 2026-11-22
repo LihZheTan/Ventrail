@@ -49,7 +49,10 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
     // What has been learnt about each peer's connection (round-trip time, speed).
     private readonly ConcurrentDictionary<string, PeerLink> _links = new();
 
-    private PeerLink Link(string peerId) => _links.GetOrAdd(peerId, _ => new PeerLink());
+    private PeerLink Link(string peerId)
+    {
+        return _links.GetOrAdd(peerId, _ => new PeerLink());
+    }
 
     /// <summary>
     /// For tests only: makes this computer answer like one on a slow or broken network
@@ -107,7 +110,10 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
 
     // ---------- Week 10: firewall ----------
 
-    public FirewallStatus CheckFirewall() => FirewallAuditor.Audit(ExePath, Ports);
+    public FirewallStatus CheckFirewall()
+    {
+        return FirewallAuditor.Audit(ExePath, Ports);
+    }
 
     public bool RequestFirewallPermission(bool includePublicNetworks)
     {
@@ -118,18 +124,33 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
             FirewallAuditor.HelperArguments(allow: true, Ports, includePublicNetworks, ownBlocks), ExePath);
     }
 
-    public bool RemoveFirewallPermission() =>
-        FirewallAuditor.RunElevatedHelper(FirewallAuditor.HelperArguments(allow: false, Ports), ExePath);
+    public bool RemoveFirewallPermission()
+    {
+        return FirewallAuditor.RunElevatedHelper(FirewallAuditor.HelperArguments(allow: false, Ports), ExePath);
+    }
 
     // ---------- Week 10: listening ----------
 
-    public bool IsListening { get { lock (_gate) return _tcp != null; } }
+    public bool IsListening
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _tcp != null;
+            }
+        }
+    }
 
     public bool StartListening()
     {
         lock (_gate)
         {
-            if (_tcp != null) return true;
+            if (_tcp != null)
+            {
+                return true;
+            }
+
             TcpListener? tcp = null;
             UdpClient? udp = null;
             try
@@ -167,12 +188,19 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
             _tcp = null;
             _udp = null;
             _stop = null;
-            foreach (var p in ConnectedPeers) _table.Update(p.PeerId, n => n.IsConnected = false);
+            foreach (var p in ConnectedPeers)
+            {
+                _table.Update(p.PeerId, n => n.IsConnected = false);
+            }
+
             ConnectedPeers.Clear();
         }
     }
 
-    public void Dispose() => StopListening();
+    public void Dispose()
+    {
+        StopListening();
+    }
 
     private async Task AcceptLoopAsync(TcpListener listener, CancellationToken stop)
     {
@@ -197,21 +225,43 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
             while (!stop.IsCancellationRequested)
             {
                 UdpReceiveResult packet;
-                try { packet = await udp.ReceiveAsync(stop); }
-                catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionReset) { continue; }
+                try
+                {
+                    packet = await udp.ReceiveAsync(stop);
+                }
+                catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionReset)
+                {
+                    continue;
+                }
 
-                if (TestConditions is { Stall: true }) continue;
+                if (TestConditions is { Stall: true })
+                {
+                    continue;
+                }
+
                 string? reply = HandleRequest(DiscoveryMessage.Parse(packet.Buffer), packet.RemoteEndPoint);
-                if (reply is null) continue;
+                if (reply is null)
+                {
+                    continue;
+                }
+
                 byte[] data = Encoding.UTF8.GetBytes(reply);
                 if (TestConditions is { Latency: var delay } && delay > TimeSpan.Zero)
+                {
                     _ = Task.Run(async () =>   // answer later without holding up other questions
                     {
-                        try { await Task.Delay(delay, stop); await udp.SendAsync(data, packet.RemoteEndPoint, stop); }
+                        try
+                        {
+                            await Task.Delay(delay, stop);
+                            await udp.SendAsync(data, packet.RemoteEndPoint, stop);
+                        }
                         catch (Exception) { }
                     }, stop);
+                }
                 else
+                {
                     await udp.SendAsync(data, packet.RemoteEndPoint, stop);
+                }
             }
         }
         catch (Exception) when (stop.IsCancellationRequested) { }
@@ -222,11 +272,19 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
     /// <summary>The answer to one incoming message, or null for none (unknown, malformed or not allowed).</summary>
     private string? HandleRequest(DiscoveryMessage? msg, IPEndPoint from)
     {
-        if (msg is null || !IsLocalNetworkAddress(from.Address)) return null;
+        if (msg is null || !IsLocalNetworkAddress(from.Address))
+        {
+            return null;
+        }
+
         var sender = msg.Sender;
         if (sender != null)
         {
-            if (sender.PeerId == LocalPeerId) return null;   // our own broadcast coming back
+            if (sender.PeerId == LocalPeerId)
+            {
+                return null;   // our own broadcast coming back
+            }
+
             Learn(sender, from.Address);
         }
 
@@ -246,7 +304,11 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
             case DiscoveryMessage.GetProviders when msg.Args.Length >= 1 && IsRepoKey(msg.Args[0]):
                 string key = msg.Args[0];
                 bool selfHas;
-                lock (_gate) selfHas = _provided.ContainsKey(key);
+                lock (_gate)
+                {
+                    selfHas = _provided.ContainsKey(key);
+                }
+
                 var known = _providers.Get(key, DateTime.UtcNow).Where(p => p.PeerId != sender?.PeerId);
                 return $"{Header(DiscoveryMessage.Providers)} {key} {(selfHas ? 1 : 0)} " +
                        $"{DiscoveryMessage.Entries(known)} " +
@@ -259,12 +321,18 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
 
     // ---------- Week 11: discovery ----------
 
-    public List<PeerNode> GetKnownPeers() => _table.All().Select(p =>
+    public List<PeerNode> GetKnownPeers()
+    {
+        return _table.All().Select(p =>
     {
         if (_links.TryGetValue(p.PeerId, out var link) && link.Rtt.Smoothed is { } rtt)
+        {
             p.RoundTripMs = (int)Math.Round(rtt.TotalMilliseconds);
+        }
+
         return p;
     }).ToList();
+    }
 
     // Long enough for the slowest peer heard from before, at least 1.5 s.
     private TimeSpan BroadcastWaitNow()
@@ -287,8 +355,15 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
                            BroadcastWaitNow(), firstOnly: false);
             await LookupAsync(LocalPeerId);
             string[] keys;
-            lock (_gate) keys = _provided.Keys.ToArray();
-            foreach (string key in keys) await AnnounceAsync(key);
+            lock (_gate)
+            {
+                keys = _provided.Keys.ToArray();
+            }
+
+            foreach (string key in keys)
+            {
+                await AnnounceAsync(key);
+            }
         });
         return GetKnownPeers();
     }
@@ -304,18 +379,35 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
         int port = DefaultUdpPort;
         int colon = host.LastIndexOf(':');
         if (colon > 0 && int.TryParse(host[(colon + 1)..], out int p) && p is > 0 and <= 65535)
+        {
             (host, port) = (host[..colon], p);
-        if (host.Length == 0) throw new VentrailException("Type the other computer's IP address or name.");
+        }
+
+        if (host.Length == 0)
+        {
+            throw new VentrailException("Type the other computer's IP address or name.");
+        }
 
         IPAddress? ip;
         if (!IPAddress.TryParse(host, out ip))
         {
-            try { ip = Dns.GetHostAddresses(host).FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork); }
-            catch (SocketException) { ip = null; }
-            if (ip is null) throw new VentrailException($"No computer called \"{host}\" was found on this network.");
+            try
+            {
+                ip = Dns.GetHostAddresses(host).FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
+            }
+            catch (SocketException)
+            {
+                ip = null;
+            }
+            if (ip is null)
+            {
+                throw new VentrailException($"No computer called \"{host}\" was found on this network.");
+            }
         }
         if (!IsLocalNetworkAddress(ip))
+        {
             throw new VentrailException($"{ip} is not on your local network. Ventrail only shares with computers on the same network.");
+        }
 
         var replies = Run(() => AskAsync(new[] { new IPEndPoint(ip, port) }, Header(DiscoveryMessage.Hello),
                                          DiscoveryMessage.HelloAnswer, AddressWait, firstOnly: true));
@@ -328,31 +420,63 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
     /// </summary>
     public void ProvideRepository(string repositoryKey, string repositoryPath, string name)
     {
-        if (!IsRepoKey(repositoryKey)) throw new ArgumentException("Not a repository key", nameof(repositoryKey));
+        if (!IsRepoKey(repositoryKey))
+        {
+            throw new ArgumentException("Not a repository key", nameof(repositoryKey));
+        }
+
         RequireListening();
-        lock (_gate) _provided[repositoryKey] = new Offer(repositoryPath, name);
+        lock (_gate)
+        {
+            _provided[repositoryKey] = new Offer(repositoryPath, name);
+        }
+
         Run(() => AnnounceAsync(repositoryKey));
     }
 
     /// <summary>Peers that announced a copy of the repository (not including this computer).</summary>
     public List<PeerNode> FindProviders(string repositoryKey)
     {
-        if (!IsRepoKey(repositoryKey)) throw new ArgumentException("Not a repository key", nameof(repositoryKey));
+        if (!IsRepoKey(repositoryKey))
+        {
+            throw new ArgumentException("Not a repository key", nameof(repositoryKey));
+        }
+
         RequireListening();
         return Run(async () =>
         {
             var found = new Dictionary<string, PeerNode>();
-            void Add(PeerNode p) { if (p.PeerId != LocalPeerId) found[p.PeerId] = p; }
-            foreach (var p in _providers.Get(repositoryKey, DateTime.UtcNow)) Add(p);
+            void Add(PeerNode p)
+            {
+                if (p.PeerId != LocalPeerId)
+                {
+                    found[p.PeerId] = p;
+                }
+            }
+            foreach (var p in _providers.Get(repositoryKey, DateTime.UtcNow))
+            {
+                Add(p);
+            }
 
             var closest = await LookupAsync(repositoryKey);
             var answers = await Task.WhenAll(closest.Select(p =>
                 QueryAsync(p, $"{Header(DiscoveryMessage.GetProviders)} {repositoryKey}", DiscoveryMessage.Providers)));
             foreach (var answer in answers)
             {
-                if (answer is null || answer.Args.Length < 3 || answer.Args[0] != repositoryKey) continue;
-                if (answer.Args[1] == "1") Add(answer.Sender!);
-                foreach (var p in UsableEntries(answer.Args[2], answer.Sender!)) Add(p);
+                if (answer is null || answer.Args.Length < 3 || answer.Args[0] != repositoryKey)
+                {
+                    continue;
+                }
+
+                if (answer.Args[1] == "1")
+                {
+                    Add(answer.Sender!);
+                }
+
+                foreach (var p in UsableEntries(answer.Args[2], answer.Sender!))
+                {
+                    Add(p);
+                }
             }
             // Prefer the details in the routing table (fresher name/ports) where we have them.
             return found.Values.Select(p => _table.Find(p.PeerId) ?? p).ToList();
@@ -390,7 +514,11 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
     /// </summary>
     private async Task<List<PeerNode>> LookupAsync(string target)
     {
-        ulong Dist(PeerNode p) => DhtKey.Distance(p.PeerId, target);
+        ulong Dist(PeerNode p)
+        {
+            return DhtKey.Distance(p.PeerId, target);
+        }
+
         var candidates = _table.Closest(target).ToDictionary(p => p.PeerId);
         var asked = new HashSet<string>();
         var answered = new Dictionary<string, PeerNode>();
@@ -399,8 +527,15 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
         {
             var batch = candidates.Values.OrderBy(Dist).Take(KademliaRoutingTable.K)
                                   .Where(p => !asked.Contains(p.PeerId)).Take(Alpha).ToList();
-            if (batch.Count == 0) break;
-            foreach (var p in batch) asked.Add(p.PeerId);
+            if (batch.Count == 0)
+            {
+                break;
+            }
+
+            foreach (var p in batch)
+            {
+                asked.Add(p.PeerId);
+            }
 
             var replies = await Task.WhenAll(batch.Select(p =>
                 QueryAsync(p, $"{Header(DiscoveryMessage.Find)} {target}", DiscoveryMessage.Peers)));
@@ -412,13 +547,18 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
                     // Week 13: only drop a peer after several lookups in a row got no answer, so a link that
                     // suddenly got slower keeps its peer while the waits adapt.
                     if (Link(batch[i].PeerId).MissedLookup() >= PeerLink.DropAfterMisses && _table.Remove(batch[i].PeerId))
+                    {
                         PeersChanged?.Invoke(this, EventArgs.Empty);
+                    }
+
                     continue;
                 }
                 Link(reply.Sender!.PeerId).AnsweredLookup();
                 answered[reply.Sender.PeerId] = reply.Sender;
                 foreach (var p in UsableEntries(reply.Args.FirstOrDefault(), reply.Sender))
+                {
                     candidates.TryAdd(p.PeerId, p);
+                }
             }
         }
         return answered.Values.OrderBy(Dist).Take(KademliaRoutingTable.K).ToList();
@@ -428,12 +568,19 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
     private async Task AnnounceAsync(string key)
     {
         var closest = await LookupAsync(key);
-        if (closest.Count == 0) return;
+        if (closest.Count == 0)
+        {
+            return;
+        }
+
         using var udp = NewUdp(new IPEndPoint(_bindAddress, 0));
         byte[] data = Encoding.UTF8.GetBytes($"{Header(DiscoveryMessage.Provide)} {key}");
         foreach (var p in closest)
         {
-            try { await udp.SendAsync(data, new IPEndPoint(IPAddress.Parse(p.IPAddress), p.DiscoveryPort)); }
+            try
+            {
+                await udp.SendAsync(data, new IPEndPoint(IPAddress.Parse(p.IPAddress), p.DiscoveryPort));
+            }
             catch (SocketException) { }
         }
     }
@@ -450,7 +597,10 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
             var wait = link.Rtt.Timeout * (attempt + 1);   // second try: twice as patient
             var replies = await AskAsync(new[] { target }, message, expectVerb, wait, firstOnly: true);
             var reply = replies.FirstOrDefault(r => r.Sender!.PeerId == peer.PeerId);
-            if (reply != null) return reply;
+            if (reply != null)
+            {
+                return reply;
+            }
         }
         link.Rtt.Backoff();   // remembered for the next question to this peer
         return null;
@@ -466,7 +616,10 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
         byte[] data = Encoding.UTF8.GetBytes(message);
         foreach (var target in targets)
         {
-            try { await udp.SendAsync(data, target); }
+            try
+            {
+                await udp.SendAsync(data, target);
+            }
             catch (SocketException) { }   // e.g. a network adapter that just went away
         }
 
@@ -480,12 +633,18 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
                 var msg = DiscoveryMessage.Parse(packet.Buffer);
                 if (msg?.Sender is not { } sender || msg.Verb != expectVerb || sender.PeerId == LocalPeerId ||
                     !IsLocalNetworkAddress(packet.RemoteEndPoint.Address))
+                {
                     continue;
+                }
+
                 Link(sender.PeerId).Rtt.Observe(clock.Elapsed);   // Week 13: every answer teaches the round-trip time
                 sender.IPAddress = packet.RemoteEndPoint.Address.MapToIPv4().ToString();
                 Learn(sender, packet.RemoteEndPoint.Address);
                 replies.Add(msg);
-                if (firstOnly) break;
+                if (firstOnly)
+                {
+                    break;
+                }
             }
         }
         catch (OperationCanceledException) { }
@@ -495,16 +654,20 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
 
     // Peers listed in an answer that we may use: valid, not us, and on our local network. A loopback
     // address only makes sense if the peer that sent the list is on this computer too (tests).
-    private IEnumerable<PeerNode> UsableEntries(string? entries, PeerNode from) =>
-        DiscoveryMessage.ParseEntries(entries).Where(p =>
+    private IEnumerable<PeerNode> UsableEntries(string? entries, PeerNode from)
+    {
+        return DiscoveryMessage.ParseEntries(entries).Where(p =>
             p.PeerId != LocalPeerId &&
             IPAddress.TryParse(p.IPAddress, out var ip) && IsLocalNetworkAddress(ip) &&
             (!IPAddress.IsLoopback(ip) || IPAddress.IsLoopback(IPAddress.Parse(from.IPAddress))));
+    }
 
     private void Learn(PeerNode sender, IPAddress from)
     {
         if (_table.AddOrUpdate(WithAddress(sender, from), DateTime.UtcNow))
+        {
             PeersChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private static PeerNode WithAddress(PeerNode peer, IPAddress ip)
@@ -514,30 +677,52 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
         return copy;
     }
 
-    private string Header(string verb) => DiscoveryMessage.Header(verb, LocalPeerId, LocalPort, DiscoveryPort, DisplayName);
+    private string Header(string verb)
+    {
+        return DiscoveryMessage.Header(verb, LocalPeerId, LocalPort, DiscoveryPort, DisplayName);
+    }
 
-    private static bool IsRepoKey(string key) => DhtKey.IsValid(key) && key.StartsWith("rp-");
+    private static bool IsRepoKey(string key)
+    {
+        return DhtKey.IsValid(key) && key.StartsWith("rp-");
+    }
 
     private void RequireListening()
     {
-        if (!IsListening) throw new VentrailException("Turn on P2P sharing first.");
+        if (!IsListening)
+        {
+            throw new VentrailException("Turn on P2P sharing first.");
+        }
     }
 
     // The interface is synchronous (the ViewModel already runs it in the background).
-    private static T Run<T>(Func<Task<T>> work) => Task.Run(work).GetAwaiter().GetResult();
-    private static void Run(Func<Task> work) => Task.Run(work).GetAwaiter().GetResult();
+    private static T Run<T>(Func<Task<T>> work)
+    {
+        return Task.Run(work).GetAwaiter().GetResult();
+    }
+
+    private static void Run(Func<Task> work)
+    {
+        Task.Run(work).GetAwaiter().GetResult();
+    }
 
     private static UdpClient NewUdp(IPEndPoint bind)
     {
         var udp = new UdpClient(bind);
         if (OperatingSystem.IsWindows())
+        {
             udp.Client.IOControl(SioUdpConnReset, new byte[] { 0 }, null);
+        }
+
         return udp;
     }
 
     // The broadcast address of every connected IPv4 network, plus 255.255.255.255. (Windows only
     // sends 255.255.255.255 out of one adapter, so each network's own broadcast address is added.)
-    private IReadOnlyList<IPEndPoint> BroadcastTargets() => _fixedTargets ?? DefaultBroadcastTargets(DiscoveryPort);
+    private IReadOnlyList<IPEndPoint> BroadcastTargets()
+    {
+        return _fixedTargets ?? DefaultBroadcastTargets(DiscoveryPort);
+    }
 
     public static IReadOnlyList<IPEndPoint> DefaultBroadcastTargets(int port)
     {
@@ -546,7 +731,10 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
         {
             byte[] a = address.GetAddressBytes(), m = mask.GetAddressBytes();
             var broadcast = new IPAddress(a.Select((b, i) => (byte)(b | ~m[i])).ToArray());
-            if (!targets.Any(t => t.Address.Equals(broadcast))) targets.Add(new IPEndPoint(broadcast, port));
+            if (!targets.Any(t => t.Address.Equals(broadcast)))
+            {
+                targets.Add(new IPEndPoint(broadcast, port));
+            }
         }
         return targets;
     }
@@ -558,12 +746,19 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
     public static bool IsLocalNetworkAddress(IPAddress ip)
     {
         ip = ip.MapToIPv4();
-        if (IPAddress.IsLoopback(ip)) return true;
+        if (IPAddress.IsLoopback(ip))
+        {
+            return true;
+        }
+
         byte[] x = ip.GetAddressBytes();
         foreach (var (address, mask) in LocalSubnets())
         {
             byte[] a = address.GetAddressBytes(), m = mask.GetAddressBytes();
-            if (Enumerable.Range(0, 4).All(i => (x[i] & m[i]) == (a[i] & m[i]))) return true;
+            if (Enumerable.Range(0, 4).All(i => (x[i] & m[i]) == (a[i] & m[i])))
+            {
+                return true;
+            }
         }
         return false;
     }
@@ -571,16 +766,29 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
     private static IEnumerable<(IPAddress Address, IPAddress Mask)> LocalSubnets()
     {
         NetworkInterface[] adapters;
-        try { adapters = NetworkInterface.GetAllNetworkInterfaces(); }
-        catch (NetworkInformationException) { yield break; }
+        try
+        {
+            adapters = NetworkInterface.GetAllNetworkInterfaces();
+        }
+        catch (NetworkInformationException)
+        {
+            yield break;
+        }
         foreach (var nic in adapters)
         {
             if (nic.OperationalStatus != OperationalStatus.Up || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+            {
                 continue;
+            }
+
             foreach (var u in nic.GetIPProperties().UnicastAddresses)
+            {
                 if (u.Address.AddressFamily == AddressFamily.InterNetwork && u.IPv4Mask is { } mask &&
                     !mask.Equals(IPAddress.Any))
+                {
                     yield return (u.Address, mask);
+                }
+            }
         }
     }
 
@@ -593,7 +801,10 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
             if (File.Exists(file))
             {
                 string saved = File.ReadAllText(file).Trim();
-                if (saved.StartsWith("vt-") && DhtKey.IsValid(saved)) return saved;
+                if (saved.StartsWith("vt-") && DhtKey.IsValid(saved))
+                {
+                    return saved;
+                }
             }
             string id = "vt-" + Guid.NewGuid().ToString("N")[..12];
             Directory.CreateDirectory(folder);

@@ -27,10 +27,28 @@ public class RttEstimator
     }
 
     /// <summary>How long to wait for the next answer.</summary>
-    public TimeSpan Timeout { get { lock (_gate) return TimeSpan.FromMilliseconds(_rto); } }
+    public TimeSpan Timeout
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return TimeSpan.FromMilliseconds(_rto);
+            }
+        }
+    }
 
     /// <summary>Smoothed round-trip time, or null before the first answer.</summary>
-    public TimeSpan? Smoothed { get { lock (_gate) return _srtt is { } s ? TimeSpan.FromMilliseconds(s) : null; } }
+    public TimeSpan? Smoothed
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _srtt is { } s ? TimeSpan.FromMilliseconds(s) : null;
+            }
+        }
+    }
 
     public int Samples { get; private set; }
 
@@ -57,10 +75,16 @@ public class RttEstimator
     /// <summary>A wait ran out: be twice as patient next time (until a real answer arrives).</summary>
     public void Backoff()
     {
-        lock (_gate) _rto = Clamp(_rto * 2);
+        lock (_gate)
+        {
+            _rto = Clamp(_rto * 2);
+        }
     }
 
-    private double Clamp(double ms) => Math.Clamp(ms, Min.TotalMilliseconds, Max.TotalMilliseconds);
+    private double Clamp(double ms)
+    {
+        return Math.Clamp(ms, Min.TotalMilliseconds, Max.TotalMilliseconds);
+    }
 }
 
 /// <summary>
@@ -72,13 +96,29 @@ public class ThroughputEstimator
     private readonly object _gate = new();
     private double? _bytesPerSecond;
 
-    public double? BytesPerSecond { get { lock (_gate) return _bytesPerSecond; } }
+    public double? BytesPerSecond
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _bytesPerSecond;
+            }
+        }
+    }
 
     public void Observe(long bytes, TimeSpan elapsed)
     {
-        if (bytes <= 0) return;
+        if (bytes <= 0)
+        {
+            return;
+        }
+
         double rate = bytes / Math.Max(0.001, elapsed.TotalSeconds);
-        lock (_gate) _bytesPerSecond = _bytesPerSecond is { } old ? 0.7 * old + 0.3 * rate : rate;
+        lock (_gate)
+        {
+            _bytesPerSecond = _bytesPerSecond is { } old ? 0.7 * old + 0.3 * rate : rate;
+        }
     }
 
     /// <summary>
@@ -89,7 +129,10 @@ public class ThroughputEstimator
     public void TimedOut(long bytes, TimeSpan waited)
     {
         double ceiling = bytes / Math.Max(0.001, waited.TotalSeconds) / 2;
-        lock (_gate) _bytesPerSecond = _bytesPerSecond is { } old ? Math.Min(old, ceiling) : ceiling;
+        lock (_gate)
+        {
+            _bytesPerSecond = _bytesPerSecond is { } old ? Math.Min(old, ceiling) : ceiling;
+        }
     }
 
     /// <summary>
@@ -100,7 +143,11 @@ public class ThroughputEstimator
     public TimeSpan TimeoutFor(long bytes, TimeSpan roundTrip, TimeSpan min, TimeSpan max, TimeSpan unknown)
     {
         double? rate = BytesPerSecond;
-        if (rate is null) return unknown;
+        if (rate is null)
+        {
+            return unknown;
+        }
+
         double ms = roundTrip.TotalMilliseconds + 3 * 1000 * bytes / rate.Value;
         return TimeSpan.FromMilliseconds(Math.Clamp(ms, min.TotalMilliseconds, max.TotalMilliseconds));
     }
@@ -117,8 +164,15 @@ public class PeerLink
     // Lookups in a row this peer didn't answer; it leaves the routing table after DropAfterMisses.
     public const int DropAfterMisses = 3;
     private int _missedLookups;
-    public int MissedLookup() => Interlocked.Increment(ref _missedLookups);
-    public void AnsweredLookup() => Interlocked.Exchange(ref _missedLookups, 0);
+    public int MissedLookup()
+    {
+        return Interlocked.Increment(ref _missedLookups);
+    }
+
+    public void AnsweredLookup()
+    {
+        Interlocked.Exchange(ref _missedLookups, 0);
+    }
 
     // Connecting takes about two round trips (handshake + hello), plus a second for a busy PC.
     public TimeSpan ConnectTimeout => Clamp(Rtt.Timeout * 2 + TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(15));
@@ -127,10 +181,15 @@ public class PeerLink
     public TimeSpan LineTimeout => Clamp(TimeSpan.FromSeconds(2) + Rtt.Timeout * 4, TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(40));
 
     // One 1 MB block: 30 s (the Week 12 value) until the speed is known, then 2-120 s.
-    public TimeSpan BlockTimeout(long bytes) =>
-        Throughput.TimeoutFor(bytes, Rtt.Timeout, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(120), TimeSpan.FromSeconds(30));
+    public TimeSpan BlockTimeout(long bytes)
+    {
+        return Throughput.TimeoutFor(bytes, Rtt.Timeout, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(120), TimeSpan.FromSeconds(30));
+    }
 
-    private static TimeSpan Clamp(TimeSpan t, TimeSpan min, TimeSpan max) => t < min ? min : t > max ? max : t;
+    private static TimeSpan Clamp(TimeSpan t, TimeSpan min, TimeSpan max)
+    {
+        return t < min ? min : t > max ? max : t;
+    }
 }
 
 /// <summary>

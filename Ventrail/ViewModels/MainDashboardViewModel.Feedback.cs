@@ -85,14 +85,23 @@ public partial class MainDashboardViewModel
     }
 
     [RelayCommand]
-    private void ConfirmDialog() => CloseDialog(true);
+    private void ConfirmDialog()
+    {
+        CloseDialog(true);
+    }
 
     // Also bound to Esc, which closes the diff viewer (Week 7) when no dialog is open.
     [RelayCommand]
     private void CancelDialog()
     {
-        if (IsDialogOpen) CloseDialog(false);
-        else IsDiffOpen = false;
+        if (IsDialogOpen)
+        {
+            CloseDialog(false);
+        }
+        else
+        {
+            IsDiffOpen = false;
+        }
     }
 
     private void CloseDialog(bool result)
@@ -140,11 +149,17 @@ public partial class MainDashboardViewModel
 
     /// <summary>Left-rail Exit: show the Session Summary first (Fig 3.7) instead of closing straight away.</summary>
     [RelayCommand]
-    private void ShowSessionSummary() => CurrentPage = AppPage.Summary;
+    private void ShowSessionSummary()
+    {
+        CurrentPage = AppPage.Summary;
+    }
 
     /// <summary>"Continue Workflow" on the summary loops back to the start (Fig 3.7).</summary>
     [RelayCommand]
-    private void ContinueWorkflow() => CurrentPage = HasRepo ? AppPage.Staging : AppPage.Welcome;
+    private void ContinueWorkflow()
+    {
+        CurrentPage = HasRepo ? AppPage.Staging : AppPage.Welcome;
+    }
 
     /// <summary>"Exit Application": warn about ticked-but-unsaved files, then close.</summary>
     [RelayCommand]
@@ -155,7 +170,9 @@ public partial class MainDashboardViewModel
                 $"{StagedCount} ticked file(s) have not been saved as a version yet. " +
                 "They stay on your disk, but the version won't be created.",
                 "Exit anyway", "Stay", ""))
+        {
             return;
+        }
 
         System.Windows.Application.Current?.Shutdown();
     }

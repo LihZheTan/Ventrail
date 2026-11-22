@@ -6,17 +6,59 @@ using Ventrail.Services.Implementations;
 // Bugs found in the bug check (November 2026), each with a check that fails on the old code.
 
 int pass = 0, fail = 0;
-void Check(string name, bool ok, string detail = "") { if (ok) pass++; else fail++; Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}"); }
-string Expect<TEx>(Action a) where TEx : Exception { try { a(); return "<no exception>"; } catch (TEx ex) { return ex.Message; } catch (Exception ex) { return $"<wrong {ex.GetType().Name}: {ex.Message}>"; } }
+void Check(string name, bool ok, string detail = "")
+{
+    if (ok)
+    {
+        pass++;
+    }
+    else
+    {
+        fail++;
+    }
+
+    Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}");
+}
+string Expect<TEx>(Action a) where TEx : Exception
+{
+    try
+    {
+        a();
+        return "<no exception>";
+    }
+    catch (TEx ex)
+    {
+        return ex.Message;
+    }
+    catch (Exception ex)
+    {
+        return $"<wrong {ex.GetType().Name}: {ex.Message}>";
+    }
+}
 
 string root = Path.Combine(Path.GetTempPath(), "ventrail-reg-" + Guid.NewGuid().ToString("N")[..6]);
 Directory.CreateDirectory(root);
-string P(string rel) => Path.Combine(root, rel);
-string Read(string rel) => File.ReadAllText(P(rel)).Replace("\r\n", "\n");
+string P(string rel)
+{
+    return Path.Combine(root, rel);
+}
+
+string Read(string rel)
+{
+    return File.ReadAllText(P(rel)).Replace("\r\n", "\n");
+}
+
 var rm = new RepositoryManager();
 rm.InitRepository(root);
-FileAsset? Find(string path) => rm.ScanWorkingDirectory().SingleOrDefault(f => f.FilePath == path);
-bool Staged(string path) => Find(path)?.IsStaged == true;
+FileAsset? Find(string path)
+{
+    return rm.ScanWorkingDirectory().SingleOrDefault(f => f.FilePath == path);
+}
+
+bool Staged(string path)
+{
+    return Find(path)?.IsStaged == true;
+}
 
 // ---------- 1. file names with [ ] must not touch similarly named files ----------
 // Git reads "report[1].txt" as a pattern that also matches "report1.txt".
@@ -68,7 +110,11 @@ rm.DiscardChanges("report1.txt");
 
 // ---------- 2. a name sent by another computer can't choose where the copy goes ----------
 Console.WriteLine("--- names from other computers ---");
-string Safe(string? n) => OfferedRepository.SafeFolderName(n);
+string Safe(string? n)
+{
+    return OfferedRepository.SafeFolderName(n);
+}
+
 Check("normal names are kept", Safe("Thesis") == "Thesis" && Safe("Group Report 2026") == "Group Report 2026" && Safe("论文") == "论文");
 Check("..\\..\\Startup can't climb out", Safe(@"..\..\Startup") == "Startup" && Safe("../../etc") == "etc", Safe(@"..\..\Startup"));
 Check("C:\\Windows\\evil can't pick a drive", !Safe(@"C:\Windows\evil").Contains('\\') && !Safe(@"C:\Windows\evil").Contains(':'), Safe(@"C:\Windows\evil"));
@@ -97,8 +143,13 @@ Check("  ...and the version saves", rm.Commit("with nested folder", "T") && rm.S
 
 // ---------- 4. ticking several files quickly ----------
 Console.WriteLine("--- quick ticks ---");
-for (int i = 0; i < 16; i++) File.WriteAllText(P($"quick{i}.txt"), "q\n");
-int errors = 0; string lastError = "";
+for (int i = 0; i < 16; i++)
+{
+    File.WriteAllText(P($"quick{i}.txt"), "q\n");
+}
+
+int errors = 0;
+string lastError = "";
 Parallel.For(0, 16, i => { try { rm.Stage($"quick{i}.txt"); } catch (Exception ex) { Interlocked.Increment(ref errors); lastError = ex.Message; } });
 Check("16 ticks at the same moment: none fails", errors == 0, $"{errors} failed: {lastError}");
 Check("  ...and all 16 are ticked", rm.ScanWorkingDirectory().Count(f => f.IsStaged) == 16);
@@ -109,7 +160,7 @@ Console.WriteLine("--- compare edge cases ---");
 File.WriteAllText(P("temp.txt"), "x\n");
 rm.Stage("temp.txt");
 File.Delete(P("temp.txt"));
-string ghost = Expect<Exception>(() => { var d = rm.GetFileDiff("temp.txt"); if (d.Message?.Contains("added and then removed") != true) throw new Exception(d.Summary); });
+string ghost = Expect<Exception>(() => { var d = rm.GetFileDiff("temp.txt"); if (d.Message?.Contains("added and then removed") != true) { throw new Exception(d.Summary); } });
 Check("ticked then deleted: a clear message, no crash", ghost == "<no exception>", ghost);
 rm.DiscardChanges("temp.txt");
 Check("  ...and it can be discarded", Find("temp.txt") == null);
@@ -125,7 +176,8 @@ File.SetAttributes(P("mine.txt"), FileAttributes.ReadOnly);
 string ro = Expect<Exception>(() => rm.DiscardChanges("mine.txt"));
 Check("a read-only file can be discarded", ro == "<no exception>" && Read("mine.txt") == "my file\n", ro);
 File.WriteAllText(P("mine.txt"), "changed again\n");
-rm.StageAll(); rm.Commit("second", "T");
+rm.StageAll();
+rm.Commit("second", "T");
 File.SetAttributes(P("mine.txt"), FileAttributes.ReadOnly);
 string roRestore = Expect<Exception>(() => rm.RestoreFileFromCommit("mine.txt", rm.GetCommitHistory().Last(c => c.Message == "with nested folder").Hash));
 Check("a read-only file can be restored", roRestore == "<no exception>" && Read("mine.txt") == "my file\n", roRestore);
@@ -133,7 +185,8 @@ Check("a read-only file can be restored", roRestore == "<no exception>" && Read(
 // ---------- restore still does what it did ----------
 Console.WriteLine("--- restore basics ---");
 File.Delete(P("report1.txt"));
-rm.StageAll(); rm.Commit("removed report1", "T");
+rm.StageAll();
+rm.Commit("removed report1", "T");
 rm.RestoreFileFromCommit("report1.txt", first);
 Check("a file deleted in a later version can be restored", Read("report1.txt") == "plain v1\n" && Find("report1.txt")?.TrackStatus == "Added");
 Directory.Delete(P("data [raw]"), true);
@@ -144,7 +197,11 @@ Check("restoring a file that version doesn't have: friendly message", missing.Co
 
 try
 {
-    foreach (string f in Directory.GetFiles(root, "*", SearchOption.AllDirectories)) File.SetAttributes(f, FileAttributes.Normal);
+    foreach (string f in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
+    {
+        File.SetAttributes(f, FileAttributes.Normal);
+    }
+
     Directory.Delete(root, true);
 }
 catch (IOException) { }

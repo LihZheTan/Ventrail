@@ -14,13 +14,35 @@ using Ventrail.ViewModels;
 // static check that both colour themes are complete.
 
 int pass = 0, fail = 0;
-void Check(string name, bool ok, string detail = "") { if (ok) pass++; else fail++; Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}"); }
-async Task WaitFor(Func<bool> cond) { for (int i = 0; i < 100 && !cond(); i++) await Task.Delay(50); }
+void Check(string name, bool ok, string detail = "")
+{
+    if (ok)
+    {
+        pass++;
+    }
+    else
+    {
+        fail++;
+    }
+
+    Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}");
+}
+async Task WaitFor(Func<bool> cond)
+{
+    for (int i = 0; i < 100 && !cond(); i++)
+    {
+        await Task.Delay(50);
+    }
+}
 
 // ---------- themes: both palettes define the same colours, and every colour used exists ----------
 XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
-HashSet<string> Keys(string file) => XDocument.Load(Path.Combine(TestPaths.Project, "Themes", file))
+HashSet<string> Keys(string file)
+{
+    return XDocument.Load(Path.Combine(TestPaths.Project, "Themes", file))
     .Root!.Elements().Select(e => (string?)e.Attribute(x + "Key")).Where(k => k != null).Select(k => k!).ToHashSet();
+}
+
 var dark = Keys("Colors.Dark.xaml");
 var light = Keys("Colors.Light.xaml");
 Check("light and dark define the same colour keys", dark.SetEquals(light),
@@ -52,9 +74,12 @@ Check("FolderNameConverter: C:\\Users\\me\\Thesis\\ -> Thesis",
       (string)folderName.Convert(@"C:\Users\me\Thesis\", typeof(string), null!, CultureInfo.InvariantCulture) == "Thesis");
 
 // ---------- ViewModel with the demo repository ----------
-MainDashboardViewModel NewVm(Ventrail.Services.Contracts.IRepositoryManager repo) => new(repo,
+MainDashboardViewModel NewVm(Ventrail.Services.Contracts.IRepositoryManager repo)
+{
+    return new(repo,
     new IntelligentStorageEngine(@"C:\nope.zip"), new MockNetworkNodeCoordinator(), new SpecializedFileHandler(),
     new InMemoryRecentRepositoryStore(), true);
+}
 
 var vm = NewVm(new MockRepositoryManager());
 await vm.InitializeDashboardAsync(@"C:\Demo\Thesis");
@@ -101,9 +126,12 @@ real.CommitDescription = "Covers sections 1-3.\nMore to come.";
 Check("commit button follows the real branch", real.CommitButtonText.StartsWith("Commit to "), real.CommitButtonText);
 await real.CommitCommand.ExecuteAsync(null);
 using (var repo = new Repository(root))
+{
     Check("summary + description become one Git message (blank line between)",
           repo.Head.Tip.Message.TrimEnd('\n') == "Add chapter outline\n\nCovers sections 1-3.\nMore to come.",
           repo.Head.Tip.Message.Replace("\n", "\\n"));
+}
+
 Check("both boxes clear after committing", real.CommitMessage == "" && real.CommitDescription == "");
 
 File.WriteAllText(Path.Combine(root, "a.txt"), "two");
@@ -112,11 +140,26 @@ await real.StageAllCommand.ExecuteAsync(null);
 real.CommitMessage = "Only a summary";
 await real.CommitCommand.ExecuteAsync(null);
 using (var repo = new Repository(root))
+{
     Check("summary only -> message is just the summary", repo.Head.Tip.MessageShort == "Only a summary" && !repo.Head.Tip.Message.Contains("\n\n"));
+}
+
 Check("history list shows only the summary line", real.History[0].Message == "Only a summary" && !real.History[0].HasDescription
       && real.History[1].Message == "Add chapter outline");
 Check("the description is loaded for the version details", real.History[1].Description == "Covers sections 1-3.\nMore to come.",
       real.History[1].Description.Replace("\n", "\\n"));
 
-try { foreach (var f in Directory.GetFiles(root, "*", SearchOption.AllDirectories)) File.SetAttributes(f, FileAttributes.Normal); Directory.Delete(root, true); } catch (Exception) { }
+try
+{
+    foreach (var f in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
+    {
+        File.SetAttributes(f, FileAttributes.Normal);
+    }
+
+    Directory.Delete(root, true);
+}
+catch (Exception)
+{
+    // Only temporary test files: if Windows still holds one, leave it for the next clean-up.
+}
 Console.WriteLine($"\n{pass} passed, {fail} failed.");

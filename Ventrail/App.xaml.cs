@@ -62,7 +62,9 @@ public partial class App : Application
         viewModel.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(MainDashboardViewModel.CurrentTheme))
+            {
                 ThemeManager.Apply(viewModel.CurrentTheme);
+            }
         };
 
         var window = new MainWindow { DataContext = viewModel };
@@ -70,6 +72,8 @@ public partial class App : Application
         window.Show();
 
         if (demoMode)
+        {
             _ = viewModel.InitializeDashboardAsync(@"C:\Demo\Thesis");
+        }
     }
 }

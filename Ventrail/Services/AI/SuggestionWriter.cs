@@ -19,18 +19,23 @@ public static class SuggestionWriter
     // Git tools cut a message's first line after about 72 characters.
     public const int MaxMessageLength = 72;
 
-    public static long BlockCount(long sizeInBytes) =>
-        Math.Max(1, (sizeInBytes + ShareBlockBytes - 1) / ShareBlockBytes);
-
-    public static CommitSuggestion Suggest(IReadOnlyList<FileAsset> staged) => new()
+    public static long BlockCount(long sizeInBytes)
     {
-        Message = WriteMessage(staged),
-        FileCount = staged.Count,
-        Advice = staged.Where(f => f.TrackStatus != "Deleted")
+        return Math.Max(1, (sizeInBytes + ShareBlockBytes - 1) / ShareBlockBytes);
+    }
+
+    public static CommitSuggestion Suggest(IReadOnlyList<FileAsset> staged)
+    {
+        return new()
+        {
+            Message = WriteMessage(staged),
+            FileCount = staged.Count,
+            Advice = staged.Where(f => f.TrackStatus != "Deleted")
                        .Select(Advise).OfType<StorageAdvice>()
                        .OrderByDescending(a => a.Level).ThenByDescending(a => a.SizeInBytes)
                        .ToList()
-    };
+        };
+    }
 
     // ---------- commit message ----------
 
@@ -45,7 +50,10 @@ public static class SuggestionWriter
     /// </summary>
     public static string WriteMessage(IReadOnlyList<FileAsset> files)
     {
-        if (files.Count == 0) return string.Empty;
+        if (files.Count == 0)
+        {
+            return string.Empty;
+        }
 
         var groups = Verbs
             .Select(v => (v.Verb, Files: files.Where(f => f.TrackStatus == v.Status).ToList()))
@@ -61,7 +69,10 @@ public static class SuggestionWriter
 
         string? folder = CommonFolder(files);
         if (folder != null && files.Count > 1 && message.Length + folder.Length + 4 <= MaxMessageLength)
+        {
             message += $" in {folder}";
+        }
+
         return message;
     }
 
@@ -73,11 +84,17 @@ public static class SuggestionWriter
         string noun = kinds.Count == 1 ? Plural(kinds[0]) : "files";
 
         if (files.Count == 1)
+        {
             return detail < 2 ? $"{verb} {files[0].FileName}" : $"{verb} 1 {noun[..^1]}";
+        }
+
         if (detail == 0 && kinds.Count > 1)
+        {
             return files.Count == 2
                 ? $"{verb} {files[0].FileName} and {files[1].FileName}"
                 : $"{verb} {files.MaxBy(f => f.SizeInBytes)!.FileName} and {files.Count - 1} other files";
+        }
+
         return $"{verb} {files.Count} {noun}";
     }
 
@@ -89,20 +106,23 @@ public static class SuggestionWriter
             : string.Join(", ", parts.Take(parts.Count - 1)) + " and " + parts[^1];
     }
 
-    private static string Plural(string category) => category switch
+    private static string Plural(string category)
     {
-        "document" => "documents",
-        "data" => "data files",
-        "text" => "text files",
-        "code" => "code files",
-        "image" => "pictures",
-        "video" => "videos",
-        "audio" => "audio files",
-        "archive" => "archives",
-        "executable" => "programs",
-        "font" => "fonts",
-        _ => "files"
-    };
+        return category switch
+        {
+            "document" => "documents",
+            "data" => "data files",
+            "text" => "text files",
+            "code" => "code files",
+            "image" => "pictures",
+            "video" => "videos",
+            "audio" => "audio files",
+            "archive" => "archives",
+            "executable" => "programs",
+            "font" => "fonts",
+            _ => "files"
+        };
+    }
 
     // The top-level folder all files are in, e.g. "figures" (null if they are spread out).
     private static string? CommonFolder(IReadOnlyList<FileAsset> files)
@@ -122,7 +142,10 @@ public static class SuggestionWriter
     {
         var verdict = file.Classification;
         bool needsAdvice = verdict?.IsHeavy ?? file.IsLarge;   // no model: fall back to the Week 6 size rule
-        if (!needsAdvice) return null;
+        if (!needsAdvice)
+        {
+            return null;
+        }
 
         bool veryLarge = file.SizeInBytes >= FileAsset.LargeFileBytes;
         string size = FileAsset.FormatSize(file.SizeInBytes);
@@ -151,16 +174,23 @@ public static class SuggestionWriter
     {
         bool veryLarge = sizeInBytes >= FileAsset.LargeFileBytes;
         if (verdict is null)
+        {
             return veryLarge ? "Tip: every saved version keeps a full copy of this file, so save it only when it matters." : string.Empty;
+        }
+
         if (!verdict.IsHeavy)
+        {
             return "Tip: save new versions as often as you like. Each one takes very little space.";
+        }
 
         string tip = verdict.IsAlreadyCompressed
             ? "Tip: save this file at milestones (a finished draft, a final figure) rather than after every small edit."
             : $"Tip: Git shrinks this {verdict.FormatName} a little, but it is still best saved at milestones " +
               "rather than after every small edit.";
         if (veryLarge)
+        {
             tip += " It is very large, so ask whether it needs a history at all: you can untick it and keep it as a normal file.";
+        }
 
         long blocks = BlockCount(sizeInBytes);
         tip += $" When you share this folder, it is sent in {blocks:N0} block{(blocks == 1 ? "" : "s")} of 1 MB, " +

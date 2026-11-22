@@ -10,7 +10,10 @@ public class InMemoryRecentRepositoryStore : IRecentRepositoryStore
 {
     private readonly List<string> _items = new() { @"C:\Demo\Thesis", @"C:\Demo\Research Data" };
 
-    public IReadOnlyList<string> Load() => _items.ToList();
+    public IReadOnlyList<string> Load()
+    {
+        return _items.ToList();
+    }
 
     public void Add(string folderPath)
     {

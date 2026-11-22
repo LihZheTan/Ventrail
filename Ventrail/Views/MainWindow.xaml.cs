@@ -17,10 +17,16 @@ public partial class MainWindow : Window
         DataContextChanged += (_, e) =>
         {
             if (e.NewValue is INotifyPropertyChanged vm)
+            {
                 vm.PropertyChanged += (_, args) =>
                 {
-                    if (args.PropertyName == nameof(MainDashboardViewModel.CurrentTheme)) UpdateThemeButton();
+                    if (args.PropertyName == nameof(MainDashboardViewModel.CurrentTheme))
+                    {
+                        UpdateThemeButton();
+                    }
                 };
+            }
+
             UpdateThemeButton();
         };
     }
@@ -29,7 +35,9 @@ public partial class MainWindow : Window
     private void ToggleTheme_Click(object sender, RoutedEventArgs e)
     {
         if (DataContext is MainDashboardViewModel vm)
+        {
             vm.CurrentTheme = ThemeManager.IsDark ? AppTheme.Light : AppTheme.Dark;
+        }
     }
 
     // Shows where a click takes you: "Light mode" with a sun while dark, "Dark mode" with a moon while light.
@@ -40,5 +48,8 @@ public partial class MainWindow : Window
     }
 
     // Choosing something in the repository drop-down closes it.
-    private void ClosePopup_Click(object sender, RoutedEventArgs e) => RepoToggle.IsChecked = false;
+    private void ClosePopup_Click(object sender, RoutedEventArgs e)
+    {
+        RepoToggle.IsChecked = false;
+    }
 }

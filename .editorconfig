@@ -1,0 +1,30 @@
+# Code style for Ventrail. Visual Studio and "dotnet format" both read this file.
+root = true
+
+[*.cs]
+indent_style = space
+indent_size = 4
+
+# Methods, constructors and local functions get a normal { } body over several lines,
+# instead of being written on one line with =>.
+csharp_style_expression_bodied_methods = false:warning
+csharp_style_expression_bodied_constructors = false:warning
+csharp_style_expression_bodied_local_functions = false:warning
+csharp_style_expression_bodied_operators = false:warning
+# Short read-only properties ("public bool HasRepo => ...") stay on one line.
+csharp_style_expression_bodied_properties = true:silent
+csharp_style_expression_bodied_accessors = true:silent
+csharp_style_expression_bodied_lambdas = true:silent
+
+# Every if / else / for / foreach / while body goes in { } on its own lines.
+csharp_prefer_braces = true:warning
+
+# Never put several statements, or a whole { ... } block, on one line.
+csharp_preserve_single_line_statements = false
+csharp_preserve_single_line_blocks = false
+
+# Braces on their own line (the usual C# layout).
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true

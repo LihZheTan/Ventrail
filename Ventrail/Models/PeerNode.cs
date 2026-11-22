@@ -28,5 +28,8 @@ public class PeerNode
 
     public string Title => string.IsNullOrEmpty(DisplayName) ? PeerId : DisplayName;
 
-    public PeerNode Copy() => (PeerNode)MemberwiseClone();
+    public PeerNode Copy()
+    {
+        return (PeerNode)MemberwiseClone();
+    }
 }

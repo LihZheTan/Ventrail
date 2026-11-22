@@ -9,14 +9,36 @@ using Ventrail.Services.Mock;
 using Ventrail.ViewModels;
 
 int pass = 0, fail = 0;
-void Check(string name, bool ok, string detail = "") { if (ok) pass++; else fail++; Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}"); }
+void Check(string name, bool ok, string detail = "")
+{
+    if (ok)
+    {
+        pass++;
+    }
+    else
+    {
+        fail++;
+    }
+
+    Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}");
+}
 
 const string Exe = @"C:\Apps\Ventrail\Ventrail.exe";
 var ports = new[] { (4001, "TCP"), (4002, "UDP") };
 FirewallRuleInfo Rule(string name, bool allow = true, int proto = 6, string? lp = "4001", int prof = 0x7FFFFFFF, string? app = Exe, bool en = true, bool inbound = true)
-    => new(name, en, inbound, allow, proto, lp, prof, app);
-FirewallStatus Eval(params FirewallRuleInfo[] rules) => FirewallAuditor.Evaluate(Exe, 2, true, false, false, rules, ports);
-PortAccess Tcp(FirewallStatus s) => s.Ports[0].Access;
+{
+    return new(name, en, inbound, allow, proto, lp, prof, app);
+}
+
+FirewallStatus Eval(params FirewallRuleInfo[] rules)
+{
+    return FirewallAuditor.Evaluate(Exe, 2, true, false, false, rules, ports);
+}
+
+PortAccess Tcp(FirewallStatus s)
+{
+    return s.Ports[0].Access;
+}
 
 // ---- port matching ----
 Check("ports: exact, list, range, any", FirewallAuditor.PortMatches("4001", 4001) && FirewallAuditor.PortMatches("80, 4001", 4001)
@@ -84,7 +106,11 @@ Check("helper with bad arguments exits with code 2 and changes nothing",
 var sw = System.Diagnostics.Stopwatch.StartNew();
 var real = FirewallAuditor.Audit(Environment.ProcessPath!, ports);
 Console.WriteLine($"   this PC: {real.NetworkProfile} network, firewall on={real.FirewallOn}, {real.Summary} ({sw.ElapsedMilliseconds} ms)");
-foreach (var p in real.Ports) Console.WriteLine($"     {p.Name}: {p.Label} - {p.Detail}");
+foreach (var p in real.Ports)
+{
+    Console.WriteLine($"     {p.Name}: {p.Label} - {p.Detail}");
+}
+
 Check("real audit reads Windows Firewall without admin", real.Error == null && real.Ports.Count == 2, real.Error ?? "");
 Check("real audit under 10 s", sw.ElapsedMilliseconds < 10000);
 Check("this PC: no Ventrail rules yet -> needs permission", real.Ports.All(p => p.Access == PortAccess.NeedsPermission));
@@ -114,22 +140,47 @@ using (var u = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0)))
     Check("UDP 4002 answers the discovery question (and ignores other packets)", text.StartsWith($"VENTRAIL! {node.LocalPeerId} 45101 "), text);
 }
 var twin = new NetworkNodeCoordinator(IPAddress.Loopback, 45101, 45103, dataDir);
-try { twin.StartListening(); Check("port in use -> friendly error", false); }
-catch (VentrailException ex) { Check("port in use -> friendly error", ex.Message.StartsWith("Port 45101 is already used"), ex.Message); }
+try
+{
+    twin.StartListening();
+    Check("port in use -> friendly error", false);
+}
+catch (VentrailException ex)
+{
+    Check("port in use -> friendly error", ex.Message.StartsWith("Port 45101 is already used"), ex.Message);
+}
 Check("failed start leaves nothing half-open", !twin.IsListening);
 node.StopListening();
 Check("StopListening frees the ports", !node.IsListening && twin.StartListening());
 twin.StopListening();
 bool refused;
-try { using var c2 = new TcpClient(); await c2.ConnectAsync(IPAddress.Loopback, 45101); refused = false; }
-catch (SocketException) { refused = true; }
+try
+{
+    using var c2 = new TcpClient();
+    await c2.ConnectAsync(IPAddress.Loopback, 45101);
+    refused = false;
+}
+catch (SocketException)
+{
+    refused = true;
+}
 Check("after stop, nobody listens", refused);
 Directory.Delete(dataDir, true);
 
 // ---- ViewModel flow (Fig 3.5) ----
-MainDashboardViewModel NewVm(INetworkNodeCoordinator net) => new(new MockRepositoryManager(),
+MainDashboardViewModel NewVm(INetworkNodeCoordinator net)
+{
+    return new(new MockRepositoryManager(),
     new IntelligentStorageEngine(@"C:\nope.zip"), net, new SpecializedFileHandler(), new InMemoryRecentRepositoryStore(), true);
-async Task WaitFor(Func<bool> cond) { for (int i = 0; i < 50 && !cond(); i++) await Task.Delay(50); }
+}
+
+async Task WaitFor(Func<bool> cond)
+{
+    for (int i = 0; i < 50 && !cond(); i++)
+    {
+        await Task.Delay(50);
+    }
+}
 
 var mock = new MockNetworkNodeCoordinator();
 var vm = NewVm(mock);
@@ -192,5 +243,9 @@ class DecliningNode : MockNetworkNodeCoordinator, INetworkNodeCoordinator
         s.IsPublicNetwork = true;
         return s;
     }
-    bool INetworkNodeCoordinator.RequestFirewallPermission(bool includePublic) { AskedPublic = includePublic; return false; }
+    bool INetworkNodeCoordinator.RequestFirewallPermission(bool includePublic)
+    {
+        AskedPublic = includePublic;
+        return false;
+    }
 }

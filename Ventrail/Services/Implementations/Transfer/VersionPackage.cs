@@ -42,7 +42,9 @@ public static class VersionPackage
             repo.ObjectDatabase.Pack(new PackBuilderOptions(work), builder =>
             {
                 foreach (var commit in repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = head }))
+                {
                     builder.AddRecursively(commit);   // the version, its folders and its files
+                }
             });
             string pack = Directory.GetFiles(work, "pack-*.pack").Single();
             string idx = Path.ChangeExtension(pack, ".idx");
@@ -53,12 +55,23 @@ public static class VersionPackage
             using (var output = File.Create(temp))
             {
                 output.Write(Encoding.ASCII.GetBytes($"{Magic}\n{name}\n{packLength}\n{idxLength}\n"));
-                using (var p = File.OpenRead(pack)) p.CopyTo(output);
-                using (var i = File.OpenRead(idx)) i.CopyTo(output);
+                using (var p = File.OpenRead(pack))
+                {
+                    p.CopyTo(output);
+                }
+
+                using (var i = File.OpenRead(idx))
+                {
+                    i.CopyTo(output);
+                }
             }
             string sha = BlockHashing.FileSha256(temp);
             string final = Path.Combine(outputFolder, sha + ".vtpk");
-            if (!File.Exists(final)) File.Move(temp, final);
+            if (!File.Exists(final))
+            {
+                File.Move(temp, final);
+            }
+
             return new PackageInfo(final, sha, new FileInfo(final).Length, head.Sha, branch);
         }
         finally
@@ -66,7 +79,11 @@ public static class VersionPackage
             // Our own build folder. Git writes pack files read-only, so clear that first.
             try
             {
-                foreach (string f in Directory.GetFiles(work)) File.SetAttributes(f, FileAttributes.Normal);
+                foreach (string f in Directory.GetFiles(work))
+                {
+                    File.SetAttributes(f, FileAttributes.Normal);
+                }
+
                 Directory.Delete(work, true);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
@@ -81,11 +98,17 @@ public static class VersionPackage
     {
         using var input = File.OpenRead(packageFile);
         string[] header = new string[4];
-        for (int i = 0; i < 4; i++) header[i] = ReadLine(input) ?? "";
+        for (int i = 0; i < 4; i++)
+        {
+            header[i] = ReadLine(input) ?? "";
+        }
+
         if (header[0] != Magic || !PackName.IsMatch(header[1]) ||
             !long.TryParse(header[2], out long packLength) || !long.TryParse(header[3], out long idxLength) ||
             packLength <= 0 || idxLength <= 0 || input.Position + packLength + idxLength != input.Length)
+        {
             throw new VentrailException("The received data is not a valid Ventrail version package.");
+        }
 
         string packDir = Path.Combine(gitDirectory, "objects", "pack");
         Directory.CreateDirectory(packDir);
@@ -110,7 +133,11 @@ public static class VersionPackage
             while (left > 0)
             {
                 int read = input.Read(buffer, 0, (int)Math.Min(buffer.Length, left));
-                if (read == 0) throw new VentrailException("The received version package is incomplete.");
+                if (read == 0)
+                {
+                    throw new VentrailException("The received version package is incomplete.");
+                }
+
                 output.Write(buffer, 0, read);
                 left -= read;
             }
@@ -125,7 +152,10 @@ public static class VersionPackage
         while ((b = s.ReadByte()) >= 0 && b != '\n')
         {
             bytes.Add((byte)b);
-            if (bytes.Count > 100) return null;
+            if (bytes.Count > 100)
+            {
+                return null;
+            }
         }
         return b < 0 ? null : Encoding.ASCII.GetString(bytes.ToArray());
     }
@@ -136,7 +166,10 @@ public static class BlockHashing
 {
     public const int BlockSize = 1024 * 1024;   // same as SuggestionWriter.ShareBlockBytes (Week 9)
 
-    public static string Sha256(ReadOnlySpan<byte> data) => Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
+    public static string Sha256(ReadOnlySpan<byte> data)
+    {
+        return Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
+    }
 
     public static string FileSha256(string path)
     {
@@ -150,16 +183,27 @@ public static class BlockHashing
         using var f = File.OpenRead(path);
         var buffer = new byte[blockSize];
         int read;
-        while ((read = ReadFull(f, buffer)) > 0) hashes.Add(Sha256(buffer.AsSpan(0, read)));
+        while ((read = ReadFull(f, buffer)) > 0)
+        {
+            hashes.Add(Sha256(buffer.AsSpan(0, read)));
+        }
+
         return hashes;
     }
 
     public static int ReadFull(Stream s, byte[] buffer)
     {
         int total = 0, read;
-        while (total < buffer.Length && (read = s.Read(buffer, total, buffer.Length - total)) > 0) total += read;
+        while (total < buffer.Length && (read = s.Read(buffer, total, buffer.Length - total)) > 0)
+        {
+            total += read;
+        }
+
         return total;
     }
 
-    public static bool IsHash(string? s) => s is { Length: 64 } && s.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+    public static bool IsHash(string? s)
+    {
+        return s is { Length: 64 } && s.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+    }
 }

@@ -16,13 +16,21 @@ public static class DhtKey
 {
     public const int Bits = 48;
 
-    public static bool IsValid(string? id) =>
-        id is { Length: 15 } && (id.StartsWith("vt-") || id.StartsWith("rp-")) &&
+    public static bool IsValid(string? id)
+    {
+        return id is { Length: 15 } && (id.StartsWith("vt-") || id.StartsWith("rp-")) &&
         id.Skip(3).All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+    }
 
-    public static ulong Value(string id) => Convert.ToUInt64(id[3..], 16);
+    public static ulong Value(string id)
+    {
+        return Convert.ToUInt64(id[3..], 16);
+    }
 
-    public static ulong Distance(string a, string b) => Value(a) ^ Value(b);
+    public static ulong Distance(string a, string b)
+    {
+        return Value(a) ^ Value(b);
+    }
 
     /// <summary>
     /// The DHT key for a repository: a hash of its very first version. Every copy of a repository
@@ -52,7 +60,10 @@ public class KademliaRoutingTable
 
     public string LocalId { get; }
 
-    public KademliaRoutingTable(string localId) => LocalId = localId;
+    public KademliaRoutingTable(string localId)
+    {
+        LocalId = localId;
+    }
 
     // 0 = differs only in the last bit (closest), 47 = differs in the first bit (furthest).
     public static int BucketIndex(string localId, string otherId)
@@ -61,7 +72,16 @@ public class KademliaRoutingTable
         return distance == 0 ? -1 : 63 - System.Numerics.BitOperations.LeadingZeroCount(distance);
     }
 
-    public int Count { get { lock (_gate) return _buckets.Sum(b => b.Count); } }
+    public int Count
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _buckets.Sum(b => b.Count);
+            }
+        }
+    }
 
     /// <summary>
     /// Adds or refreshes a peer (newest at the end of its bucket). Returns true if the peer is new.
@@ -70,7 +90,11 @@ public class KademliaRoutingTable
     /// </summary>
     public bool AddOrUpdate(PeerNode peer, DateTime now)
     {
-        if (!DhtKey.IsValid(peer.PeerId) || peer.PeerId == LocalId) return false;
+        if (!DhtKey.IsValid(peer.PeerId) || peer.PeerId == LocalId)
+        {
+            return false;
+        }
+
         lock (_gate)
         {
             var bucket = _buckets[BucketIndex(LocalId, peer.PeerId)];
@@ -80,7 +104,11 @@ public class KademliaRoutingTable
             if (existing >= 0)
             {
                 // Keep a name learnt earlier if this message didn't carry one.
-                if (string.IsNullOrEmpty(entry.DisplayName)) entry.DisplayName = bucket[existing].DisplayName;
+                if (string.IsNullOrEmpty(entry.DisplayName))
+                {
+                    entry.DisplayName = bucket[existing].DisplayName;
+                }
+
                 entry.IsConnected = bucket[existing].IsConnected;
                 bucket.RemoveAt(existing);
                 bucket.Add(entry);
@@ -88,7 +116,11 @@ public class KademliaRoutingTable
             }
             if (bucket.Count >= K)
             {
-                if (now - bucket[0].LastSeen < StaleAfter) return false;   // all still active: ignore newcomer
+                if (now - bucket[0].LastSeen < StaleAfter)
+                {
+                    return false;   // all still active: ignore newcomer
+                }
+
                 bucket.RemoveAt(0);
             }
             bucket.Add(entry);
@@ -98,23 +130,44 @@ public class KademliaRoutingTable
 
     public bool Remove(string peerId)
     {
-        if (!DhtKey.IsValid(peerId) || peerId == LocalId) return false;
-        lock (_gate) return _buckets[BucketIndex(LocalId, peerId)].RemoveAll(p => p.PeerId == peerId) > 0;
+        if (!DhtKey.IsValid(peerId) || peerId == LocalId)
+        {
+            return false;
+        }
+
+        lock (_gate)
+        {
+            return _buckets[BucketIndex(LocalId, peerId)].RemoveAll(p => p.PeerId == peerId) > 0;
+        }
     }
 
     public PeerNode? Find(string peerId)
     {
-        if (!DhtKey.IsValid(peerId) || peerId == LocalId) return null;
-        lock (_gate) return _buckets[BucketIndex(LocalId, peerId)].FirstOrDefault(p => p.PeerId == peerId)?.Copy();
+        if (!DhtKey.IsValid(peerId) || peerId == LocalId)
+        {
+            return null;
+        }
+
+        lock (_gate)
+        {
+            return _buckets[BucketIndex(LocalId, peerId)].FirstOrDefault(p => p.PeerId == peerId)?.Copy();
+        }
     }
 
     public void Update(string peerId, Action<PeerNode> change)
     {
-        if (!DhtKey.IsValid(peerId) || peerId == LocalId) return;
+        if (!DhtKey.IsValid(peerId) || peerId == LocalId)
+        {
+            return;
+        }
+
         lock (_gate)
         {
             var peer = _buckets[BucketIndex(LocalId, peerId)].FirstOrDefault(p => p.PeerId == peerId);
-            if (peer != null) change(peer);
+            if (peer != null)
+            {
+                change(peer);
+            }
         }
     }
 
@@ -122,17 +175,22 @@ public class KademliaRoutingTable
     public List<PeerNode> Closest(string target, int count = K, string? except = null)
     {
         lock (_gate)
+        {
             return _buckets.SelectMany(b => b)
                            .Where(p => p.PeerId != except)
                            .OrderBy(p => DhtKey.Distance(p.PeerId, target))
                            .Take(count)
                            .Select(p => p.Copy())
                            .ToList();
+        }
     }
 
     public List<PeerNode> All()
     {
-        lock (_gate) return _buckets.SelectMany(b => b).OrderByDescending(p => p.LastSeen).Select(p => p.Copy()).ToList();
+        lock (_gate)
+        {
+            return _buckets.SelectMany(b => b).OrderByDescending(p => p.LastSeen).Select(p => p.Copy()).ToList();
+        }
     }
 }
 
@@ -150,13 +208,23 @@ public class ProviderStore
 
     public void Add(string key, PeerNode provider, DateTime now)
     {
-        if (!DhtKey.IsValid(key) || !DhtKey.IsValid(provider.PeerId)) return;
+        if (!DhtKey.IsValid(key) || !DhtKey.IsValid(provider.PeerId))
+        {
+            return;
+        }
+
         lock (_gate)
         {
-            if (!_records.TryGetValue(key, out var providers)) _records[key] = providers = new();
+            if (!_records.TryGetValue(key, out var providers))
+            {
+                _records[key] = providers = new();
+            }
+
             providers[provider.PeerId] = (provider.Copy(), now + RecordLifetime);
             if (providers.Count > MaxProvidersPerKey)   // keep the most recently announced
+            {
                 providers.Remove(providers.MinBy(p => p.Value.Expires).Key);
+            }
         }
     }
 
@@ -164,9 +232,16 @@ public class ProviderStore
     {
         lock (_gate)
         {
-            if (!_records.TryGetValue(key, out var providers)) return new();
+            if (!_records.TryGetValue(key, out var providers))
+            {
+                return new();
+            }
+
             foreach (var expired in providers.Where(p => p.Value.Expires <= now).Select(p => p.Key).ToList())
+            {
                 providers.Remove(expired);
+            }
+
             return providers.Values.Select(p => p.Peer.Copy()).ToList();
         }
     }

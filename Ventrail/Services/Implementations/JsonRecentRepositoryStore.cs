@@ -28,7 +28,11 @@ public class JsonRecentRepositoryStore : IRecentRepositoryStore
     {
         try
         {
-            if (!File.Exists(_file)) return Array.Empty<string>();
+            if (!File.Exists(_file))
+            {
+                return Array.Empty<string>();
+            }
+
             var list = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(_file)) ?? new();
             return list.Where(Directory.Exists).ToList();   // hide folders that were moved or deleted
         }

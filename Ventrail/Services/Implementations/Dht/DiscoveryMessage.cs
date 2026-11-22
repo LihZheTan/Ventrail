@@ -44,8 +44,10 @@ public sealed class DiscoveryMessage
 
     // ---------- writing ----------
 
-    public static string Header(string verb, string peerId, int tcpPort, int udpPort, string name) =>
-        $"{verb} {peerId} {tcpPort} {udpPort} {CleanName(name)}";
+    public static string Header(string verb, string peerId, int tcpPort, int udpPort, string name)
+    {
+        return $"{verb} {peerId} {tcpPort} {udpPort} {CleanName(name)}";
+    }
 
     public static string Entries(IEnumerable<PeerNode> peers)
     {
@@ -59,7 +61,11 @@ public sealed class DiscoveryMessage
     public static string CleanName(string? name)
     {
         string clean = Regex.Replace((name ?? "").Replace(' ', '_'), "[^A-Za-z0-9_-]", "");
-        if (clean.Length > 32) clean = clean[..32];
+        if (clean.Length > 32)
+        {
+            clean = clean[..32];
+        }
+
         return clean.Length == 0 ? "-" : clean;
     }
 
@@ -67,21 +73,41 @@ public sealed class DiscoveryMessage
 
     public static DiscoveryMessage? Parse(byte[] packet)
     {
-        if (packet.Length == 0 || packet.Length > MaxBytes) return null;
+        if (packet.Length == 0 || packet.Length > MaxBytes)
+        {
+            return null;
+        }
+
         string text;
-        try { text = new UTF8Encoding(false, true).GetString(packet).Trim(); }
-        catch (ArgumentException) { return null; }   // not valid UTF-8
+        try
+        {
+            text = new UTF8Encoding(false, true).GetString(packet).Trim();
+        }
+        catch (ArgumentException)   // not valid UTF-8
+        {
+            return null;
+        }
         return Parse(text);
     }
 
     public static DiscoveryMessage? Parse(string text)
     {
         string[] parts = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0 || !Verbs.Contains(parts[0])) return null;
-        if (parts.Length == 1) return parts[0] == Hello ? new DiscoveryMessage { Verb = Hello } : null;
+        if (parts.Length == 0 || !Verbs.Contains(parts[0]))
+        {
+            return null;
+        }
+
+        if (parts.Length == 1)
+        {
+            return parts[0] == Hello ? new DiscoveryMessage { Verb = Hello } : null;
+        }
+
         if (parts.Length < 5 || !DhtKey.IsValid(parts[1]) || !parts[1].StartsWith("vt-") ||
             !TryPort(parts[2], out int tcp) || !TryPort(parts[3], out int udp))
+        {
             return null;
+        }
 
         return new DiscoveryMessage
         {
@@ -95,23 +121,40 @@ public sealed class DiscoveryMessage
     public static List<PeerNode> ParseEntries(string? text)
     {
         var peers = new List<PeerNode>();
-        if (string.IsNullOrEmpty(text) || text == "-") return peers;
+        if (string.IsNullOrEmpty(text) || text == "-")
+        {
+            return peers;
+        }
+
         foreach (string entry in text.Split(',').Take(MaxEntries))
         {
             int at = entry.IndexOf('@');
-            if (at < 0) continue;
+            if (at < 0)
+            {
+                continue;
+            }
+
             string id = entry[..at];
             string[] rest = entry[(at + 1)..].Split(':');
             if (rest.Length != 4 || !DhtKey.IsValid(id) || !id.StartsWith("vt-") ||
                 !System.Net.IPAddress.TryParse(rest[0], out var ip) || ip.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork ||
                 !TryPort(rest[1], out int tcp) || !TryPort(rest[2], out int udp))
+            {
                 continue;
+            }
+
             peers.Add(new PeerNode { PeerId = id, IPAddress = ip.ToString(), Port = tcp, DiscoveryPort = udp, DisplayName = NameOrEmpty(rest[3]) });
         }
         return peers;
     }
 
-    private static bool TryPort(string s, out int port) => int.TryParse(s, out port) && port is > 0 and <= 65535;
+    private static bool TryPort(string s, out int port)
+    {
+        return int.TryParse(s, out port) && port is > 0 and <= 65535;
+    }
 
-    private static string NameOrEmpty(string s) => s == "-" ? string.Empty : CleanName(s);
+    private static string NameOrEmpty(string s)
+    {
+        return s == "-" ? string.Empty : CleanName(s);
+    }
 }

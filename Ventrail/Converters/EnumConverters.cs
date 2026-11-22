@@ -8,31 +8,43 @@ namespace Ventrail.Converters;
 /// <summary>Visible when the bound enum value equals ConverterParameter (used to show the current page).</summary>
 public class EnumToVisibilityConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
-        Equals(value, parameter) ? Visibility.Visible : Visibility.Collapsed;
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return Equals(value, parameter) ? Visibility.Visible : Visibility.Collapsed;
+    }
 
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
         throw new NotSupportedException();
+    }
 }
 
 /// <summary>True when the bound enum equals ConverterParameter; checking a radio button sets the enum.</summary>
 public class EnumToBoolConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
-        Equals(value, parameter);
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return Equals(value, parameter);
+    }
 
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
-        value is true ? parameter : Binding.DoNothing;
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return value is true ? parameter : Binding.DoNothing;
+    }
 }
 
 /// <summary>Collapsed when true, Visible when false (for "nothing here yet" messages).</summary>
 public class InverseBoolToVisibilityConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
-        value is true ? Visibility.Collapsed : Visibility.Visible;
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return value is true ? Visibility.Collapsed : Visibility.Visible;
+    }
 
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
         throw new NotSupportedException();
+    }
 }
 
 /// <summary>
@@ -41,21 +53,29 @@ public class InverseBoolToVisibilityConverter : IValueConverter
 /// </summary>
 public class WidthBelowConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
-        value is double width && width > 0 &&
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return value is double width && width > 0 &&
         double.TryParse(parameter?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double limit) &&
         width < limit;
+    }
 
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
         throw new NotSupportedException();
+    }
 }
 
 /// <summary>"C:\Users\me\Documents\Thesis" -> "Thesis" (repository names in the toolbar drop-down).</summary>
 public class FolderNameConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
-        value is string path ? System.IO.Path.GetFileName(path.TrimEnd('\\', '/')) : string.Empty;
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return value is string path ? System.IO.Path.GetFileName(path.TrimEnd('\\', '/')) : string.Empty;
+    }
 
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
         throw new NotSupportedException();
+    }
 }

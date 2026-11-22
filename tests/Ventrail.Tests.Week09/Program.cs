@@ -6,14 +6,40 @@ using Ventrail.Services.Mock;
 using Ventrail.ViewModels;
 
 int pass = 0, fail = 0;
-void Check(string name, bool ok, string detail = "") { if (ok) pass++; else fail++; Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}"); }
-
-FileAsset F(string path, string status, long size = 1000, bool? heavy = null, bool compressed = false) => new()
+void Check(string name, bool ok, string detail = "")
 {
-    FilePath = path, FileName = Path.GetFileName(path), TrackStatus = status, SizeInBytes = size, IsStaged = true,
-    Classification = heavy is null ? null : new FileClassification
-    { IsHeavy = heavy.Value, Probability = heavy.Value ? 0.97f : 0.02f, FormatName = "file", IsAlreadyCompressed = compressed, SizeInBytes = size }
-};
+    if (ok)
+    {
+        pass++;
+    }
+    else
+    {
+        fail++;
+    }
+
+    Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}");
+}
+
+FileAsset F(string path, string status, long size = 1000, bool? heavy = null, bool compressed = false)
+{
+    return new()
+    {
+        FilePath = path,
+        FileName = Path.GetFileName(path),
+        TrackStatus = status,
+        SizeInBytes = size,
+        IsStaged = true,
+        Classification = heavy is null ? null : new FileClassification
+        {
+            IsHeavy = heavy.Value,
+            Probability = heavy.Value ? 0.97f : 0.02f,
+            FormatName = "file",
+            IsAlreadyCompressed = compressed,
+            SizeInBytes = size
+        }
+    };
+}
+
 string Msg(params FileAsset[] files) { string m = SuggestionWriter.WriteMessage(files); Console.WriteLine($"   \"{m}\" ({m.Length})"); return m; }
 
 // ---- commit messages ----
@@ -50,7 +76,11 @@ var s = SuggestionWriter.Suggest(new[]
     F("gone.mp4", "Deleted", 0, heavy: true),
     F("raw.bin", "Added", 80_000_000, heavy: null)   // no verdict: Week 6 size rule
 });
-foreach (var a in s.Advice) Console.WriteLine($"   advice [{a.Level}] {a.Text}");
+foreach (var a in s.Advice)
+{
+    Console.WriteLine($"   advice [{a.Level}] {a.Text}");
+}
+
 Console.WriteLine($"   summary: {s.Summary}");
 Check("advice only for heavy (and large unclassified) files", s.Advice.Count == 3 && s.Advice.All(a => a.FileName != "notes.txt"));
 Check("deleted file gets no advice", s.Advice.All(a => a.FileName != "gone.mp4"));
@@ -82,12 +112,19 @@ Check("no model: recommendation falls back, no crash", noModel.GenerateRecommend
 var vm = new MainDashboardViewModel(new MockRepositoryManager(), engine, new NetworkNodeCoordinator(),
     new SpecializedFileHandler(), new InMemoryRecentRepositoryStore(), true);
 await vm.InitializeDashboardAsync(@"C:\Demo\Thesis");
-async Task Idle() { for (int i = 0; i < 50 && (vm.IsBusy || vm.Changes.Any(c => c.TrackStatus != "Deleted" && c.Classification == null)); i++) await Task.Delay(100); }
+async Task Idle()
+{
+    for (int i = 0; i < 50 && (vm.IsBusy || vm.Changes.Any(c => c.TrackStatus != "Deleted" && c.Classification == null)); i++)
+    {
+        await Task.Delay(100);
+    }
+}
 await Idle();
 Check("nothing ticked -> no suggestion card", !vm.IsSuggestionVisible && vm.Suggestion is null);
 
 vm.StageAllCommand.Execute(null);
-await Idle(); await Task.Delay(200);
+await Idle();
+await Task.Delay(200);
 Console.WriteLine($"   card: \"{vm.Suggestion?.Message}\" | {vm.Suggestion?.Summary}");
 Check("all ticked -> card visible with message", vm.IsSuggestionVisible && !string.IsNullOrEmpty(vm.Suggestion!.Message));
 Check("card flags the 2.4 GB slide", vm.Suggestion!.LeaveOutPaths.Contains("slides/scan_sample.svs"));
@@ -136,7 +173,11 @@ await vm2.InitializeDashboardAsync(@"C:\Demo\Thesis");
 var only = vm2.Changes.Single(c => c.FileName == "scan_sample.svs");
 only.IsStaged = true;
 await vm2.ToggleStageCommand.ExecuteAsync(only);
-for (int i = 0; i < 50 && vm2.Suggestion?.HasAdvice != true; i++) await Task.Delay(100);
+for (int i = 0; i < 50 && vm2.Suggestion?.HasAdvice != true; i++)
+{
+    await Task.Delay(100);
+}
+
 await vm2.AcceptSuggestionCommand.ExecuteAsync(null);
 Check("Accept never unticks the last file", vm2.Changes.Single(c => c.FileName == "scan_sample.svs").IsStaged
       && vm2.CommitMessage == "Add scan_sample.svs");

@@ -9,7 +9,10 @@ using Microsoft.Win32;
 
 namespace Ventrail.Themes;
 
-public enum AppTheme { System, Light, Dark }
+public enum AppTheme
+{
+    System, Light, Dark
+}
 
 /// <summary>
 /// Light / dark themes. The colours live in Colors.Light.xaml and Colors.Dark.xaml (same keys);
@@ -37,7 +40,10 @@ public static class ThemeManager
             if (File.Exists(SettingsFile))
             {
                 var settings = JsonSerializer.Deserialize<Settings>(File.ReadAllText(SettingsFile));
-                if (settings != null && Enum.TryParse(settings.Theme, out AppTheme theme)) return theme;
+                if (settings != null && Enum.TryParse(settings.Theme, out AppTheme theme))
+                {
+                    return theme;
+                }
             }
         }
         catch (Exception) { }   // unreadable settings: use the default
@@ -48,7 +54,10 @@ public static class ThemeManager
     {
         _chosen = theme;
         var app = Application.Current;
-        if (app is null) return;   // tests: no WPF application
+        if (app is null)
+        {
+            return;   // tests: no WPF application
+        }
 
         bool dark = theme switch
         {
@@ -64,10 +73,19 @@ public static class ThemeManager
         };
         var merged = app.Resources.MergedDictionaries;
         var old = merged.FirstOrDefault(d => d.Source?.OriginalString.Contains("Themes/Colors.") == true);
-        if (old != null) merged[merged.IndexOf(old)] = colours;
-        else merged.Insert(0, colours);
+        if (old != null)
+        {
+            merged[merged.IndexOf(old)] = colours;
+        }
+        else
+        {
+            merged.Insert(0, colours);
+        }
 
-        foreach (Window window in app.Windows) SetTitleBar(window, dark);
+        foreach (Window window in app.Windows)
+        {
+            SetTitleBar(window, dark);
+        }
 
         if (!_listening)
         {
@@ -75,12 +93,17 @@ public static class ThemeManager
             SystemEvents.UserPreferenceChanged += (_, e) =>
             {
                 if (e.Category == UserPreferenceCategory.General && _chosen == AppTheme.System)
+                {
                     app.Dispatcher.BeginInvoke(() => Apply(AppTheme.System, save: false));
+                }
             };
             _listening = true;
         }
 
-        if (save) Save(theme);
+        if (save)
+        {
+            Save(theme);
+        }
     }
 
     /// <summary>Dark or light window title bar to match the theme (Windows 10 2004+ / 11).</summary>
@@ -103,7 +126,10 @@ public static class ThemeManager
             using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
             return key?.GetValue("AppsUseLightTheme") is int light && light == 0;
         }
-        catch (Exception) { return true; }
+        catch (Exception)
+        {
+            return true;
+        }
     }
 
     private static void Save(AppTheme theme)

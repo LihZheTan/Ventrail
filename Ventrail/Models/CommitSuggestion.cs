@@ -3,7 +3,10 @@ using System.Linq;
 
 namespace Ventrail.Models;
 
-public enum AdviceLevel { Info, Warning }
+public enum AdviceLevel
+{
+    Info, Warning
+}
 
 /// <summary>Week 9: one storage tip about a staged file, shown on the AI suggestion card.</summary>
 public class StorageAdvice
@@ -37,12 +40,19 @@ public class CommitSuggestion
     {
         get
         {
-            if (Advice.Count == 0) return "No heavy files: this version adds little to the history.";
+            if (Advice.Count == 0)
+            {
+                return "No heavy files: this version adds little to the history.";
+            }
+
             var leaveOut = Advice.Where(a => a.SuggestLeaveOut).ToList();
             string text = $"{Advice.Count} heavy file{(Advice.Count == 1 ? "" : "s")} in this version.";
             if (leaveOut.Count > 0)
+            {
                 text += $" Leaving {(leaveOut.Count == 1 ? "1 file" : $"{leaveOut.Count} files")} out would keep about " +
                         $"{FileAsset.FormatSize(leaveOut.Sum(a => a.SizeInBytes))} out of the history.";
+            }
+
             return text;
         }
     }

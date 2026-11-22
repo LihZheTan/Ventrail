@@ -55,7 +55,11 @@ public static class FolderTreeBuilder
         {
             foreach (var sub in dir.EnumerateDirectories().OrderBy(d => d.Name))
             {
-                if (sub.Name == ".git" || count >= maxEntries) continue;
+                if (sub.Name == ".git" || count >= maxEntries)
+                {
+                    continue;
+                }
+
                 count++;
                 var node = new FolderNode
                 {
@@ -64,12 +68,19 @@ public static class FolderTreeBuilder
                     RelativePath = Path.GetRelativePath(root, sub.FullName)
                 };
                 if (depth < maxDepth)
+                {
                     node.Children = Walk(sub, root, depth + 1, maxDepth, maxEntries, ref count);
+                }
+
                 result.Add(node);
             }
             foreach (var file in dir.EnumerateFiles().OrderBy(f => f.Name))
             {
-                if (count >= maxEntries) break;
+                if (count >= maxEntries)
+                {
+                    break;
+                }
+
                 count++;
                 result.Add(new FolderNode
                 {
@@ -89,6 +100,9 @@ public static class FolderTreeBuilder
         nodes.Sort((a, b) => a.IsFolder != b.IsFolder
             ? (a.IsFolder ? -1 : 1)
             : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-        foreach (var n in nodes) Sort(n.Children);
+        foreach (var n in nodes)
+        {
+            Sort(n.Children);
+        }
     }
 }

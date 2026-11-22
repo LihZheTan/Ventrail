@@ -30,7 +30,10 @@ public static class FirewallAuditor
     public const int Tcp = 6, Udp = 17, AnyProtocol = 256;   // NET_FW_IP_PROTOCOL
     private const int Domain = 1, Private = 2, Public = 4;   // NET_FW_PROFILE_TYPE2
 
-    public static string RuleName(string protocol, int port) => $"Ventrail P2P ({protocol} {port})";
+    public static string RuleName(string protocol, int port)
+    {
+        return $"Ventrail P2P ({protocol} {port})";
+    }
 
     // ---------- reading ----------
 
@@ -44,8 +47,10 @@ public static class FirewallAuditor
             int current = policy.CurrentProfileTypes;
 
             // Per-profile settings are indexed COM properties, which "dynamic" can't call directly.
-            object Get(string name, int profile) =>
-                type.InvokeMember(name, BindingFlags.GetProperty, null, policy, new object[] { profile })!;
+            object Get(string name, int profile)
+            {
+                return type.InvokeMember(name, BindingFlags.GetProperty, null, policy, new object[] { profile })!;
+            }
 
             var active = new[] { Domain, Private, Public }.Where(p => (current & p) != 0).ToList();
             bool on = active.Any(p => (bool)Get("FirewallEnabled", p));
@@ -81,7 +86,9 @@ public static class FirewallAuditor
                         $"computers can reach it ({ex.Message}).",
                 Ports = ports.Select(p => new PortCheck
                 {
-                    Port = p.Port, Protocol = p.Protocol, Access = PortAccess.Unknown,
+                    Port = p.Port,
+                    Protocol = p.Protocol,
+                    Access = PortAccess.Unknown,
                     Detail = "The firewall settings could not be read."
                 }).ToList()
             };
@@ -120,22 +127,33 @@ public static class FirewallAuditor
             var allow = matching.FirstOrDefault(r => r.Allow);
 
             if (!firewallOn)
+            {
                 (check.Access, check.Detail) = (PortAccess.Allowed, "Windows Firewall is off on this network.");
+            }
             else if (blockAllInbound)
+            {
                 (check.Access, check.Detail) = (PortAccess.Blocked,
                     "Windows is set to block ALL incoming connections on this network (Windows Security > Firewall).");
+            }
             else if (block != null)
             {
                 (check.Access, check.Detail) = (PortAccess.Blocked, $"Blocked by the firewall rule \"{block.Name}\".");
                 check.BlockedByOwnRule = !string.IsNullOrEmpty(block.Application) && AppMatches(block.Application, exePath);
             }
             else if (allow != null)
+            {
                 (check.Access, check.Detail) = (PortAccess.Allowed, $"Allowed by the firewall rule \"{allow.Name}\".");
+            }
             else if (defaultInboundAllow)
+            {
                 (check.Access, check.Detail) = (PortAccess.Allowed, "This network lets all incoming connections through.");
+            }
             else
+            {
                 (check.Access, check.Detail) = (PortAccess.NeedsPermission,
                     "No firewall rule lets other computers reach Ventrail on this port yet.");
+            }
+
             status.Ports.Add(check);
         }
         return status;
@@ -144,15 +162,25 @@ public static class FirewallAuditor
     // "4001", "4000-4010", "80,443,4001", "*" or empty (= any). Keywords like "RPC" never match.
     public static bool PortMatches(string? localPorts, int port)
     {
-        if (string.IsNullOrWhiteSpace(localPorts) || localPorts.Trim() == "*") return true;
+        if (string.IsNullOrWhiteSpace(localPorts) || localPorts.Trim() == "*")
+        {
+            return true;
+        }
+
         foreach (string part in localPorts.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
         {
             int dash = part.IndexOf('-');
             if (dash > 0 && int.TryParse(part[..dash], out int lo) && int.TryParse(part[(dash + 1)..], out int hi))
             {
-                if (port >= lo && port <= hi) return true;
+                if (port >= lo && port <= hi)
+                {
+                    return true;
+                }
             }
-            else if (int.TryParse(part, out int single) && single == port) return true;
+            else if (int.TryParse(part, out int single) && single == port)
+            {
+                return true;
+            }
         }
         return false;
     }
@@ -164,25 +192,44 @@ public static class FirewallAuditor
     //    can only make Ventrail ask for permission it didn't strictly need, never the reverse.
     private static bool AppliesToDesktopApps(FirewallRuleInfo r)
     {
-        if (!string.IsNullOrEmpty(r.Service)) return false;
+        if (!string.IsNullOrEmpty(r.Service))
+        {
+            return false;
+        }
+
         bool noProgram = string.IsNullOrWhiteSpace(r.Application) || r.Application == "*";
-        if (noProgram && !string.IsNullOrEmpty(r.UserOwner)) return false;
+        if (noProgram && !string.IsNullOrEmpty(r.UserOwner))
+        {
+            return false;
+        }
+
         bool anyPort = string.IsNullOrWhiteSpace(r.LocalPorts) || r.LocalPorts.Trim() == "*";
-        if (noProgram && anyPort && r.Allow) return false;
+        if (noProgram && anyPort && r.Allow)
+        {
+            return false;
+        }
+
         return true;
     }
 
     // A rule with no program applies to every program; otherwise it must be Ventrail's exe.
     private static bool AppMatches(string? ruleApp, string exePath)
     {
-        if (string.IsNullOrWhiteSpace(ruleApp) || ruleApp == "*") return true;
+        if (string.IsNullOrWhiteSpace(ruleApp) || ruleApp == "*")
+        {
+            return true;
+        }
+
         try
         {
             string a = Path.GetFullPath(Environment.ExpandEnvironmentVariables(ruleApp));
             string b = Path.GetFullPath(exePath);
             return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
         }
-        catch (Exception) { return false; }   // malformed path in someone else's rule
+        catch (Exception)   // malformed path in someone else's rule
+        {
+            return false;
+        }
     }
 
     // ---------- changing (admin prompt) ----------
@@ -207,24 +254,40 @@ public static class FirewallAuditor
     /// exact rules can be tested without touching the firewall.
     /// </summary>
     public static List<FirewallRuleSpec> BuildAllowRules(string exePath, IReadOnlyList<(int Port, string Protocol)> ports,
-                                                         bool includePublic) =>
-        ports.Select(p => new FirewallRuleSpec(
+                                                         bool includePublic)
+    {
+        return ports.Select(p => new FirewallRuleSpec(
             RuleName(p.Protocol, p.Port), p.Protocol == "UDP" ? Udp : Tcp, p.Port,
             Domain | Private | (includePublic ? Public : 0), exePath)).ToList();
+    }
 
     /// <summary>The command-line arguments for the elevated helper.</summary>
     public static string HelperArguments(bool allow, IReadOnlyList<(int Port, string Protocol)> ports,
                                          bool includePublic = false, bool replaceOwnBlockRules = false)
     {
         var args = new List<string> { allow ? HelperAllow : HelperRemove };
-        foreach (var (port, protocol) in ports) args.Add($"--{protocol.ToLowerInvariant()} {port}");
-        if (allow && includePublic) args.Add("--public");
-        if (allow && replaceOwnBlockRules) args.Add("--replace-own-blocks");
+        foreach (var (port, protocol) in ports)
+        {
+            args.Add($"--{protocol.ToLowerInvariant()} {port}");
+        }
+
+        if (allow && includePublic)
+        {
+            args.Add("--public");
+        }
+
+        if (allow && replaceOwnBlockRules)
+        {
+            args.Add("--replace-own-blocks");
+        }
+
         return string.Join(' ', args);
     }
 
-    public static bool IsHelperCommand(string[] args) =>
-        args.Length > 0 && (args[0] == HelperAllow || args[0] == HelperRemove);
+    public static bool IsHelperCommand(string[] args)
+    {
+        return args.Length > 0 && (args[0] == HelperAllow || args[0] == HelperRemove);
+    }
 
     /// <summary>
     /// Parses the helper's arguments. Null if anything is wrong: the helper runs with admin
@@ -232,7 +295,11 @@ public static class FirewallAuditor
     /// </summary>
     public static HelperRequest? ParseHelperArguments(string[] args)
     {
-        if (!IsHelperCommand(args)) return null;
+        if (!IsHelperCommand(args))
+        {
+            return null;
+        }
+
         var request = new HelperRequest { Allow = args[0] == HelperAllow };
         for (int i = 1; i < args.Length; i++)
         {
@@ -264,14 +331,23 @@ public static class FirewallAuditor
     {
         var request = ParseHelperArguments(args);
         string? exe = Environment.ProcessPath;
-        if (request is null || string.IsNullOrEmpty(exe)) return HelperBadArguments;
+        if (request is null || string.IsNullOrEmpty(exe))
+        {
+            return HelperBadArguments;
+        }
+
         try
         {
             if (request.Allow)
+            {
                 ApplyAllowRules(BuildAllowRules(exe, request.Ports, request.IncludePublic),
                                 request.ReplaceOwnBlockRules ? exe : null);
+            }
             else
+            {
                 RemoveRules(request.Ports.Select(p => RuleName(p.Protocol, p.Port)));
+            }
+
             return HelperOk;
         }
         catch (Exception)
@@ -338,8 +414,14 @@ public static class FirewallAuditor
             // Remove() deletes one rule with that name at a time; Item() throws once none are left.
             for (int i = 0; i < 50; i++)
             {
-                try { _ = list!.Item(name); }
-                catch (Exception) { break; }
+                try
+                {
+                    _ = list!.Item(name);
+                }
+                catch (Exception)
+                {
+                    break;
+                }
                 list!.Remove(name);
             }
         }
@@ -364,10 +446,16 @@ public static class FirewallAuditor
             using var process = Process.Start(info)
                                 ?? throw new VentrailException("Windows could not start the firewall settings helper.");
             if (!process.WaitForExit(60_000))
+            {
                 throw new VentrailException("Changing the firewall settings took too long. Please try again.");
+            }
+
             if (process.ExitCode != HelperOk)
+            {
                 throw new VentrailException($"Windows did not accept the firewall change (code {process.ExitCode}). " +
                                             "Your organisation may manage these settings.");
+            }
+
             return true;
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)   // ERROR_CANCELLED: "No" on the admin prompt

@@ -28,26 +28,35 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
 
     public event EventHandler? PeersChanged;
 
-    public FirewallStatus CheckFirewall() => new()
+    public FirewallStatus CheckFirewall()
     {
-        NetworkProfile = "Private",
-        HasVentrailRules = _allowed,
-        Ports = new()
+        return new()
+        {
+            NetworkProfile = "Private",
+            HasVentrailRules = _allowed,
+            Ports = new()
         {
             Port(LocalPort, "TCP"),
             Port(DiscoveryPort, "UDP")
         }
-    };
+        };
+    }
 
-    private PortCheck Port(int port, string protocol) => new()
+    private PortCheck Port(int port, string protocol)
     {
-        Port = port,
-        Protocol = protocol,
-        Access = _allowed ? PortAccess.Allowed : PortAccess.NeedsPermission,
-        Detail = _allowed ? "Allowed (demo mode)." : "No firewall rule yet (demo mode)."
-    };
+        return new()
+        {
+            Port = port,
+            Protocol = protocol,
+            Access = _allowed ? PortAccess.Allowed : PortAccess.NeedsPermission,
+            Detail = _allowed ? "Allowed (demo mode)." : "No firewall rule yet (demo mode)."
+        };
+    }
 
-    public bool RequestFirewallPermission(bool includePublicNetworks) => _allowed = true;
+    public bool RequestFirewallPermission(bool includePublicNetworks)
+    {
+        return _allowed = true;
+    }
 
     public bool RemoveFirewallPermission()
     {
@@ -56,16 +65,25 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
         return true;
     }
 
-    public bool StartListening() => IsListening = true;
+    public bool StartListening()
+    {
+        return IsListening = true;
+    }
 
     public void StopListening()
     {
         IsListening = false;
         ConnectedPeers.Clear();
-        foreach (var p in _known) p.IsConnected = false;
+        foreach (var p in _known)
+        {
+            p.IsConnected = false;
+        }
     }
 
-    public List<PeerNode> GetKnownPeers() => _known.Select(p => p.Copy()).ToList();
+    public List<PeerNode> GetKnownPeers()
+    {
+        return _known.Select(p => p.Copy()).ToList();
+    }
 
     public List<PeerNode> DiscoverPeers()
     {
@@ -75,7 +93,11 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
             _known.Add(Peer("vt-a1b2c3d4e5f6", "LAB-PC-02", "192.168.1.24"));
             _known.Add(Peer("vt-0f9e8d7c6b5a", "SUPERVISOR-LAPTOP", "192.168.1.31"));
         }
-        foreach (var p in _known) p.LastSeen = DateTime.UtcNow;
+        foreach (var p in _known)
+        {
+            p.LastSeen = DateTime.UtcNow;
+        }
+
         return GetKnownPeers();
     }
 
@@ -83,7 +105,11 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
     {
         Thread.Sleep(500);
         var existing = _known.FirstOrDefault(p => p.IPAddress == address.Trim());
-        if (existing != null) return existing.Copy();
+        if (existing != null)
+        {
+            return existing.Copy();
+        }
+
         var peer = Peer("vt-" + (0x1000000 + _known.Count).ToString("x12"), "DEMO-PC-" + (_known.Count + 1), address.Trim());
         _known.Add(peer);
         PeersChanged?.Invoke(this, EventArgs.Empty);
@@ -92,9 +118,15 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
 
     private readonly Dictionary<string, string> _shared = new();   // key -> name
 
-    public void ProvideRepository(string repositoryKey, string repositoryPath, string name) => _shared[repositoryKey] = name;
+    public void ProvideRepository(string repositoryKey, string repositoryPath, string name)
+    {
+        _shared[repositoryKey] = name;
+    }
 
-    public List<PeerNode> FindProviders(string repositoryKey) => _known.Take(1).Select(p => p.Copy()).ToList();
+    public List<PeerNode> FindProviders(string repositoryKey)
+    {
+        return _known.Take(1).Select(p => p.Copy()).ToList();
+    }
 
     public bool EstablishConnection(string targetPeerId)
     {
@@ -122,9 +154,15 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
                    ?? throw new VentrailException("Ventrail no longer knows this computer. Search for peers again.");
         var list = new List<OfferedRepository>();
         if (peer == _known.FirstOrDefault())
+        {
             list.AddRange(_shared.Select(s => Offer(peer, s.Key, s.Value)));
+        }
+
         if (_known.IndexOf(peer) < 2)
+        {
             list.Add(Offer(peer, GroupReportKey, "Group-Report"));
+        }
+
         return list;
     }
 
@@ -134,8 +172,14 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
                     ?? throw new VentrailException("This repository is not shared from that computer.");
         return new TransferManifest
         {
-            PeerId = peerId, RepositoryKey = repositoryKey, Name = offer.Name, HeadHash = offer.HeadHash, Branch = "main",
-            PackageHash = new string('d', 64), BlockSize = 1024 * 1024, Size = DemoBlocks * 1024L * 1024 - 300_000,
+            PeerId = peerId,
+            RepositoryKey = repositoryKey,
+            Name = offer.Name,
+            HeadHash = offer.HeadHash,
+            Branch = "main",
+            PackageHash = new string('d', 64),
+            BlockSize = 1024 * 1024,
+            Size = DemoBlocks * 1024L * 1024 - 300_000,
             BlockHashes = Enumerable.Range(0, DemoBlocks).Select(i => i.ToString("x64")).ToList()
         };
     }
@@ -148,24 +192,47 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
             Thread.Sleep(250);   // feels like a real transfer
             progress?.Report(new TransferProgress
             {
-                BlocksDone = i, BlockCount = manifest.BlockCount, TotalBytes = manifest.Size,
-                BytesDone = Math.Min(manifest.Size, i * (long)manifest.BlockSize), BlocksRetried = i >= 5 ? 1 : 0,
+                BlocksDone = i,
+                BlockCount = manifest.BlockCount,
+                TotalBytes = manifest.Size,
+                BytesDone = Math.Min(manifest.Size, i * (long)manifest.BlockSize),
+                BlocksRetried = i >= 5 ? 1 : 0,
                 BytesPerSecond = 3.4 * 1024 * 1024
             });
         }
         return @"C:\Demo\inbox\" + manifest.PackageHash + ".vtpk";
     }
 
-    public bool TransferData(string peerId, string dataHash) => true;
+    public bool TransferData(string peerId, string dataHash)
+    {
+        return true;
+    }
 
     // The demo peer's head is a fixed made-up version, so "Get latest" works once and then says "up to date".
-    private static OfferedRepository Offer(PeerNode peer, string key, string name) => new()
+    private static OfferedRepository Offer(PeerNode peer, string key, string name)
     {
-        PeerId = peer.PeerId, PeerName = peer.Title, Key = key, Name = name, Branch = "main",
-        HeadHash = key == GroupReportKey ? new string('b', 40) : new string('a', 40)
-    };
+        return new()
+        {
+            PeerId = peer.PeerId,
+            PeerName = peer.Title,
+            Key = key,
+            Name = name,
+            Branch = "main",
+            HeadHash = key == GroupReportKey ? new string('b', 40) : new string('a', 40)
+        };
+    }
 
-    private static PeerNode Peer(string id, string name, string ip) =>
-        new() { PeerId = id, DisplayName = name, IPAddress = ip, Port = 4001, DiscoveryPort = 4002, LastSeen = DateTime.UtcNow,
-                RoundTripMs = name.StartsWith("LAB") ? 4 : 23 };
+    private static PeerNode Peer(string id, string name, string ip)
+    {
+        return new()
+        {
+            PeerId = id,
+            DisplayName = name,
+            IPAddress = ip,
+            Port = 4001,
+            DiscoveryPort = 4002,
+            LastSeen = DateTime.UtcNow,
+            RoundTripMs = name.StartsWith("LAB") ? 4 : 23
+        };
+    }
 }

@@ -11,7 +11,7 @@ public interface INetworkNodeCoordinator
     int DiscoveryPort { get; }    // UDP: finding peers on the local network (Week 11)
     string LocalPeerId { get; }
     List<PeerNode> ConnectedPeers { get; }
-        
+
     // Week 10: firewall audit and permission (Fig 3.5).
     FirewallStatus CheckFirewall();
 

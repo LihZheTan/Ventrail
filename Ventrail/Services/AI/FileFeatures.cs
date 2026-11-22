@@ -14,19 +14,25 @@ namespace Ventrail.Services.AI;
 /// </summary>
 public class FileFeatures
 {
-    [LoadColumn(0)] public float LogSize { get; set; }          // log10(bytes + 1): 1 KB = 3, 1 MB = 6, 1 GB = 9
-    [LoadColumn(1)] public float HeaderEntropy { get; set; }    // 0-8 bits per byte; ~8 = already compressed/encrypted
-    [LoadColumn(2)] public float ZeroByteRatio { get; set; }    // share of 0x00 bytes (binary structures)
-    [LoadColumn(3)] public float PrintableRatio { get; set; }   // share of text-like bytes (ASCII + UTF-8)
+    [LoadColumn(0)]
+    public float LogSize { get; set; }          // log10(bytes + 1): 1 KB = 3, 1 MB = 6, 1 GB = 9
+    [LoadColumn(1)]
+    public float HeaderEntropy { get; set; }    // 0-8 bits per byte; ~8 = already compressed/encrypted
+    [LoadColumn(2)]
+    public float ZeroByteRatio { get; set; }    // share of 0x00 bytes (binary structures)
+    [LoadColumn(3)]
+    public float PrintableRatio { get; set; }   // share of text-like bytes (ASCII + UTF-8)
     [LoadColumn(4)] public string Signature { get; set; } = "unknown";   // format from the magic bytes
     [LoadColumn(5)] public string Category { get; set; } = "other";     // family from the extension
-    [LoadColumn(6), ColumnName("Label")] public bool IsHeavy { get; set; } // training only
+    [LoadColumn(6), ColumnName("Label")]
+    public bool IsHeavy { get; set; } // training only
 }
 
 /// <summary>What the trained model returns.</summary>
 public class HeavyPrediction
 {
-    [ColumnName("PredictedLabel")] public bool IsHeavy { get; set; }
+    [ColumnName("PredictedLabel")]
+    public bool IsHeavy { get; set; }
     public float Probability { get; set; }
 }
 
@@ -59,19 +65,31 @@ public static class FileFeatureExtractor
         foreach (byte b in header)
         {
             counts[b]++;
-            if (b == 0) zeros++;
+            if (b == 0)
+            {
+                zeros++;
+            }
             // tab, newline, carriage return, printable ASCII, and UTF-8 multi-byte parts
-            if (b is 9 or 10 or 13 || (b >= 32 && b < 127) || b >= 0x80) printable++;
+            if (b is 9 or 10 or 13 || (b >= 32 && b < 127) || b >= 0x80)
+            {
+                printable++;
+            }
         }
 
         double entropy = 0;
         if (header.Length > 0)
+        {
             foreach (int c in counts)
             {
-                if (c == 0) continue;
+                if (c == 0)
+                {
+                    continue;
+                }
+
                 double p = (double)c / header.Length;
                 entropy -= p * Math.Log2(p);
             }
+        }
 
         return new FileFeatures
         {
@@ -118,45 +136,126 @@ public static class FileFeatureExtractor
     public static string DetectSignature(ReadOnlySpan<byte> h)
     {
 
-        if (Starts(h, 0x50, 0x4B, 0x03, 0x04) || Starts(h, 0x50, 0x4B, 0x05, 0x06)) return "zip";   // also docx/xlsx/pptx/nupkg
-        if (Starts(h, 0x89, 0x50, 0x4E, 0x47)) return "png";
-        if (Starts(h, 0xFF, 0xD8, 0xFF)) return "jpeg";
-        if (Starts(h, 0x47, 0x49, 0x46, 0x38)) return "gif";
-        if (Starts(h, 0x25, 0x50, 0x44, 0x46)) return "pdf";
+        if (Starts(h, 0x50, 0x4B, 0x03, 0x04) || Starts(h, 0x50, 0x4B, 0x05, 0x06))
+        {
+            return "zip";   // also docx/xlsx/pptx/nupkg
+        }
+
+        if (Starts(h, 0x89, 0x50, 0x4E, 0x47))
+        {
+            return "png";
+        }
+
+        if (Starts(h, 0xFF, 0xD8, 0xFF))
+        {
+            return "jpeg";
+        }
+
+        if (Starts(h, 0x47, 0x49, 0x46, 0x38))
+        {
+            return "gif";
+        }
+
+        if (Starts(h, 0x25, 0x50, 0x44, 0x46))
+        {
+            return "pdf";
+        }
+
         if (Starts(h, 0x49, 0x49, 0x2A, 0x00) || Starts(h, 0x4D, 0x4D, 0x00, 0x2A) ||
-            Starts(h, 0x49, 0x49, 0x2B, 0x00) || Starts(h, 0x4D, 0x4D, 0x00, 0x2B)) return "tiff";   // incl. BigTIFF (.svs)
-        if (Starts(h, 0x38, 0x42, 0x50, 0x53)) return "psd";
-        if (Starts(h, 0xD0, 0xCF, 0x11, 0xE0)) return "ole";        // old .doc/.xls/.msi
-        if (Starts(h, 0x4D, 0x5A)) return "exe";                    // .exe/.dll
-        if (Starts(h, 0x1F, 0x8B)) return "gzip";
-        if (Starts(h, 0x37, 0x7A, 0xBC, 0xAF)) return "7z";
-        if (Starts(h, 0x52, 0x61, 0x72, 0x21)) return "rar";
-        if (Starts(h, 0x52, 0x49, 0x46, 0x46)) return "riff";       // wav/avi/webp
-        if (Starts(h, 0x49, 0x44, 0x33) || Starts(h, 0xFF, 0xFB)) return "mp3";
-        if (Starts(h, 0x66, 0x4C, 0x61, 0x43)) return "flac";
-        if (Starts(h, 0x00, 0x01, 0x00, 0x00) || Starts(h, 0x4F, 0x54, 0x54, 0x4F)) return "font";
-        if (Starts(h, 0x1A, 0x45, 0xDF, 0xA3)) return "mkv";
-        if (h.Length >= 8 && h[4..8].SequenceEqual("ftyp"u8)) return "mp4";   // mp4/mov/m4a/heic
-        if (h.Length > 0 && h.IndexOf((byte)0) < 0) return "text";
+            Starts(h, 0x49, 0x49, 0x2B, 0x00) || Starts(h, 0x4D, 0x4D, 0x00, 0x2B))
+        {
+            return "tiff";   // incl. BigTIFF (.svs)
+        }
+
+        if (Starts(h, 0x38, 0x42, 0x50, 0x53))
+        {
+            return "psd";
+        }
+
+        if (Starts(h, 0xD0, 0xCF, 0x11, 0xE0))
+        {
+            return "ole";        // old .doc/.xls/.msi
+        }
+
+        if (Starts(h, 0x4D, 0x5A))
+        {
+            return "exe";                    // .exe/.dll
+        }
+
+        if (Starts(h, 0x1F, 0x8B))
+        {
+            return "gzip";
+        }
+
+        if (Starts(h, 0x37, 0x7A, 0xBC, 0xAF))
+        {
+            return "7z";
+        }
+
+        if (Starts(h, 0x52, 0x61, 0x72, 0x21))
+        {
+            return "rar";
+        }
+
+        if (Starts(h, 0x52, 0x49, 0x46, 0x46))
+        {
+            return "riff";       // wav/avi/webp
+        }
+
+        if (Starts(h, 0x49, 0x44, 0x33) || Starts(h, 0xFF, 0xFB))
+        {
+            return "mp3";
+        }
+
+        if (Starts(h, 0x66, 0x4C, 0x61, 0x43))
+        {
+            return "flac";
+        }
+
+        if (Starts(h, 0x00, 0x01, 0x00, 0x00) || Starts(h, 0x4F, 0x54, 0x54, 0x4F))
+        {
+            return "font";
+        }
+
+        if (Starts(h, 0x1A, 0x45, 0xDF, 0xA3))
+        {
+            return "mkv";
+        }
+
+        if (h.Length >= 8 && h[4..8].SequenceEqual("ftyp"u8))
+        {
+            return "mp4";   // mp4/mov/m4a/heic
+        }
+
+        if (h.Length > 0 && h.IndexOf((byte)0) < 0)
+        {
+            return "text";
+        }
+
         return "unknown";
     }
 
-    private static bool Starts(ReadOnlySpan<byte> header, params byte[] magic) =>
-        header.Length >= magic.Length && header[..magic.Length].SequenceEqual(magic);
-
-    public static string CategoryOf(string extension) => extension.ToLowerInvariant() switch
+    private static bool Starts(ReadOnlySpan<byte> header, params byte[] magic)
     {
-        ".doc" or ".docx" or ".odt" or ".rtf" or ".pdf" or ".pptx" or ".ppt" or ".odp" or ".epub" => "document",
-        ".xls" or ".xlsx" or ".ods" or ".csv" or ".tsv" or ".json" or ".xml" or ".yaml" or ".yml" or ".sqlite" or ".db" => "data",
-        ".txt" or ".md" or ".log" or ".ini" or ".cfg" or ".html" or ".htm" or ".css" or ".tex" or ".bib" => "text",
-        ".cs" or ".py" or ".js" or ".ts" or ".java" or ".cpp" or ".c" or ".h" or ".xaml" or ".ps1" or ".sh" or ".sql" => "code",
-        ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".tif" or ".tiff" or ".svs" or ".psd" or ".webp"
-            or ".ico" or ".svg" or ".heic" or ".raw" or ".cr2" or ".nef" => "image",
-        ".mp4" or ".mov" or ".avi" or ".mkv" or ".wmv" or ".webm" => "video",
-        ".mp3" or ".wav" or ".flac" or ".m4a" or ".ogg" or ".wma" => "audio",
-        ".zip" or ".7z" or ".rar" or ".gz" or ".tar" or ".nupkg" or ".cab" or ".iso" => "archive",
-        ".exe" or ".dll" or ".msi" or ".sys" or ".pdb" or ".lib" or ".so" => "executable",
-        ".ttf" or ".otf" or ".woff" or ".woff2" => "font",
-        _ => "other"
-    };
+        return header.Length >= magic.Length && header[..magic.Length].SequenceEqual(magic);
+    }
+
+    public static string CategoryOf(string extension)
+    {
+        return extension.ToLowerInvariant() switch
+        {
+            ".doc" or ".docx" or ".odt" or ".rtf" or ".pdf" or ".pptx" or ".ppt" or ".odp" or ".epub" => "document",
+            ".xls" or ".xlsx" or ".ods" or ".csv" or ".tsv" or ".json" or ".xml" or ".yaml" or ".yml" or ".sqlite" or ".db" => "data",
+            ".txt" or ".md" or ".log" or ".ini" or ".cfg" or ".html" or ".htm" or ".css" or ".tex" or ".bib" => "text",
+            ".cs" or ".py" or ".js" or ".ts" or ".java" or ".cpp" or ".c" or ".h" or ".xaml" or ".ps1" or ".sh" or ".sql" => "code",
+            ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".tif" or ".tiff" or ".svs" or ".psd" or ".webp"
+                or ".ico" or ".svg" or ".heic" or ".raw" or ".cr2" or ".nef" => "image",
+            ".mp4" or ".mov" or ".avi" or ".mkv" or ".wmv" or ".webm" => "video",
+            ".mp3" or ".wav" or ".flac" or ".m4a" or ".ogg" or ".wma" => "audio",
+            ".zip" or ".7z" or ".rar" or ".gz" or ".tar" or ".nupkg" or ".cab" or ".iso" => "archive",
+            ".exe" or ".dll" or ".msi" or ".sys" or ".pdb" or ".lib" or ".so" => "executable",
+            ".ttf" or ".otf" or ".woff" or ".woff2" => "font",
+            _ => "other"
+        };
+    }
 }

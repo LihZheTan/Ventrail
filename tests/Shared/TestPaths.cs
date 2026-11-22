@@ -11,7 +11,13 @@ static class TestPaths
     private static string Find()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
-            if (File.Exists(Path.Combine(dir.FullName, "Ventrail.slnx"))) return dir.FullName;
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "Ventrail.slnx")))
+            {
+                return dir.FullName;
+            }
+        }
+
         throw new InvalidOperationException("Run the tests from inside the Ventrail repository (Ventrail.slnx not found).");
     }
 }

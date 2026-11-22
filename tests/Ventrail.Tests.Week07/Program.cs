@@ -5,12 +5,43 @@ using Ventrail.Services.Contracts;
 using Ventrail.Services.Implementations;
 
 int pass = 0, fail = 0;
-void Check(string name, bool ok, string detail = "") { if (ok) pass++; else fail++; Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}"); }
-string Expect<TEx>(Action a) where TEx : Exception { try { a(); return "<no exception>"; } catch (TEx ex) { return ex.Message; } catch (Exception ex) { return $"<wrong {ex.GetType().Name}: {ex.Message}>"; } }
+void Check(string name, bool ok, string detail = "")
+{
+    if (ok)
+    {
+        pass++;
+    }
+    else
+    {
+        fail++;
+    }
+
+    Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}");
+}
+string Expect<TEx>(Action a) where TEx : Exception
+{
+    try
+    {
+        a();
+        return "<no exception>";
+    }
+    catch (TEx ex)
+    {
+        return ex.Message;
+    }
+    catch (Exception ex)
+    {
+        return $"<wrong {ex.GetType().Name}: {ex.Message}>";
+    }
+}
 
 string root = Path.Combine(Path.GetTempPath(), "ventrail-w7-" + Guid.NewGuid().ToString("N")[..6]);
 Directory.CreateDirectory(root);
-string P(string rel) => Path.Combine(root, rel);
+string P(string rel)
+{
+    return Path.Combine(root, rel);
+}
+
 var rm = new RepositoryManager();
 
 rm.InitRepository(root);
@@ -24,7 +55,8 @@ File.WriteAllText(P("keep.txt"), "a\nb\nc\n");
 File.WriteAllText(P("gone.txt"), "x1\nx2\n");
 File.WriteAllBytes(P("report.docx"), new byte[] { 0x50, 0x4B, 0, 0, 1, 2, 3 });
 File.WriteAllText(P("old-name.txt"), "rename me\n");
-rm.StageAll(); rm.Commit("baseline", "T");
+rm.StageAll();
+rm.Commit("baseline", "T");
 
 File.WriteAllText(P("notes.txt"), "one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight\nnine\n");
 var d = rm.GetFileDiff("notes.txt");
@@ -52,7 +84,11 @@ File.Delete(P("big.log"));
 
 // ---- Discard ----
 Check("discard modified -> Recycle Bin", rm.DiscardChanges("notes.txt") == SafeDelete.RecycleBin);
-string Lf(string s) => s.Replace("\r\n", "\n");
+string Lf(string s)
+{
+    return s.Replace("\r\n", "\n");
+}
+
 Check("  ...content back to saved version", Lf(File.ReadAllText(P("notes.txt"))) == "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\n");
 Check("  ...no longer listed as changed", !rm.ScanWorkingDirectory().Any(f => f.FilePath == "notes.txt"));
 
@@ -64,7 +100,11 @@ Check("  ...file restored", File.Exists(P("gone.txt")) && Lf(File.ReadAllText(P(
 rm.DiscardChanges("report.docx");
 Check("discard binary -> original bytes", File.ReadAllBytes(P("report.docx")).Length == 7);
 
-using (var repo = new Repository(root)) Commands.Move(repo, "old-name.txt", "new-name.txt");
+using (var repo = new Repository(root))
+{
+    Commands.Move(repo, "old-name.txt", "new-name.txt");
+}
+
 var renamed = rm.ScanWorkingDirectory();
 Console.WriteLine("   after rename: " + string.Join(", ", renamed.Select(f => $"{f.FilePath}={f.TrackStatus}")));
 Check("rename visible", renamed.Any(f => f.FilePath == "new-name.txt"));

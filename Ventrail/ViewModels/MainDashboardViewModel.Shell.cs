@@ -21,7 +21,10 @@ public partial class MainDashboardViewModel
     [ObservableProperty] private AppTheme _currentTheme = AppTheme.System;
 
     [RelayCommand]
-    private void SetTheme(AppTheme theme) => CurrentTheme = theme;
+    private void SetTheme(AppTheme theme)
+    {
+        CurrentTheme = theme;
+    }
 
     // ---------- commit box: summary (CommitMessage) + optional description ----------
 
@@ -59,28 +62,46 @@ public partial class MainDashboardViewModel
         {
             string path = file.FilePath;
             var diff = await Background(() => _repo.GetFileDiff(path));
-            if (request == _diffRequest) InlineDiff = diff;
+            if (request == _diffRequest)
+            {
+                InlineDiff = diff;
+            }
         }
         catch (Exception ex)
         {
-            if (request == _diffRequest) InlineDiff = new FileDiff { FilePath = file.FilePath, Message = $"Could not compare this file: {ex.Message}" };
+            if (request == _diffRequest)
+            {
+                InlineDiff = new FileDiff { FilePath = file.FilePath, Message = $"Could not compare this file: {ex.Message}" };
+            }
         }
         finally
         {
-            if (request == _diffRequest) IsInlineDiffLoading = false;
+            if (request == _diffRequest)
+            {
+                IsInlineDiffLoading = false;
+            }
         }
     }
 
     // ---------- menu commands ----------
 
     [RelayCommand]
-    private void NavigateToWelcome() => CurrentPage = AppPage.Welcome;
+    private void NavigateToWelcome()
+    {
+        CurrentPage = AppPage.Welcome;
+    }
 
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
     private void ShowInExplorer()
     {
-        try { Process.Start(new ProcessStartInfo("explorer.exe", $"\"{CurrentDirectory}\"") { UseShellExecute = true }); }
-        catch (Exception ex) { ShowToast($"Could not open File Explorer: {ex.Message}", ToastKind.Error); }
+        try
+        {
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{CurrentDirectory}\"") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            ShowToast($"Could not open File Explorer: {ex.Message}", ToastKind.Error);
+        }
     }
 
     // Help > User guide: the copy shipped next to Ventrail.exe, or docs/ in the source folder.
@@ -91,14 +112,23 @@ public partial class MainDashboardViewModel
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null && guide is null; dir = dir.Parent)
         {
             foreach (string candidate in new[] { Path.Combine(dir.FullName, "USER_GUIDE.md"), Path.Combine(dir.FullName, "docs", "USER_GUIDE.md") })
-                if (File.Exists(candidate)) { guide = candidate; break; }
+            {
+                if (File.Exists(candidate))
+                {
+                    guide = candidate;
+                    break;
+                }
+            }
         }
         if (guide is null)
         {
             ShowToast("The user guide (USER_GUIDE.md) was not found next to Ventrail.", ToastKind.Error);
             return;
         }
-        try { Process.Start(new ProcessStartInfo(guide) { UseShellExecute = true }); }
+        try
+        {
+            Process.Start(new ProcessStartInfo(guide) { UseShellExecute = true });
+        }
         catch (Exception)
         {
             // No app is set to open .md files: show it in Notepad instead.
@@ -107,10 +137,13 @@ public partial class MainDashboardViewModel
     }
 
     [RelayCommand]
-    private Task ShowAboutAsync() => AskAsync(
+    private Task ShowAboutAsync()
+    {
+        return AskAsync(
         "About Ventrail",
         $"{AppVersion}\n\nVersion control for non-technical users, with an offline AI storage advisor and " +
         "peer-to-peer sharing on your local network.\n\nCapstone Project 2, Sunway University, by Tan Lih Zhe.\n" +
         "Built with .NET 8, WPF, LibGit2Sharp and ML.NET.",
         "OK", string.Empty, "");
+    }
 }

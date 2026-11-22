@@ -158,7 +158,8 @@ public partial class MainDashboardViewModel : ObservableObject
 
     partial void OnSelectedFileChanged(FileAsset? value)
     {
-        if (value != null) CheckFileRecommendation(value.FilePath);
+        if (value != null)
+            CheckFileRecommendation(value.FilePath);
         _ = LoadInlineDiffAsync(value);   // Redesign: the diff shows next to the list, like GitHub Desktop
     }
 
@@ -166,10 +167,12 @@ public partial class MainDashboardViewModel : ObservableObject
     {
         CommitFiles.Clear();
         SelectedCommitFile = null;
-        if (value is null) return;
+        if (value is null)
+            return;
         try
         {
-            foreach (var f in _repo.GetFilesInCommit(value.Hash)) CommitFiles.Add(f);
+            foreach (var f in _repo.GetFilesInCommit(value.Hash))
+                CommitFiles.Add(f);
         }
         catch (Exception ex)
         {
@@ -225,20 +228,37 @@ public partial class MainDashboardViewModel : ObservableObject
     public void CheckFileRecommendation(string filePath)
     {
         var file = Changes.FirstOrDefault(f => f.FilePath == filePath);
-        if (file is null) return;
+        if (file is null)
+        {
+            return;
+        }
 
-        try { RecommendationTip = _ai.GetStorageTip(file); }
-        catch (Exception) { RecommendationTip = string.Empty; }   // the advisor must never break the inspector
+        try
+        {
+            RecommendationTip = _ai.GetStorageTip(file);
+        }
+        catch (Exception)   // the advisor must never break the inspector
+        {
+            RecommendationTip = string.Empty;
+        }
 
         if (file.TrackStatus == "Deleted")
+        {
             RecommendationText = "This file was deleted. Saving this change adds nothing to the history.";
+        }
         else if (file.Classification is { } verdict)
+        {
             RecommendationText = verdict.Summary;
+        }
         else if (_advisorAvailable == false)
+        {
             RecommendationText = "The storage advisor isn't available (its model file could not be loaded), " +
                                  "so Ventrail only flags files over 50 MB.";
+        }
         else
+        {
             RecommendationText = "Checking this file...";
+        }
     }
 
     // ---------- commands (buttons) ----------
@@ -247,60 +267,99 @@ public partial class MainDashboardViewModel : ObservableObject
     private async Task OpenFolderAsync()
     {
         var dialog = new OpenFolderDialog { Title = "Choose a folder for Ventrail to track" };
-        if (dialog.ShowDialog() != true) return;
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
         await InitializeDashboardAsync(dialog.FolderName);
     }
 
     // Clicking a folder in "Recent Repositories" on the Welcome page.
     [RelayCommand]
-    private Task OpenRecentAsync(string? folderPath) =>
-        string.IsNullOrEmpty(folderPath) ? Task.CompletedTask : InitializeDashboardAsync(folderPath);
+    private Task OpenRecentAsync(string? folderPath)
+    {
+        return string.IsNullOrEmpty(folderPath) ? Task.CompletedTask : InitializeDashboardAsync(folderPath);
+    }
 
-    private bool CanUseRepo() => HasRepo && !IsBusy;
+    private bool CanUseRepo()
+    {
+        return HasRepo && !IsBusy;
+    }
 
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
-    private Task RefreshAsync() => RunBusyAsync("Scanning for changes...", async () =>
+    private Task RefreshAsync()
+    {
+        return RunBusyAsync("Scanning for changes...", async () =>
     {
         await ReloadAsync();
         await RefreshTreeAsync();
     });
+    }
 
     // Page navigation from buttons inside pages (the rail uses radio buttons bound to CurrentPage).
     [RelayCommand]
-    private void NavigateToStaging() => CurrentPage = AppPage.Staging;
+    private void NavigateToStaging()
+    {
+        CurrentPage = AppPage.Staging;
+    }
 
     [RelayCommand]
-    private void NavigateToHistory() => CurrentPage = AppPage.History;
+    private void NavigateToHistory()
+    {
+        CurrentPage = AppPage.History;
+    }
 
     // Week 14: also reachable with no folder open, to download a copy from a peer.
     [RelayCommand]
-    private void NavigateToNetwork() => CurrentPage = AppPage.Network;
+    private void NavigateToNetwork()
+    {
+        CurrentPage = AppPage.Network;
+    }
 
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
-    private Task StageAllAsync() => RunBusyAsync("Staging all changes...", async () =>
+    private Task StageAllAsync()
+    {
+        return RunBusyAsync("Staging all changes...", async () =>
     {
         await Background(_repo.StageAll);
         await ReloadAsync();
         LogActivity($"{StagedCount} file(s) staged");
     });
+    }
 
     // Class diagram: StageSelectedFile(String filePath). Bound to each file's checkbox.
     [RelayCommand]
-    private Task ToggleStageAsync(FileAsset? file) => file is null ? Task.CompletedTask :
+    private Task ToggleStageAsync(FileAsset? file)
+    {
+        return file is null ? Task.CompletedTask :
         RunBusyAsync(file.IsStaged ? "Staging..." : "Unstaging...", async () =>
         {
             // The checkbox has already flipped IsStaged through two-way binding.
-            if (file.IsStaged) await Background(() => _repo.Stage(file.FilePath));
-            else await Background(() => _repo.Unstage(file.FilePath));
+            if (file.IsStaged)
+            {
+                await Background(() => _repo.Stage(file.FilePath));
+            }
+            else
+            {
+                await Background(() => _repo.Unstage(file.FilePath));
+            }
+
             await ReloadAsync();
         });
+    }
 
-    private bool CanCommit() => CanUseRepo() && !string.IsNullOrWhiteSpace(CommitMessage);
+    private bool CanCommit()
+    {
+        return CanUseRepo() && !string.IsNullOrWhiteSpace(CommitMessage);
+    }
 
     // Class diagram: CommitStagedFiles(String message).
     // Week 5: shows the "Committing Changes..." progress screen from the proposal mockup.
     [RelayCommand(CanExecute = nameof(CanCommit))]
-    private Task CommitAsync() => RunBusyAsync("Saving version...", async () =>
+    private Task CommitAsync()
+    {
+        return RunBusyAsync("Saving version...", async () =>
     {
         var staged = Changes.Where(c => c.IsStaged).ToList();
         if (staged.Count == 0)
@@ -314,7 +373,11 @@ public partial class MainDashboardViewModel : ObservableObject
         if (large.Count > 0)
         {
             string names = string.Join("\n", large.Take(4).Select(f => $"  • {f.FileName} ({f.DisplaySize})"));
-            if (large.Count > 4) names += $"\n  • ...and {large.Count - 4} more";
+            if (large.Count > 4)
+            {
+                names += $"\n  • ...and {large.Count - 4} more";
+            }
+
             string total = new FileAsset { SizeInBytes = large.Sum(f => f.SizeInBytes) }.DisplaySize;
             bool saveAnyway = await AskAsync(
                 "Save large files?",
@@ -349,9 +412,15 @@ public partial class MainDashboardViewModel : ObservableObject
                 await Background(() =>
                 {
                     string full = Path.Combine(root, file.FilePath);
-                    if (File.Exists(full)) _ = new FileInfo(full).Length;
+                    if (File.Exists(full))
+                    {
+                        _ = new FileInfo(full).Length;
+                    }
                 });
-                if (staged.Count <= 20) await Task.Delay(60);   // small commits: let each step be seen
+                if (staged.Count <= 20)
+                {
+                    await Task.Delay(60);   // small commits: let each step be seen
+                }
             }
 
             CommitProgress = 85;
@@ -382,13 +451,19 @@ public partial class MainDashboardViewModel : ObservableObject
             IsCommitting = false;
         }
     });
+    }
 
     // ShareRepository (class diagram) and the Week 10 firewall flow live in MainDashboardViewModel.Network.cs.
 
-    private bool CanRestore() => SelectedCommit is not null && SelectedCommitFile is not null;
+    private bool CanRestore()
+    {
+        return SelectedCommit is not null && SelectedCommitFile is not null;
+    }
 
     [RelayCommand(CanExecute = nameof(CanRestore))]
-    private Task RestoreSelectedFileAsync() => RunBusyAsync("Restoring file...", async () =>
+    private Task RestoreSelectedFileAsync()
+    {
+        return RunBusyAsync("Restoring file...", async () =>
     {
         string path = SelectedCommitFile!.FilePath, hash = SelectedCommit!.Hash;
 
@@ -397,7 +472,9 @@ public partial class MainDashboardViewModel : ObservableObject
                 $"\"{path}\" will be replaced with the copy from version {hash[..7]}.\n\n" +
                 "Your history is not changed: the current version is still saved, and you can restore it the same way.",
                 "Restore", "Cancel", "\uE777"))
+        {
             return;
+        }
 
         await Background(() => _repo.RestoreFileFromCommit(path, hash));
         await ReloadAsync();
@@ -405,11 +482,14 @@ public partial class MainDashboardViewModel : ObservableObject
         StatusText = $"Restored {path} from version {hash[..7]}. Save a version to keep it.";
         ShowToast($"Restored {System.IO.Path.GetFileName(path)}. Save a version to keep it.", ToastKind.Success);
     });
+    }
 
     // Week 7: "Discard changes" in the File Inspector. Always asks first, and the current copy
     // goes to the Recycle Bin, so a mis-click never loses work for good.
     [RelayCommand(CanExecute = nameof(HasSelectedFile))]
-    private Task DiscardSelectedFileAsync() => RunBusyAsync("Discarding changes...", async () =>
+    private Task DiscardSelectedFileAsync()
+    {
+        return RunBusyAsync("Discarding changes...", async () =>
     {
         var file = SelectedFile!;
         string path = file.FilePath, status = file.TrackStatus;
@@ -423,12 +503,16 @@ public partial class MainDashboardViewModel : ObservableObject
                  "The current copy is moved to the Recycle Bin first, so you can still get it back."
         };
         if (!await AskAsync("Discard changes?", $"\"{path}\"\n\n{what}", "Discard", "Cancel", ""))
+        {
             return;
+        }
 
         string? movedTo = await Background(() => _repo.DiscardChanges(path));
         await ReloadAsync();
         if (status is "Added" or "Deleted" or "Renamed")
+        {
             await RefreshTreeAsync();   // the file appeared or disappeared on disk
+        }
 
         string name = Path.GetFileName(path);
         string where = movedTo switch
@@ -441,36 +525,54 @@ public partial class MainDashboardViewModel : ObservableObject
         StatusText = $"Discarded changes to {path}.";
         ShowToast($"Discarded changes to {name}.{where}", ToastKind.Success, 5);
     });
+    }
 
     // Week 7: line-by-line comparison with the last saved version (double-click a file or "View changes").
     [RelayCommand(CanExecute = nameof(HasSelectedFile))]
-    private Task ViewChangesAsync() => RunBusyAsync("Comparing with the last saved version...", async () =>
+    private Task ViewChangesAsync()
+    {
+        return RunBusyAsync("Comparing with the last saved version...", async () =>
     {
         string path = SelectedFile!.FilePath;
         CurrentDiff = await Background(() => _repo.GetFileDiff(path));
         IsDiffOpen = true;
     });
+    }
 
     [RelayCommand]
-    private void CloseDiff() => IsDiffOpen = false;
+    private void CloseDiff()
+    {
+        IsDiffOpen = false;
+    }
 
     // Week 9: "Accept AI Suggestions" uses the suggested message and unticks the files the
     // advisor suggests leaving out (very large heavy files), as long as something stays ticked.
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
-    private Task AcceptSuggestionAsync() => RunBusyAsync("Applying AI suggestions...", async () =>
+    private Task AcceptSuggestionAsync()
     {
-        if (Suggestion is not { } suggestion) return;
+        return RunBusyAsync("Applying AI suggestions...", async () =>
+    {
+        if (Suggestion is not { } suggestion)
+        {
+            return;
+        }
 
         var staged = Changes.Where(f => f.IsStaged).ToList();
         var leaveOut = staged.Where(f => suggestion.LeaveOutPaths.Contains(f.FilePath)).ToList();
-        if (leaveOut.Count == staged.Count) leaveOut.Clear();   // never untick everything
+        if (leaveOut.Count == staged.Count)
+        {
+            leaveOut.Clear();   // never untick everything
+        }
 
         foreach (var file in leaveOut)
         {
             string path = file.FilePath;
             await Background(() => _repo.Unstage(path));
         }
-        if (leaveOut.Count > 0) await ReloadAsync();   // rebuilds the suggestion for the files still ticked
+        if (leaveOut.Count > 0)
+        {
+            await ReloadAsync();   // rebuilds the suggestion for the files still ticked
+        }
 
         CommitMessage = (Suggestion ?? suggestion).Message;
         IsSuggestionDismissed = true;
@@ -484,6 +586,7 @@ public partial class MainDashboardViewModel : ObservableObject
         LogActivity($"AI suggestion accepted: \"{suggestion.Message}\"{unticked}");
         ShowToast($"Message filled in{unticked}. Check it, then commit.", ToastKind.Success, 4);
     });
+    }
 
     // Week 9: "Edit Manually" puts the suggestion in the box as a starting point (only if the box
     // is empty) and leaves the ticked files alone. The view moves the keyboard focus to the box.
@@ -491,7 +594,10 @@ public partial class MainDashboardViewModel : ObservableObject
     private void EditSuggestionManually()
     {
         if (Suggestion is { } suggestion && string.IsNullOrWhiteSpace(CommitMessage))
+        {
             CommitMessage = suggestion.Message;
+        }
+
         IsSuggestionDismissed = true;
     }
 
@@ -511,11 +617,18 @@ public partial class MainDashboardViewModel : ObservableObject
         // Week 8: keep the advisor's verdicts for files that didn't change, so badges don't flicker.
         var previous = Changes.GroupBy(c => c.FilePath).ToDictionary(g => g.Key, g => g.First());
         foreach (var f in files)
+        {
             if (previous.TryGetValue(f.FilePath, out var old) && old.SizeInBytes == f.SizeInBytes)
+            {
                 f.Classification = old.Classification;
+            }
+        }
 
         Changes.Clear();
-        foreach (var f in files) Changes.Add(f);
+        foreach (var f in files)
+        {
+            Changes.Add(f);
+        }
 
         // Mark the ends of the timeline so the connecting line stops at the first and last version.
         for (int i = 0; i < history.Count; i++)
@@ -524,7 +637,10 @@ public partial class MainDashboardViewModel : ObservableObject
             history[i].IsOldest = i == history.Count - 1;
         }
         History.Clear();
-        foreach (var c in history) History.Add(c);
+        foreach (var c in history)
+        {
+            History.Add(c);
+        }
 
         SelectedFile = Changes.FirstOrDefault(f => f.FilePath == selectedPath);
         SelectedCommit = History.FirstOrDefault(c => c.Hash == selectedHash);
@@ -535,7 +651,11 @@ public partial class MainDashboardViewModel : ObservableObject
         OnPropertyChanged(nameof(HasChanges));
         OnPropertyChanged(nameof(HasHistory));
         OnPropertyChanged(nameof(LatestVersionHash));
-        if (!IsBusy) StatusText = $"{Changes.Count} changed file(s), {StagedCount} staged.";
+        if (!IsBusy)
+        {
+            StatusText = $"{Changes.Count} changed file(s), {StagedCount} staged.";
+        }
+
         LastScanText = $"Last scanned at {DateTime.Now:HH:mm}";
 
         UpdateSuggestion();
@@ -559,8 +679,14 @@ public partial class MainDashboardViewModel : ObservableObject
             IsSuggestionDismissed = false;
         }
 
-        try { Suggestion = staged.Count == 0 ? null : _ai.SuggestCommit(staged); }
-        catch (Exception) { Suggestion = null; }
+        try
+        {
+            Suggestion = staged.Count == 0 ? null : _ai.SuggestCommit(staged);
+        }
+        catch (Exception)
+        {
+            Suggestion = null;
+        }
     }
 
     // ---------- Week 8: storage advisor ----------
@@ -577,17 +703,33 @@ public partial class MainDashboardViewModel : ObservableObject
         try
         {
             _advisorAvailable = await Background(() => _ai.IsModelLoaded);
-            if (_advisorAvailable != true) return;
+            if (_advisorAvailable != true)
+            {
+                return;
+            }
 
             foreach (var batch in files.Where(f => f.TrackStatus != "Deleted").Take(2000).Chunk(25))
             {
-                if (run != _classifyRun) return;
+                if (run != _classifyRun)
+                {
+                    return;
+                }
+
                 var verdicts = await Background(() => batch.Select(f => SafeClassify(f, root)).ToArray());
-                for (int i = 0; i < batch.Length; i++) batch[i].Classification = verdicts[i];
+                for (int i = 0; i < batch.Length; i++)
+                {
+                    batch[i].Classification = verdicts[i];
+                }
 
                 if (SelectedFile is { } selected && batch.Contains(selected))
+                {
                     CheckFileRecommendation(selected.FilePath);
-                if (batch.Any(f => f.IsStaged)) UpdateSuggestion();
+                }
+
+                if (batch.Any(f => f.IsStaged))
+                {
+                    UpdateSuggestion();
+                }
             }
         }
         catch (Exception)
@@ -598,14 +740,24 @@ public partial class MainDashboardViewModel : ObservableObject
 
     private FileClassification? SafeClassify(FileAsset file, string root)
     {
-        try { return _ai.ClassifyFile(Path.Combine(root, file.FilePath), file.SizeInBytes); }
-        catch (Exception) { return null; }
+        try
+        {
+            return _ai.ClassifyFile(Path.Combine(root, file.FilePath), file.SizeInBytes);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private void LoadRecentRepositories()
     {
         RecentRepositories.Clear();
-        foreach (var path in _recent.Load()) RecentRepositories.Add(path);
+        foreach (var path in _recent.Load())
+        {
+            RecentRepositories.Add(path);
+        }
+
         OnPropertyChanged(nameof(HasRecentRepositories));
     }
 
@@ -619,7 +771,10 @@ public partial class MainDashboardViewModel : ObservableObject
             : FolderTreeBuilder.FromPaths(paths));   // demo mode: folder isn't on disk
 
         WorkspaceTree.Clear();
-        foreach (var n in nodes) WorkspaceTree.Add(n);
+        foreach (var n in nodes)
+        {
+            WorkspaceTree.Add(n);
+        }
     }
 
     // Runs work on a background thread (like Task.Run) so the window never freezes, but catches any
@@ -630,14 +785,23 @@ public partial class MainDashboardViewModel : ObservableObject
     {
         var (result, error) = await Task.Run(() =>
         {
-            try { return (work(), (ExceptionDispatchInfo?)null); }
-            catch (Exception ex) { return (default(T)!, ExceptionDispatchInfo.Capture(ex)); }
+            try
+            {
+                return (work(), (ExceptionDispatchInfo?)null);
+            }
+            catch (Exception ex)
+            {
+                return (default(T)!, ExceptionDispatchInfo.Capture(ex));
+            }
         });
         error?.Throw();   // keeps the original stack trace
         return result;
     }
 
-    private static Task Background(Action work) => Background(() => { work(); return true; });
+    private static Task Background(Action work)
+    {
+        return Background(() => { work(); return true; });
+    }
 
     // Wraps every operation: busy flag on, friendly error message instead of a crash.
     private async Task RunBusyAsync(string message, Func<Task> work)
@@ -648,7 +812,9 @@ public partial class MainDashboardViewModel : ObservableObject
         {
             await work();
             if (StatusText == message)
+            {
                 StatusText = $"{Changes.Count} changed file(s), {StagedCount} staged.";
+            }
         }
         catch (Exception ex)
         {

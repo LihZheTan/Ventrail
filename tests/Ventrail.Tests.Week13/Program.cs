@@ -11,14 +11,33 @@ using Ventrail.ViewModels;
 using TransferProgress = Ventrail.Models.TransferProgress;
 
 int pass = 0, fail = 0;
-void Check(string name, bool ok, string detail = "") { if (ok) pass++; else fail++; Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}"); }
-void Section(string title) => Console.WriteLine($"\n--- {title} ---");
+void Check(string name, bool ok, string detail = "")
+{
+    if (ok)
+    {
+        pass++;
+    }
+    else
+    {
+        fail++;
+    }
+
+    Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}");
+}
+void Section(string title)
+{
+    Console.WriteLine($"\n--- {title} ---");
+}
 
 // ================= 1. adaptive timeouts (pure logic) =================
 Section("adaptive timeouts");
 var est = new RttEstimator(TimeSpan.FromMilliseconds(800), TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(8));
 Check("starts at the Week 11 value (0.8 s)", est.Timeout == TimeSpan.FromMilliseconds(800) && est.Smoothed is null);
-for (int i = 0; i < 20; i++) est.Observe(TimeSpan.FromMilliseconds(5));
+for (int i = 0; i < 20; i++)
+{
+    est.Observe(TimeSpan.FromMilliseconds(5));
+}
+
 Check("fast LAN -> short wait (but never below 0.25 s)", est.Timeout == TimeSpan.FromMilliseconds(250), $"{est.Timeout.TotalMilliseconds} ms");
 var slow = new RttEstimator(TimeSpan.FromMilliseconds(800), TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(8));
 slow.Observe(TimeSpan.FromMilliseconds(1200));
@@ -26,12 +45,21 @@ Check("one slow answer -> wait above it straight away", slow.Timeout > TimeSpan.
 var jitter = new RttEstimator(TimeSpan.FromMilliseconds(800), TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(8));
 var steady = new RttEstimator(TimeSpan.FromMilliseconds(800), TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(8));
 var rnd = new Random(3);
-for (int i = 0; i < 50; i++) { jitter.Observe(TimeSpan.FromMilliseconds(rnd.Next(100, 900))); steady.Observe(TimeSpan.FromMilliseconds(500)); }
+for (int i = 0; i < 50; i++)
+{
+    jitter.Observe(TimeSpan.FromMilliseconds(rnd.Next(100, 900)));
+    steady.Observe(TimeSpan.FromMilliseconds(500));
+}
 Check("unsteady link -> more patience than a steady one with the same average", jitter.Timeout > steady.Timeout,
       $"{jitter.Timeout.TotalMilliseconds:F0} vs {steady.Timeout.TotalMilliseconds:F0} ms");
-est.Backoff(); est.Backoff();
+est.Backoff();
+est.Backoff();
 Check("missed answers -> wait doubles", est.Timeout == TimeSpan.FromSeconds(1));
-for (int i = 0; i < 10; i++) est.Backoff();
+for (int i = 0; i < 10; i++)
+{
+    est.Backoff();
+}
+
 Check("...but never beyond 8 s", est.Timeout == TimeSpan.FromSeconds(8));
 est.Observe(TimeSpan.FromMilliseconds(5));
 Check("a real answer brings it back down", est.Timeout < TimeSpan.FromSeconds(8), $"{est.Timeout.TotalMilliseconds:F0} ms");
@@ -53,11 +81,18 @@ Check("a timed-out block drops the speed estimate at once (next wait fits a slow
 string root = Path.Combine(Path.GetTempPath(), "vw13-" + Guid.NewGuid().ToString("N")[..6]);
 Directory.CreateDirectory(root);
 int portBase = 48100;
-NetworkNodeCoordinator Node(string name, int n, params int[] targets) =>
-    new(IPAddress.Loopback, portBase + n * 10 + 1, portBase + n * 10 + 2, Path.Combine(root, "node-" + name), @"C:\x\Ventrail.exe",
+NetworkNodeCoordinator Node(string name, int n, params int[] targets)
+{
+    return new(IPAddress.Loopback, portBase + n * 10 + 1, portBase + n * 10 + 2, Path.Combine(root, "node-" + name), @"C:\x\Ventrail.exe",
         targets.Select(t => new IPEndPoint(IPAddress.Loopback, portBase + t * 10 + 2)), name);
-MainDashboardViewModel Vm(INetworkNodeCoordinator net) => new(new RepositoryManager(),
+}
+
+MainDashboardViewModel Vm(INetworkNodeCoordinator net)
+{
+    return new(new RepositoryManager(),
     new IntelligentStorageEngine(@"C:\nope.zip"), new AllowedFirewall(net), new SpecializedFileHandler(), new InMemoryRecentRepositoryStore());
+}
+
 async Task Save(MainDashboardViewModel vm, string message)
 {
     await vm.RefreshCommand.ExecuteAsync(null);
@@ -65,11 +100,27 @@ async Task Save(MainDashboardViewModel vm, string message)
     vm.CommitMessage = message;
     await vm.CommitCommand.ExecuteAsync(null);
 }
-async Task SharingOn(MainDashboardViewModel vm) { vm.IsSharingEnabled = true; await vm.ToggleSharingCommand.ExecuteAsync(null); }
-OfferedRepository? OfferFrom(MainDashboardViewModel vm, string peer, string repo) =>
-    vm.ActivePeers.FirstOrDefault(p => p.Title == peer)?.Repositories.FirstOrDefault(o => o.Name == repo);
-string Norm(string path) => File.ReadAllText(path).Replace("\r\n", "\n");
-byte[] Random(int n, int seed) { var b = new byte[n]; new Random(seed).NextBytes(b); return b; }
+async Task SharingOn(MainDashboardViewModel vm)
+{
+    vm.IsSharingEnabled = true;
+    await vm.ToggleSharingCommand.ExecuteAsync(null);
+}
+OfferedRepository? OfferFrom(MainDashboardViewModel vm, string peer, string repo)
+{
+    return vm.ActivePeers.FirstOrDefault(p => p.Title == peer)?.Repositories.FirstOrDefault(o => o.Name == repo);
+}
+
+string Norm(string path)
+{
+    return File.ReadAllText(path).Replace("\r\n", "\n");
+}
+
+byte[] Random(int n, int seed)
+{
+    var b = new byte[n];
+    new Random(seed).NextBytes(b);
+    return b;
+}
 
 // ================= 2. end to end: a day in the life =================
 Section("end to end: Alice and Bob");
@@ -150,7 +201,7 @@ Check("Bob's measured round trip went up (smoothed, so it climbs over a few answ
 
 // Bob's copy diverged earlier, so download a fresh copy of the new version over the slow link.
 var progressSeen = new List<string>();
-B.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(B.TransferDetail)) lock (progressSeen) progressSeen.Add(B.TransferDetail); };
+B.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(B.TransferDetail)) { lock (progressSeen) { progressSeen.Add(B.TransferDetail); } } };
 string bob2Folder = Path.Combine(root, "Bob2");
 Directory.CreateDirectory(bob2Folder);
 B.PickFolder = _ => bob2Folder;
@@ -182,11 +233,17 @@ await Save(A, "Add big file");
 var key = OfferFrom(B, "ALICE-PC", "Thesis")!.Key;
 var m5 = nodeB.RequestVersion(nodeA.LocalPeerId, key);
 nodeA.TestConditions = new NetworkConditions { BytesPerSecond = 2 * 1024 * 1024 };
-var freezeAfterTwo = new SyncProgress(p => { if (p.BlocksDone >= 2 && nodeA.TestConditions is { } c) c.Stall = true; });
+var freezeAfterTwo = new SyncProgress(p => { if (p.BlocksDone >= 2 && nodeA.TestConditions is { } c) { c.Stall = true; } });
 sw.Restart();
 string? frozenMessage = null;
-try { nodeB.DownloadPackage(m5, freezeAfterTwo, CancellationToken.None); }
-catch (VentrailException ex) { frozenMessage = ex.Message; }
+try
+{
+    nodeB.DownloadPackage(m5, freezeAfterTwo, CancellationToken.None);
+}
+catch (VentrailException ex)
+{
+    frozenMessage = ex.Message;
+}
 sw.Stop();
 Check("frozen peer noticed quickly (Week 12: 30 s per try, 90 s+)", frozenMessage != null && sw.Elapsed < TimeSpan.FromSeconds(15),
       $"{sw.Elapsed.TotalSeconds:F1} s: {frozenMessage}");
@@ -216,7 +273,9 @@ for (int i = 0; i < PeerLink.DropAfterMisses; i++)
 {
     C.DiscoverPeers();
     if (i < PeerLink.DropAfterMisses - 1)
+    {
         Check($"Bob silent for {i + 1} lookup(s): still kept", C.GetKnownPeers().Any(p => p.Title == "BOB-PC"));
+    }
 }
 Check("Bob silent for 3 lookups: dropped", C.GetKnownPeers().All(p => p.Title != "BOB-PC"),
       string.Join(",", C.GetKnownPeers().Select(p => p.Title)));
@@ -234,45 +293,126 @@ Check("Alice offline -> Bob gets a clear message quickly", B.ToastMessage.Contai
       $"{sw.Elapsed.TotalSeconds:F1} s: {B.ToastMessage}");
 Check("error is in Bob's activity log", B.ActivityLog.Any(a => a.Text.Contains("didn't answer")));
 
-nodeA.StopListening(); nodeB.StopListening(); C.StopListening();
-try { foreach (var f in Directory.GetFiles(root, "*", SearchOption.AllDirectories)) File.SetAttributes(f, FileAttributes.Normal); Directory.Delete(root, true); } catch (Exception) { }
+nodeA.StopListening();
+nodeB.StopListening();
+C.StopListening();
+try
+{
+    foreach (var f in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
+    {
+        File.SetAttributes(f, FileAttributes.Normal);
+    }
+
+    Directory.Delete(root, true);
+}
+catch (Exception)
+{
+    // Only temporary test files: if Windows still holds one, leave it for the next clean-up.
+}
 Console.WriteLine($"\n{pass} passed, {fail} failed.");
 
 class SyncProgress(Action<TransferProgress> report) : IProgress<TransferProgress>
 {
-    public void Report(TransferProgress value) => report(value);
+    public void Report(TransferProgress value)
+    {
+        report(value);
+    }
 }
 
 // The real node, except the firewall check: tests must never trigger the Windows admin prompt.
 class AllowedFirewall(INetworkNodeCoordinator real) : INetworkNodeCoordinator
 {
-    public FirewallStatus CheckFirewall() => new()
+    public FirewallStatus CheckFirewall()
     {
-        NetworkProfile = "Private", HasVentrailRules = true,
-        Ports = new() { new() { Port = LocalPort, Protocol = "TCP", Access = PortAccess.Allowed, Detail = "test" },
+        return new()
+        {
+            NetworkProfile = "Private",
+            HasVentrailRules = true,
+            Ports = new() { new() { Port = LocalPort, Protocol = "TCP", Access = PortAccess.Allowed, Detail = "test" },
                         new() { Port = DiscoveryPort, Protocol = "UDP", Access = PortAccess.Allowed, Detail = "test" } }
-    };
-    public bool RequestFirewallPermission(bool includePublicNetworks) => throw new InvalidOperationException("never in tests");
-    public bool RemoveFirewallPermission() => throw new InvalidOperationException("never in tests");
+        };
+    }
+
+    public bool RequestFirewallPermission(bool includePublicNetworks)
+    {
+        throw new InvalidOperationException("never in tests");
+    }
+
+    public bool RemoveFirewallPermission()
+    {
+        throw new InvalidOperationException("never in tests");
+    }
 
     public int LocalPort => real.LocalPort;
     public int DiscoveryPort => real.DiscoveryPort;
     public string LocalPeerId => real.LocalPeerId;
     public List<PeerNode> ConnectedPeers => real.ConnectedPeers;
     public bool IsListening => real.IsListening;
-    public bool StartListening() => real.StartListening();
-    public void StopListening() => real.StopListening();
-    public event EventHandler? PeersChanged { add => real.PeersChanged += value; remove => real.PeersChanged -= value; }
+    public bool StartListening()
+    {
+        return real.StartListening();
+    }
+
+    public void StopListening()
+    {
+        real.StopListening();
+    }
+
+    public event EventHandler? PeersChanged
+    {
+        add => real.PeersChanged += value;
+        remove => real.PeersChanged -= value;
+    }
     public string DisplayName => real.DisplayName;
-    public List<PeerNode> GetKnownPeers() => real.GetKnownPeers();
-    public List<PeerNode> DiscoverPeers() => real.DiscoverPeers();
-    public PeerNode? AddPeerByAddress(string address) => real.AddPeerByAddress(address);
-    public void ProvideRepository(string k, string p, string n) => real.ProvideRepository(k, p, n);
-    public List<PeerNode> FindProviders(string k) => real.FindProviders(k);
-    public bool EstablishConnection(string id) => real.EstablishConnection(id);
-    public List<OfferedRepository> ListRepositories(string id) => real.ListRepositories(id);
-    public TransferManifest RequestVersion(string id, string k) => real.RequestVersion(id, k);
-    public string DownloadPackage(TransferManifest m, IProgress<TransferProgress>? p, CancellationToken c) => real.DownloadPackage(m, p, c);
-    public bool TransferData(string id, string h) => real.TransferData(id, h);
+    public List<PeerNode> GetKnownPeers()
+    {
+        return real.GetKnownPeers();
+    }
+
+    public List<PeerNode> DiscoverPeers()
+    {
+        return real.DiscoverPeers();
+    }
+
+    public PeerNode? AddPeerByAddress(string address)
+    {
+        return real.AddPeerByAddress(address);
+    }
+
+    public void ProvideRepository(string k, string p, string n)
+    {
+        real.ProvideRepository(k, p, n);
+    }
+
+    public List<PeerNode> FindProviders(string k)
+    {
+        return real.FindProviders(k);
+    }
+
+    public bool EstablishConnection(string id)
+    {
+        return real.EstablishConnection(id);
+    }
+
+    public List<OfferedRepository> ListRepositories(string id)
+    {
+        return real.ListRepositories(id);
+    }
+
+    public TransferManifest RequestVersion(string id, string k)
+    {
+        return real.RequestVersion(id, k);
+    }
+
+    public string DownloadPackage(TransferManifest m, IProgress<TransferProgress>? p, CancellationToken c)
+    {
+        return real.DownloadPackage(m, p, c);
+    }
+
+    public bool TransferData(string id, string h)
+    {
+        return real.TransferData(id, h);
+    }
+
     public long BytesSent => real.BytesSent;
 }

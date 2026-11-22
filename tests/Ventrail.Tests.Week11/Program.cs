@@ -11,8 +11,30 @@ using Ventrail.Services.Mock;
 using Ventrail.ViewModels;
 
 int pass = 0, fail = 0;
-void Check(string name, bool ok, string detail = "") { if (ok) pass++; else fail++; Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}"); }
-PeerNode P(string id, string name = "") => new() { PeerId = id, DisplayName = name, IPAddress = "127.0.0.1", Port = 1, DiscoveryPort = 2 };
+void Check(string name, bool ok, string detail = "")
+{
+    if (ok)
+    {
+        pass++;
+    }
+    else
+    {
+        fail++;
+    }
+
+    Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}");
+}
+PeerNode P(string id, string name = "")
+{
+    return new()
+    {
+        PeerId = id,
+        DisplayName = name,
+        IPAddress = "127.0.0.1",
+        Port = 1,
+        DiscoveryPort = 2
+    };
+}
 
 // ---------- keys and XOR distance ----------
 Check("valid ids", DhtKey.IsValid("vt-0123456789ab") && DhtKey.IsValid("rp-ffffffffffff"));
@@ -34,13 +56,21 @@ Check("refresh keeps the name learnt earlier", table.Find("vt-000000000001")!.Di
 Check("self and invalid ids are never added", !table.AddOrUpdate(P("vt-000000000000"), t0) && !table.AddOrUpdate(P("vt-bad"), t0));
 // Bucket 47 (first bit differs): fill it with K peers.
 var tb = new KademliaRoutingTable("vt-000000000000");
-for (int i = 0; i < KademliaRoutingTable.K; i++) tb.AddOrUpdate(P($"vt-8000000000{i:x2}"), t0);
+for (int i = 0; i < KademliaRoutingTable.K; i++)
+{
+    tb.AddOrUpdate(P($"vt-8000000000{i:x2}"), t0);
+}
+
 Check("full bucket ignores a newcomer while everyone is active", !tb.AddOrUpdate(P("vt-8000000000ff"), t0.AddMinutes(1)) && tb.Count == KademliaRoutingTable.K);
 Check("full bucket replaces a long-silent peer", tb.AddOrUpdate(P("vt-8000000000ff"), t0.AddMinutes(20)) && tb.Find("vt-800000000000") is null);
 var rnd = new Random(7);
 var big = new KademliaRoutingTable("vt-123456789abc");
 var ids = Enumerable.Range(0, 300).Select(_ => "vt-" + rnd.NextInt64(0, 1L << 48).ToString("x12")).Distinct().ToList();
-foreach (var id in ids) big.AddOrUpdate(P(id), t0);
+foreach (var id in ids)
+{
+    big.AddOrUpdate(P(id), t0);
+}
+
 string target = "vt-fedcba987654";
 var closest = big.Closest(target).Select(p => p.PeerId).ToList();
 var inTable = big.All().Select(p => p.PeerId).ToList();
@@ -54,7 +84,11 @@ var store = new ProviderStore();
 store.Add(k1, P("vt-000000000001"), t0);
 Check("provider record found", store.Get(k1, t0.AddMinutes(1)).Count == 1 && store.Get(k3, t0).Count == 0);
 Check("provider record expires", store.Get(k1, t0.AddMinutes(31)).Count == 0);
-for (int i = 0; i < 30; i++) store.Add(k3, P($"vt-0000000001{i:x2}"), t0.AddSeconds(i));
+for (int i = 0; i < 30; i++)
+{
+    store.Add(k3, P($"vt-0000000001{i:x2}"), t0.AddSeconds(i));
+}
+
 Check("providers per key are capped", store.Get(k3, t0.AddMinutes(1)).Count == ProviderStore.MaxProvidersPerKey);
 
 // ---------- message format ----------
@@ -85,7 +119,8 @@ var myLan = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfac
     .FirstOrDefault(u => u.Address.AddressFamily == AddressFamily.InterNetwork && u.PrefixLength is > 0 and <= 30)?.Address;
 if (myLan != null)
 {
-    var neighbour = myLan.GetAddressBytes(); neighbour[3] = (byte)(neighbour[3] == 1 ? 2 : 1);
+    var neighbour = myLan.GetAddressBytes();
+    neighbour[3] = (byte)(neighbour[3] == 1 ? 2 : 1);
     Check("this PC's own network is local", NetworkNodeCoordinator.IsLocalNetworkAddress(myLan) && NetworkNodeCoordinator.IsLocalNetworkAddress(new IPAddress(neighbour)), myLan.ToString());
 }
 var bc = NetworkNodeCoordinator.DefaultBroadcastTargets(4002);
@@ -95,18 +130,34 @@ Check("broadcast targets: 255.255.255.255 + each network's broadcast", bc[0].Add
 // ---------- three real nodes on loopback ----------
 // The "broadcast" of A only reaches B, so A can only find C through the DHT (B tells A about C).
 string root = Path.Combine(Path.GetTempPath(), "vw11-" + Guid.NewGuid().ToString("N")[..6]);
-IPEndPoint Ep(int port) => new(IPAddress.Loopback, port);
-NetworkNodeCoordinator Node(string name, int tcp, int udp, params int[] targets) =>
-    new(IPAddress.Loopback, tcp, udp, Path.Combine(root, name), @"C:\x\Ventrail.exe", targets.Select(Ep), name);
+IPEndPoint Ep(int port)
+{
+    return new(IPAddress.Loopback, port);
+}
+
+NetworkNodeCoordinator Node(string name, int tcp, int udp, params int[] targets)
+{
+    return new(IPAddress.Loopback, tcp, udp, Path.Combine(root, name), @"C:\x\Ventrail.exe", targets.Select(Ep), name);
+}
+
 var A = Node("NODE-A", 46101, 46102, 46112);
 var B = Node("NODE-B", 46111, 46112, 46102, 46122);
 var C = Node("NODE-C", 46121, 46122, 46112);
 Check("three different peer ids", new[] { A.LocalPeerId, B.LocalPeerId, C.LocalPeerId }.Distinct().Count() == 3);
 
-try { A.DiscoverPeers(); Check("discovery needs sharing on", false); }
-catch (VentrailException ex) { Check("discovery needs sharing on", ex.Message.Contains("Turn on P2P sharing")); }
+try
+{
+    A.DiscoverPeers();
+    Check("discovery needs sharing on", false);
+}
+catch (VentrailException ex)
+{
+    Check("discovery needs sharing on", ex.Message.Contains("Turn on P2P sharing"));
+}
 
-A.StartListening(); B.StartListening(); C.StartListening();
+A.StartListening();
+B.StartListening();
+C.StartListening();
 int bChanged = 0;
 B.PeersChanged += (_, _) => Interlocked.Increment(ref bChanged);
 
@@ -142,14 +193,28 @@ var providers = C.FindProviders(repoKey);
 Check("C finds that A has the repository", providers.Count == 1 && providers[0].PeerId == A.LocalPeerId, string.Join(",", providers.Select(p => p.Title)));
 Check("unknown repository -> nobody", C.FindProviders(DhtKey.ForRepository("2222")).Count == 0);
 Check("A doesn't list itself as a provider", A.FindProviders(repoKey).All(p => p.PeerId != A.LocalPeerId));
-try { A.ProvideRepository(A.LocalPeerId, root, "Repo"); Check("peer id is not a repo key", false); }
-catch (ArgumentException) { Check("peer id is not a repo key", true); }
+try
+{
+    A.ProvideRepository(A.LocalPeerId, root, "Repo");
+    Check("peer id is not a repo key", false);
+}
+catch (ArgumentException)
+{
+    Check("peer id is not a repo key", true);
+}
 
 // ---------- connect (TCP hello check) ----------
 Check("C connects to A", C.EstablishConnection(A.LocalPeerId) && C.ConnectedPeers.Any(p => p.PeerId == A.LocalPeerId)
       && C.GetKnownPeers().First(p => p.PeerId == A.LocalPeerId).IsConnected);
-try { C.EstablishConnection("vt-999999999999"); Check("unknown peer -> friendly error", false); }
-catch (VentrailException ex) { Check("unknown peer -> friendly error", ex.Message.Contains("Search for peers again")); }
+try
+{
+    C.EstablishConnection("vt-999999999999");
+    Check("unknown peer -> friendly error", false);
+}
+catch (VentrailException ex)
+{
+    Check("unknown peer -> friendly error", ex.Message.Contains("Search for peers again"));
+}
 
 // ---------- add by address ----------
 var D = Node("NODE-D", 46131, 46132);   // no broadcast targets at all
@@ -157,10 +222,24 @@ D.StartListening();
 var viaAddress = D.AddPeerByAddress("127.0.0.1:46112");
 Check("add by address finds B", viaAddress?.PeerId == B.LocalPeerId && viaAddress.DisplayName == "NODE-B");
 Check("nobody there -> null", D.AddPeerByAddress("127.0.0.1:46199") is null);
-try { D.AddPeerByAddress("8.8.8.8"); Check("internet address refused", false); }
-catch (VentrailException ex) { Check("internet address refused", ex.Message.Contains("not on your local network"), ex.Message); }
-try { D.AddPeerByAddress("  "); Check("empty address -> friendly error", false); }
-catch (VentrailException) { Check("empty address -> friendly error", true); }
+try
+{
+    D.AddPeerByAddress("8.8.8.8");
+    Check("internet address refused", false);
+}
+catch (VentrailException ex)
+{
+    Check("internet address refused", ex.Message.Contains("not on your local network"), ex.Message);
+}
+try
+{
+    D.AddPeerByAddress("  ");
+    Check("empty address -> friendly error", false);
+}
+catch (VentrailException)
+{
+    Check("empty address -> friendly error", true);
+}
 
 // ---------- a lying peer: lists an internet address and a dead local one ----------
 const string FakeId = "vt-ffffffffffff";
@@ -175,16 +254,27 @@ _ = Task.Run(async () =>
         {
             var pk = await fake.ReceiveAsync(fakeStop.Token);
             var m = DiscoveryMessage.Parse(pk.Buffer);
-            if (m is null) continue;
+            if (m is null)
+            {
+                continue;
+            }
+
             Interlocked.Increment(ref fakeQuestions);
-            string h(string verb) => DiscoveryMessage.Header(verb, FakeId, 46191, 46190, "FAKE");
+            string h(string verb)
+            {
+                return DiscoveryMessage.Header(verb, FakeId, 46191, 46190, "FAKE");
+            }
+
             string? reply = m.Verb switch
             {
                 DiscoveryMessage.Hello => h(DiscoveryMessage.HelloAnswer),
                 DiscoveryMessage.Find => h(DiscoveryMessage.Peers) + " vt-123456789abc@8.8.8.8:4001:4002:EVIL,vt-0000000000aa@127.0.0.1:46198:46198:GHOST",
                 _ => null
             };
-            if (reply != null) await fake.SendAsync(Encoding.UTF8.GetBytes(reply), pk.RemoteEndPoint);
+            if (reply != null)
+            {
+                await fake.SendAsync(Encoding.UTF8.GetBytes(reply), pk.RemoteEndPoint);
+            }
         }
     }
     catch (Exception) { }
@@ -202,17 +292,35 @@ Check("discover after stop -> refused", ePeers2 is null);
 
 // ---------- peer goes offline / address reused ----------
 A.StopListening();
-try { C.EstablishConnection(A.LocalPeerId); Check("offline peer -> friendly error", false); }
-catch (VentrailException ex) { Check("offline peer -> friendly error", ex.Message.Contains("didn't answer"), ex.Message); }
+try
+{
+    C.EstablishConnection(A.LocalPeerId);
+    Check("offline peer -> friendly error", false);
+}
+catch (VentrailException ex)
+{
+    Check("offline peer -> friendly error", ex.Message.Contains("didn't answer"), ex.Message);
+}
 var impostor = Node("NODE-IMPOSTOR", 46101, 46102);   // a different Ventrail now uses A's address
 impostor.StartListening();
-try { C.EstablishConnection(A.LocalPeerId); Check("different computer at that address -> noticed", false); }
-catch (VentrailException ex) { Check("different computer at that address -> noticed", ex.Message.Contains("no longer") && C.GetKnownPeers().All(p => p.PeerId != A.LocalPeerId), ex.Message); }
+try
+{
+    C.EstablishConnection(A.LocalPeerId);
+    Check("different computer at that address -> noticed", false);
+}
+catch (VentrailException ex)
+{
+    Check("different computer at that address -> noticed", ex.Message.Contains("no longer") && C.GetKnownPeers().All(p => p.PeerId != A.LocalPeerId), ex.Message);
+}
 impostor.StopListening();
 
 // Dead peers are dropped by the next lookup (C still knows B; stop B and look again).
 B.StopListening();
-for (int i = 0; i < 3; i++) C.DiscoverPeers();   // Week 13: dropped after 3 silent lookups, not 1
+for (int i = 0; i < 3; i++)
+{
+    C.DiscoverPeers();   // Week 13: dropped after 3 silent lookups, not 1
+}
+
 Check("peer that stopped answering is dropped (after 3 lookups)", C.GetKnownPeers().All(p => p.PeerId != B.LocalPeerId),
       string.Join(",", C.GetKnownPeers().Select(p => p.Title)));
 Check("stop clears connections", (C.StopListeningAnd(() => C.ConnectedPeers.Count == 0)));
@@ -220,9 +328,19 @@ D.StopListening();
 Directory.Delete(root, true);
 
 // ---------- ViewModel (demo node) ----------
-MainDashboardViewModel NewVm(INetworkNodeCoordinator net) => new(new MockRepositoryManager(),
+MainDashboardViewModel NewVm(INetworkNodeCoordinator net)
+{
+    return new(new MockRepositoryManager(),
     new IntelligentStorageEngine(@"C:\nope.zip"), net, new SpecializedFileHandler(), new InMemoryRecentRepositoryStore(), true);
-async Task WaitFor(Func<bool> cond) { for (int i = 0; i < 80 && !cond(); i++) await Task.Delay(50); }
+}
+
+async Task WaitFor(Func<bool> cond)
+{
+    for (int i = 0; i < 80 && !cond(); i++)
+    {
+        await Task.Delay(50);
+    }
+}
 
 var mock = new MockNetworkNodeCoordinator();
 var vm = NewVm(mock);
@@ -266,7 +384,18 @@ static class Helpers
 {
     public static List<PeerNode>? DiscoverPeersSafe(this INetworkNodeCoordinator n)
     {
-        try { return n.DiscoverPeers(); } catch (VentrailException) { return null; }
+        try
+        {
+            return n.DiscoverPeers();
+        }
+        catch (VentrailException)
+        {
+            return null;
+        }
     }
-    public static bool StopListeningAnd(this INetworkNodeCoordinator n, Func<bool> after) { n.StopListening(); return after(); }
+    public static bool StopListeningAnd(this INetworkNodeCoordinator n, Func<bool> after)
+    {
+        n.StopListening();
+        return after();
+    }
 }

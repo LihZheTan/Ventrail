@@ -2,7 +2,10 @@ using System.Collections.Generic;
 
 namespace Ventrail.Models;
 
-public enum DiffLineKind { Context, Added, Removed, Hunk }
+public enum DiffLineKind
+{
+    Context, Added, Removed, Hunk
+}
 
 /// <summary>One line of a text comparison (Week 7 diff viewer).</summary>
 public class DiffLine

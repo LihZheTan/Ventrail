@@ -1210,3 +1210,18 @@ slightly different fonts, and offer light and dark themes.
 - **Testing:** new `Ventrail.Tests.Regression` suite, **38 checks**, one group per bug.
   All 400 checks pass.
 - **Not covered by this check:** the firewall, DHT and AI code were not re-read.
+
+**Follow-up: easier-to-read code layout**
+- **Feedback:** functions shouldn't be written on single lines; spread them out so they're easier
+  to read.
+- **Change (layout only, no behaviour change):**
+  - methods, constructors and local functions written as one line with `=>` now have a normal
+    `{ }` body;
+  - every `if`, `else`, `for`, `foreach` and `while` body is in `{ }` on its own lines;
+  - one-line `try { ... } catch { ... }` blocks and helpers with several statements on one line
+    are spread over several lines.
+  - Short read-only properties (`public bool HasRepo => ...`) and `{ get; set; }` stay on one
+    line, as is usual in C#.
+- **How:** a new `.editorconfig` records these rules, so Visual Studio and `dotnet format` keep
+  new code in the same style. `dotnet format` applied most of it; the rest was done by hand.
+- **Testing:** the solution builds with no warnings and all 400 checks pass.

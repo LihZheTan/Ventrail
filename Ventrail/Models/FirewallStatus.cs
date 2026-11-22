@@ -3,7 +3,10 @@ using System.Linq;
 
 namespace Ventrail.Models;
 
-public enum PortAccess { Unknown, Allowed, NeedsPermission, Blocked }
+public enum PortAccess
+{
+    Unknown, Allowed, NeedsPermission, Blocked
+}
 
 /// <summary>Week 10: whether other computers can reach one of Ventrail's ports.</summary>
 public class PortCheck
@@ -47,11 +50,26 @@ public class FirewallStatus
     {
         get
         {
-            if (Error != null) return Error;
-            if (!FirewallOn) return "Windows Firewall is off on this network, so nothing is blocked.";
-            if (AllAllowed) return $"Other computers on your {NetworkProfile.ToLowerInvariant()} network can reach Ventrail.";
+            if (Error != null)
+            {
+                return Error;
+            }
+
+            if (!FirewallOn)
+            {
+                return "Windows Firewall is off on this network, so nothing is blocked.";
+            }
+
+            if (AllAllowed)
+            {
+                return $"Other computers on your {NetworkProfile.ToLowerInvariant()} network can reach Ventrail.";
+            }
+
             if (Ports.Any(p => p.Access == PortAccess.Blocked))
+            {
                 return "Windows Firewall is blocking Ventrail. Turning on sharing will ask Windows to allow it.";
+            }
+
             return "Windows Firewall will block other computers until you allow Ventrail.";
         }
     }

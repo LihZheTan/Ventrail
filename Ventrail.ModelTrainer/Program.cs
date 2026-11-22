@@ -30,8 +30,14 @@ var includes = new List<string>();
 int maxFiles = 6000;
 for (int i = 0; i < args.Length; i++)
 {
-    if (args[i] == "--include" && i + 1 < args.Length) includes.Add(args[++i]);
-    else if (args[i] == "--max-files" && i + 1 < args.Length) maxFiles = int.Parse(args[++i]);
+    if (args[i] == "--include" && i + 1 < args.Length)
+    {
+        includes.Add(args[++i]);
+    }
+    else if (args[i] == "--max-files" && i + 1 < args.Length)
+    {
+        maxFiles = int.Parse(args[++i]);
+    }
 }
 
 string trainerDir = FindTrainerDir();
@@ -74,7 +80,10 @@ foreach (var (root, kind) in sources.Where(s => Directory.Exists(s.Path)))
     foreach (string f in Directory.EnumerateFiles(root, "*", opts))
     {
         candidates.Add((f, kind));
-        if (++n >= 300_000) break;
+        if (++n >= 300_000)
+        {
+            break;
+        }
     }
     Console.WriteLine($"  {root}: {n} files found");
 }
@@ -85,10 +94,18 @@ const int maxPerExtension = 250;
 var picked = new List<(string Path, string Kind)>();
 foreach (var c in candidates.OrderBy(_ => rng.Next()))
 {
-    if (picked.Count >= maxFiles) break;
+    if (picked.Count >= maxFiles)
+    {
+        break;
+    }
+
     string ext = Path.GetExtension(c.Path);
     perExt.TryGetValue(ext, out int used);
-    if (used >= maxPerExtension) continue;
+    if (used >= maxPerExtension)
+    {
+        continue;
+    }
+
     perExt[ext] = used + 1;
     picked.Add(c);
 }
@@ -101,7 +118,11 @@ foreach (var (path, kind) in picked)
     try
     {
         var info = new FileInfo(path);
-        if (info.Length == 0) continue;
+        if (info.Length == 0)
+        {
+            continue;
+        }
+
         FileFeatures features = FileFeatureExtractor.FromFile(path);
         long stored = MeasureStoredBytes(path, info.Length);
         rows.Add(new Row(features, info.Extension.ToLowerInvariant(), info.Length, stored, kind));
@@ -110,7 +131,10 @@ foreach (var (path, kind) in picked)
 }
 
 // ---------- 3. synthetic large text files ----------
-foreach (var row in Synthetic(rng, 300)) rows.Add(row);
+foreach (var row in Synthetic(rng, 300))
+{
+    rows.Add(row);
+}
 
 int heavy = rows.Count(r => r.Features.IsHeavy);
 Console.WriteLine($"Dataset: {rows.Count} rows, {heavy} heavy ({100.0 * heavy / rows.Count:F1}%), {clock.Elapsed.TotalSeconds:F0}s");
@@ -150,10 +174,23 @@ var testRows = ml.Data.CreateEnumerable<FileFeatures>(split.TestSet, reuseRowObj
     foreach (var r in testRows)
     {
         bool predicted = Math.Pow(10, r.LogSize) - 1 >= minBytes;
-        if (predicted == r.IsHeavy) ok++;
-        if (predicted && r.IsHeavy) tp++;
-        else if (predicted) fp++;
-        else if (r.IsHeavy) fn++;
+        if (predicted == r.IsHeavy)
+        {
+            ok++;
+        }
+
+        if (predicted && r.IsHeavy)
+        {
+            tp++;
+        }
+        else if (predicted)
+        {
+            fp++;
+        }
+        else if (r.IsHeavy)
+        {
+            fn++;
+        }
     }
     double p = tp + fp == 0 ? 0 : (double)tp / (tp + fp);
     double rc = tp + fn == 0 ? 0 : (double)tp / (tp + fn);
@@ -161,8 +198,10 @@ var testRows = ml.Data.CreateEnumerable<FileFeatures>(split.TestSet, reuseRowObj
 }
 var rule50Mb = SizeRule(50.0 * 1024 * 1024);   // Week 6 "Large" badge
 var rule1Mb = SizeRule(1024 * 1024);           // "big file = heavy"
-string RuleRow(string name, (double Acc, double P, double R, double F1) m) =>
-    $"| {name} | {m.Acc:P2} | {m.P:F3} | {m.R:F3} | {m.F1:F3} |";
+string RuleRow(string name, (double Acc, double P, double R, double F1) m)
+{
+    return $"| {name} | {m.Acc:P2} | {m.P:F3} | {m.R:F3} | {m.F1:F3} |";
+}
 
 var cm = metrics.ConfusionMatrix;
 var report = new StringBuilder()
@@ -221,7 +260,9 @@ static long MeasureStoredBytes(string path, long size)
     const int chunk = 1024 * 1024;
     using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
     if (size <= 16L * chunk)
+    {
         return DeflatedLength(fs);
+    }
 
     long sampled = 0, compressed = 0;
     var buffer = new byte[chunk];
@@ -239,7 +280,10 @@ static long DeflatedLength(Stream input)
 {
     var counter = new CountingStream();
     using (var deflate = new ZLibStream(counter, CompressionLevel.Optimal, leaveOpen: true))
+    {
         input.CopyTo(deflate);
+    }
+
     return counter.Count;
 }
 
@@ -252,7 +296,12 @@ static IEnumerable<Row> Synthetic(Random rng, int count)
     {
         long size = (long)Math.Pow(10, 5 + rng.NextDouble() * 2.6);   // 100 KB - 40 MB, log-uniform
         int kind = i % 3;
-        string ext = kind switch { 0 => ".log", 1 => ".csv", _ => ".txt" };
+        string ext = kind switch
+        {
+            0 => ".log",
+            1 => ".csv",
+            _ => ".txt"
+        };
         var sb = new StringBuilder();
         while (sb.Length < size)
         {
@@ -267,7 +316,11 @@ static IEnumerable<Row> Synthetic(Random rng, int count)
                     sb.Append($"{rng.Next(100000)},{rng.NextDouble() * 100:F4},{rng.NextDouble() * 1000:F2},{words[rng.Next(words.Length)]},{rng.Next(2)}\r\n");
                     break;
                 default:
-                    for (int w = 0; w < 12; w++) sb.Append(words[rng.Next(words.Length)]).Append(' ');
+                    for (int w = 0; w < 12; w++)
+                    {
+                        sb.Append(words[rng.Next(words.Length)]).Append(' ');
+                    }
+
                     sb.Append(".\r\n");
                     break;
             }
@@ -298,7 +351,10 @@ static string FindTrainerDir()
 {
     var dir = new DirectoryInfo(AppContext.BaseDirectory);
     while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Ventrail.ModelTrainer.csproj")))
+    {
         dir = dir.Parent;
+    }
+
     return dir?.FullName ?? Directory.GetCurrentDirectory();
 }
 
@@ -306,22 +362,50 @@ record Row(FileFeatures Features, string Extension, long Size, long Stored, stri
 {
     // The label: measured, not guessed.
     public FileFeatures Features { get; } = SetLabel(Features, Stored);
-    static FileFeatures SetLabel(FileFeatures f, long stored) { f.IsHeavy = stored >= FileFeatureExtractor.HeavyThresholdBytes; return f; }
+    static FileFeatures SetLabel(FileFeatures f, long stored)
+    {
+        f.IsHeavy = stored >= FileFeatureExtractor.HeavyThresholdBytes;
+        return f;
+    }
 }
 
 // Counts bytes written without keeping them (we only need the compressed length).
 class CountingStream : Stream
 {
     public long Count { get; private set; }
-    public override void Write(byte[] buffer, int offset, int count) => Count += count;
-    public override void Write(ReadOnlySpan<byte> buffer) => Count += buffer.Length;
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        Count += count;
+    }
+
+    public override void Write(ReadOnlySpan<byte> buffer)
+    {
+        Count += buffer.Length;
+    }
+
     public override bool CanRead => false;
     public override bool CanSeek => false;
     public override bool CanWrite => true;
     public override long Length => Count;
-    public override long Position { get => Count; set => throw new NotSupportedException(); }
-    public override void Flush() { }
-    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-    public override void SetLength(long value) => throw new NotSupportedException();
+    public override long Position
+    {
+        get => Count; set => throw new NotSupportedException();
+    }
+    public override void Flush()
+    {
+    }
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override long Seek(long offset, SeekOrigin origin)
+    {
+        throw new NotSupportedException();
+    }
+
+    public override void SetLength(long value)
+    {
+        throw new NotSupportedException();
+    }
 }

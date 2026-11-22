@@ -65,69 +65,109 @@ public partial class NetworkNodeCoordinator
     // ---------- receiving side ----------
 
     /// <summary>The repositories a peer currently shares, with its latest version of each.</summary>
-    public List<OfferedRepository> ListRepositories(string peerId) => Run(async () =>
+    public List<OfferedRepository> ListRepositories(string peerId)
+    {
+        return Run(async () =>
     {
         using var timeout = new CancellationTokenSource(MaxRequestTime);
         using var session = await OpenSessionAsync(peerId, timeout.Token);
         await session.SendAsync("LIST", timeout.Token);
         string[] head = Words(await ReadAnswerAsync(session, timeout.Token));
         if (head.Length != 2 || head[0] != "REPOS" || !int.TryParse(head[1], out int count) || count is < 0 or > 100)
+        {
             throw ProtocolError(session.Peer, head);
+        }
 
         var list = new List<OfferedRepository>();
         for (int i = 0; i < count; i++)
         {
             string[] w = Words(await ReadAnswerAsync(session, timeout.Token), 4);
             if (w.Length == 4 && DhtKey.IsValid(w[0]) && w[0].StartsWith("rp-") && IsCommitHash(w[1]))
+            {
                 list.Add(new OfferedRepository
                 {
-                    PeerId = peerId, PeerName = session.Peer.Title, Key = w[0], HeadHash = w[1], Branch = w[2],
+                    PeerId = peerId,
+                    PeerName = session.Peer.Title,
+                    Key = w[0],
+                    HeadHash = w[1],
+                    Branch = w[2],
                     Name = OfferedRepository.SafeFolderName(w[3])
                 });
+            }
         }
         await session.SendAsync("BYE", timeout.Token);
         return list;
     });
+    }
 
     /// <summary>Asks the peer to prepare its latest version of a repository and describe it (no data yet).</summary>
-    public TransferManifest RequestVersion(string peerId, string repositoryKey) => Run(async () =>
+    public TransferManifest RequestVersion(string peerId, string repositoryKey)
+    {
+        return Run(async () =>
     {
         using var timeout = new CancellationTokenSource(ManifestWait);
         using var session = await OpenSessionAsync(peerId, timeout.Token);
         await session.SendAsync($"MANIFEST {repositoryKey}", timeout.Token);
         string[] w = Words(await ReadAnswerAsync(session, timeout.Token), 8);
         if (w.Length >= 2 && w[0] == "ERROR")
+        {
             throw new VentrailException($"{session.Peer.Title}: {string.Join(' ', w[1..])}");
+        }
+
         if (w.Length != 8 || w[0] != "MANIFEST" || !BlockHashing.IsHash(w[1]) ||
             !long.TryParse(w[2], out long size) || size <= 0 || size > MaxPackageBytes ||
             !int.TryParse(w[3], out int blockSize) || blockSize != BlockHashing.BlockSize ||
             !int.TryParse(w[4], out int blocks) || blocks != (int)((size + blockSize - 1) / blockSize) ||
             !IsCommitHash(w[5]))
+        {
             throw ProtocolError(session.Peer, w);
+        }
 
         var manifest = new TransferManifest
         {
-            PeerId = peerId, RepositoryKey = repositoryKey, PackageHash = w[1], Size = size, BlockSize = blockSize,
-            HeadHash = w[5], Branch = w[6], Name = OfferedRepository.SafeFolderName(w[7])
+            PeerId = peerId,
+            RepositoryKey = repositoryKey,
+            PackageHash = w[1],
+            Size = size,
+            BlockSize = blockSize,
+            HeadHash = w[5],
+            Branch = w[6],
+            Name = OfferedRepository.SafeFolderName(w[7])
         };
         for (int i = 0; i < blocks; i++)
         {
             string? line = (await ReadAnswerAsync(session, timeout.Token))?.Trim();
-            if (!BlockHashing.IsHash(line)) throw ProtocolError(session.Peer, new[] { line ?? "" });
+            if (!BlockHashing.IsHash(line))
+            {
+                throw ProtocolError(session.Peer, new[] { line ?? "" });
+            }
+
             manifest.BlockHashes.Add(line!);
         }
         await session.SendAsync("BYE", timeout.Token);
-        lock (_gate) _manifests[manifest.PackageHash] = manifest;
+        lock (_gate)
+        {
+            _manifests[manifest.PackageHash] = manifest;
+        }
+
         return manifest;
     });
+    }
 
     /// <summary>Class diagram: TransferData(peerId, dataHash): downloads a package described earlier by RequestVersion.</summary>
     public bool TransferData(string peerId, string dataHash)
     {
         TransferManifest? manifest;
-        lock (_gate) _manifests.TryGetValue(dataHash, out manifest);
+        lock (_gate)
+        {
+            _manifests.TryGetValue(dataHash, out manifest);
+        }
+
         if (manifest is null || manifest.PeerId != peerId)
+        {
             throw new VentrailException("Ask that computer for its latest version first.");
+        }
+
         DownloadPackage(manifest, null, CancellationToken.None);
         return true;
     }
@@ -140,7 +180,11 @@ public partial class NetworkNodeCoordinator
     {
         Directory.CreateDirectory(Inbox);
         string final = Path.Combine(Inbox, manifest.PackageHash + ".vtpk");
-        if (File.Exists(final) && BlockHashing.FileSha256(final) == manifest.PackageHash) return final;
+        if (File.Exists(final) && BlockHashing.FileSha256(final) == manifest.PackageHash)
+        {
+            return final;
+        }
+
         string part = final + ".part";
 
         return Run(async () =>
@@ -163,7 +207,9 @@ public partial class NetworkNodeCoordinator
                         if (BlockHashing.ReadFull(file, buffer) >= length &&
                             BlockHashing.Sha256(buffer.AsSpan(0, length)) == manifest.BlockHashes[i])
                         {
-                            done++; resumed++; bytesDone += length;
+                            done++;
+                            resumed++;
+                            bytesDone += length;
                             continue;
                         }
                     }
@@ -213,17 +259,22 @@ public partial class NetworkNodeCoordinator
                             }
                             retried++;
                             if (attempt >= MaxBlockAttempts)
+                            {
                                 throw new VentrailException(stalled >= MaxBlockAttempts
                                     ? $"{manifest.Name}: the other computer stopped sending (block {i + 1} of {count}), so the " +
                                       "download stopped. The blocks received so far are kept; try again to continue."
                                     : $"Block {i + 1} of {count} kept arriving damaged or not at all, so the download " +
                                       "stopped. The blocks received so far are kept; try again to continue.");
+                            }
                         }
                         done++;
                         bytesDone += length;
                         Report();
                     }
-                    if (session != null) await session.SendAsync("BYE", cancel);
+                    if (session != null)
+                    {
+                        await session.SendAsync("BYE", cancel);
+                    }
                 }
                 finally
                 {
@@ -239,12 +290,19 @@ public partial class NetworkNodeCoordinator
             File.Move(part, final, overwrite: true);
             return final;
 
-            void Report() => progress?.Report(new TransferProgress
+            void Report()
             {
-                BlocksDone = done, BlockCount = count, BytesDone = bytesDone, TotalBytes = manifest.Size,
-                BlocksResumed = resumed, BlocksRetried = retried,
-                BytesPerSecond = fetched > 0 ? fetched / Math.Max(0.001, started.Elapsed.TotalSeconds) : 0
-            });
+                progress?.Report(new TransferProgress
+                {
+                    BlocksDone = done,
+                    BlockCount = count,
+                    BytesDone = bytesDone,
+                    TotalBytes = manifest.Size,
+                    BlocksResumed = resumed,
+                    BlocksRetried = retried,
+                    BytesPerSecond = fetched > 0 ? fetched / Math.Max(0.001, started.Elapsed.TotalSeconds) : 0
+                });
+            }
         });
     }
 
@@ -261,12 +319,17 @@ public partial class NetworkNodeCoordinator
             return data;
         }
         if (w.Length > 0 && w[0] == "ERROR")
+        {
             throw new VentrailException($"{session.Peer.Title}: {string.Join(' ', w[1..])}");
+        }
+
         throw new IOException("Unexpected answer");   // out of step: reconnect
     }
 
-    private static int BlockLength(TransferManifest m, int index) =>
-        (int)Math.Min(m.BlockSize, m.Size - (long)index * m.BlockSize);
+    private static int BlockLength(TransferManifest m, int index)
+    {
+        return (int)Math.Min(m.BlockSize, m.Size - (long)index * m.BlockSize);
+    }
 
     /// <summary>
     /// Connects to a peer and checks its hello: the computer that answers must have the peer id
@@ -288,7 +351,10 @@ public partial class NetworkNodeCoordinator
             await client.ConnectAsync(IPAddress.Parse(peer.IPAddress), peer.Port, timeout.Token);
             session.Start();
             hello = await session.ReadLineAsync(timeout.Token);
-            if (hello != null) link.Rtt.Observe(clock.Elapsed / 2);   // handshake + hello = about two round trips
+            if (hello != null)
+            {
+                link.Rtt.Observe(clock.Elapsed / 2);   // handshake + hello = about two round trips
+            }
         }
         catch (Exception ex) when (ex is SocketException or IOException ||
                                    ex is OperationCanceledException && !cancel.IsCancellationRequested)
@@ -344,20 +410,31 @@ public partial class NetworkNodeCoordinator
             {
                 throw new VentrailException($"{session.Peer.Title} is taking too long to answer. Try again later.");
             }
-            if (line?.Trim() == "WAIT") continue;
+            if (line?.Trim() == "WAIT")
+            {
+                continue;
+            }
+
             return line;
         }
     }
 
-    private static VentrailException ProtocolError(PeerNode peer, string[] words) =>
-        new($"{peer.Title} sent an answer Ventrail doesn't understand ({string.Join(' ', words).Truncate(60)}). " +
+    private static VentrailException ProtocolError(PeerNode peer, string[] words)
+    {
+        return new($"{peer.Title} sent an answer Ventrail doesn't understand ({string.Join(' ', words).Truncate(60)}). " +
             "Both computers may need the same Ventrail version.");
+    }
 
-    private static bool IsCommitHash(string s) => s.Length == 40 && s.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+    private static bool IsCommitHash(string s)
+    {
+        return s.Length == 40 && s.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+    }
 
     // Splits a line into at most max words; the last word keeps any spaces (used for names).
-    private static string[] Words(string? line, int max = int.MaxValue) =>
-        line is null ? Array.Empty<string>() : line.Trim().Split(' ', max, StringSplitOptions.RemoveEmptyEntries);
+    private static string[] Words(string? line, int max = int.MaxValue)
+    {
+        return line is null ? Array.Empty<string>() : line.Trim().Split(' ', max, StringSplitOptions.RemoveEmptyEntries);
+    }
 
     // ---------- sending side ----------
 
@@ -374,7 +451,10 @@ public partial class NetworkNodeCoordinator
                 using var idle = CancellationTokenSource.CreateLinkedTokenSource(stop);
                 idle.CancelAfter(IdleTimeout);
                 string[] w = Words(await session.ReadLineAsync(idle.Token));
-                if (w.Length == 0 || w[0] == "BYE") return;
+                if (w.Length == 0 || w[0] == "BYE")
+                {
+                    return;
+                }
 
                 await ActLikeTestNetworkAsync(stop);
                 switch (w[0])
@@ -403,7 +483,11 @@ public partial class NetworkNodeCoordinator
     private async Task SendListAsync(Session session, CancellationToken stop)
     {
         KeyValuePair<string, Offer>[] offers;
-        lock (_gate) offers = _provided.ToArray();
+        lock (_gate)
+        {
+            offers = _provided.ToArray();
+        }
+
         var lines = new List<string>();
         foreach (var (key, offer) in offers)
         {
@@ -411,18 +495,27 @@ public partial class NetworkNodeCoordinator
             {
                 using var repo = new Repository(offer.Path);
                 if (repo.Head.Tip is { } tip)
+                {
                     lines.Add($"{key} {tip.Sha} {SafeWord(repo.Head.FriendlyName)} {offer.Name}");
+                }
             }
             catch (Exception ex) when (ex is LibGit2SharpException or IOException) { }   // folder moved or deleted
         }
         await session.SendAsync($"REPOS {lines.Count}", stop);
-        foreach (string line in lines) await session.SendAsync(line, stop);
+        foreach (string line in lines)
+        {
+            await session.SendAsync(line, stop);
+        }
     }
 
     private async Task SendManifestAsync(Session session, string key, CancellationToken stop)
     {
         Offer? offer;
-        lock (_gate) _provided.TryGetValue(key, out offer);
+        lock (_gate)
+        {
+            _provided.TryGetValue(key, out offer);
+        }
+
         if (offer is null)
         {
             await session.SendAsync("ERROR This repository is not shared from this computer.", stop);
@@ -435,7 +528,10 @@ public partial class NetworkNodeCoordinator
             // Week 13: say "WAIT" every 2 s while packing, so the receiver knows we are alive.
             var prepare = PreparePackageAsync(key, offer, stop);
             while (await Task.WhenAny(prepare, Task.Delay(KeepAliveEvery, stop)) != prepare)
+            {
                 await session.SendAsync("WAIT", stop);
+            }
+
             package = await prepare;
         }
         catch (Exception ex) when (ex is VentrailException or LibGit2SharpException or IOException or UnauthorizedAccessException)
@@ -446,13 +542,20 @@ public partial class NetworkNodeCoordinator
         var info = package.Info;
         await session.SendAsync($"MANIFEST {info.Sha256} {info.Size} {BlockHashing.BlockSize} {package.BlockHashes.Count} " +
                                 $"{info.HeadHash} {SafeWord(info.Branch)} {offer.Name}", stop);
-        foreach (string hash in package.BlockHashes) await session.SendAsync(hash, stop);
+        foreach (string hash in package.BlockHashes)
+        {
+            await session.SendAsync(hash, stop);
+        }
     }
 
     private async Task SendBlockAsync(Session session, string packageHash, int index, CancellationToken stop)
     {
         CachedPackage? package;
-        lock (_gate) package = _packages.Values.FirstOrDefault(p => p.Info.Sha256 == packageHash);
+        lock (_gate)
+        {
+            package = _packages.Values.FirstOrDefault(p => p.Info.Sha256 == packageHash);
+        }
+
         if (package is null || index < 0 || index >= package.BlockHashes.Count)
         {
             await session.SendAsync("ERROR That version is no longer offered. Ask for the latest version again.", stop);
@@ -480,21 +583,41 @@ public partial class NetworkNodeCoordinator
         {
             string head;
             using (var repo = new Repository(offer.Path))
+            {
                 head = repo.Head.Tip?.Sha ?? throw new VentrailException("Nothing has been saved yet.");
+            }
 
             CachedPackage? cached;
-            lock (_gate) _packages.TryGetValue(key, out cached);
-            if (cached != null && cached.Info.HeadHash == head && File.Exists(cached.Info.FilePath)) return cached;
+            lock (_gate)
+            {
+                _packages.TryGetValue(key, out cached);
+            }
 
-            if (TestConditions is { ExtraPackingTime: var extra } && extra > TimeSpan.Zero) await Task.Delay(extra, stop);
+            if (cached != null && cached.Info.HeadHash == head && File.Exists(cached.Info.FilePath))
+            {
+                return cached;
+            }
+
+            if (TestConditions is { ExtraPackingTime: var extra } && extra > TimeSpan.Zero)
+            {
+                await Task.Delay(extra, stop);
+            }
+
             var package = await Task.Run(() =>
             {
                 var info = VersionPackage.Create(offer.Path, Outbox);
                 return new CachedPackage(info, BlockHashing.BlockHashes(info.FilePath));
             }, stop);
-            lock (_gate) _packages[key] = package;
+            lock (_gate)
+            {
+                _packages[key] = package;
+            }
+
             if (cached != null && cached.Info.FilePath != package.Info.FilePath)
+            {
                 TryDelete(cached.Info.FilePath);   // our own outdated package in the outbox
+            }
+
             return package;
         }
         finally
@@ -505,19 +628,42 @@ public partial class NetworkNodeCoordinator
 
     private static void TryDelete(string path)
     {
-        try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     // Tests only (NetworkConditions): a frozen peer never answers; a slow one answers late.
     private async Task ActLikeTestNetworkAsync(CancellationToken stop)
     {
-        if (TestConditions is not { } c) return;
-        if (c.Stall) await Task.Delay(Timeout.Infinite, stop);
-        if (c.Latency > TimeSpan.Zero) await Task.Delay(c.Latency, stop);
+        if (TestConditions is not { } c)
+        {
+            return;
+        }
+
+        if (c.Stall)
+        {
+            await Task.Delay(Timeout.Infinite, stop);
+        }
+
+        if (c.Latency > TimeSpan.Zero)
+        {
+            await Task.Delay(c.Latency, stop);
+        }
     }
 
-    private static string SafeWord(string s) => string.IsNullOrWhiteSpace(s) ? "main" : s.Replace(' ', '-');
-    private static string OneLine(string s) => s.Replace('\r', ' ').Replace('\n', ' ');
+    private static string SafeWord(string s)
+    {
+        return string.IsNullOrWhiteSpace(s) ? "main" : s.Replace(' ', '-');
+    }
+
+    private static string OneLine(string s)
+    {
+        return s.Replace('\r', ' ').Replace('\n', ' ');
+    }
 
     /// <summary>One TCP connection: text lines and raw block bytes over the same buffered stream.</summary>
     private sealed class Session : IDisposable
@@ -545,7 +691,10 @@ public partial class NetworkNodeCoordinator
         public async Task SendAsync(string line, CancellationToken cancel, bool flush = true)
         {
             await Io.WriteAsync(Encoding.UTF8.GetBytes(line + "\n"), cancel);
-            if (flush) await Io.FlushAsync(cancel);
+            if (flush)
+            {
+                await Io.FlushAsync(cancel);
+            }
         }
 
         // bytesPerSecond > 0 only in tests (NetworkConditions): sends in small pieces at that speed.
@@ -574,14 +723,28 @@ public partial class NetworkNodeCoordinator
             var one = new byte[1];
             while (true)
             {
-                if (await Io.ReadAsync(one, cancel) == 0) return bytes.Count == 0 ? null : throw new IOException("Connection closed mid-line");
-                if (one[0] == '\n') return Encoding.UTF8.GetString(bytes.ToArray());
+                if (await Io.ReadAsync(one, cancel) == 0)
+                {
+                    return bytes.Count == 0 ? null : throw new IOException("Connection closed mid-line");
+                }
+
+                if (one[0] == '\n')
+                {
+                    return Encoding.UTF8.GetString(bytes.ToArray());
+                }
+
                 bytes.Add(one[0]);
-                if (bytes.Count > MaxLine) throw new IOException("Line too long");
+                if (bytes.Count > MaxLine)
+                {
+                    throw new IOException("Line too long");
+                }
             }
         }
 
-        public Task ReadExactlyAsync(byte[] buffer, CancellationToken cancel) => Io.ReadExactlyAsync(buffer, cancel).AsTask();
+        public Task ReadExactlyAsync(byte[] buffer, CancellationToken cancel)
+        {
+            return Io.ReadExactlyAsync(buffer, cancel).AsTask();
+        }
 
         public void Dispose()
         {
@@ -593,5 +756,8 @@ public partial class NetworkNodeCoordinator
 
 internal static class StringExtensions
 {
-    public static string Truncate(this string s, int max) => s.Length <= max ? s : s[..max] + "...";
+    public static string Truncate(this string s, int max)
+    {
+        return s.Length <= max ? s : s[..max] + "...";
+    }
 }

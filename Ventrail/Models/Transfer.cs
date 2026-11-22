@@ -28,7 +28,10 @@ public class OfferedRepository
         var invalid = System.IO.Path.GetInvalidFileNameChars();   // includes \ / : * ? " < > |
         string clean = new string((name ?? string.Empty).Select(ch => invalid.Contains(ch) || char.IsControl(ch) ? '-' : ch).ToArray());
         clean = clean.Trim(' ', '.', '-');                         // no "..", no trailing dot or space
-        if (clean.Length > 60) clean = clean[..60].TrimEnd(' ', '.');
+        if (clean.Length > 60)
+        {
+            clean = clean[..60].TrimEnd(' ', '.');
+        }
 
         // Windows device names (CON, NUL, COM1...) can't be folders, with or without an extension.
         string stem = clean.Split('.')[0].Trim().ToUpperInvariant();

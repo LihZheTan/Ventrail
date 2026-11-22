@@ -8,7 +8,19 @@ using Ventrail.Services.Implementations;
 // Ventrail saves and restores notebooks like any file, and compares them cell by cell.
 
 int pass = 0, fail = 0;
-void Check(string name, bool ok, string detail = "") { if (ok) pass++; else fail++; Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}"); }
+void Check(string name, bool ok, string detail = "")
+{
+    if (ok)
+    {
+        pass++;
+    }
+    else
+    {
+        fail++;
+    }
+
+    Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}");
+}
 
 // ---- helpers that write notebooks the way Jupyter does ----
 string png = Convert.ToBase64String(new byte[600]);   // stands in for an embedded chart
@@ -22,34 +34,82 @@ string[] SourceLines(string source)
 object Code(string source, int? run = null, string? result = null, string? id = null, string? image = null)
 {
     var outputs = new List<object>();
-    if (result != null) outputs.Add(new { output_type = "stream", name = "stdout", text = new[] { result + "\n" } });
-    if (image != null) outputs.Add(new { output_type = "display_data", data = new Dictionary<string, object> { ["image/png"] = image }, metadata = new { } });
+    if (result != null)
+    {
+        outputs.Add(new
+        {
+            output_type = "stream",
+            name = "stdout",
+            text = new[] { result + "\n" }
+        });
+    }
+
+    if (image != null)
+    {
+        outputs.Add(new
+        {
+            output_type = "display_data",
+            data = new Dictionary<string, object> { ["image/png"] = image },
+            metadata = new
+            {
+            }
+        });
+    }
+
     var cell = new Dictionary<string, object?>
     {
-        ["cell_type"] = "code", ["execution_count"] = run, ["metadata"] = new { },
-        ["outputs"] = outputs, ["source"] = SourceLines(source)
+        ["cell_type"] = "code",
+        ["execution_count"] = run,
+        ["metadata"] = new { },
+        ["outputs"] = outputs,
+        ["source"] = SourceLines(source)
     };
-    if (id != null) cell["id"] = id;
+    if (id != null)
+    {
+        cell["id"] = id;
+    }
+
     return cell;
 }
 object Text(string source, string? id = null)
 {
     var cell = new Dictionary<string, object?> { ["cell_type"] = "markdown", ["metadata"] = new { }, ["source"] = SourceLines(source) };
-    if (id != null) cell["id"] = id;
+    if (id != null)
+    {
+        cell["id"] = id;
+    }
+
     return cell;
 }
-string Notebook(params object[] cells) => JsonSerializer.Serialize(new
+string Notebook(params object[] cells)
 {
-    cells,
-    metadata = new
+    return JsonSerializer.Serialize(new
     {
-        kernelspec = new { display_name = "Python 3", language = "python", name = "python3" },
-        language_info = new { name = "python", version = "3.12.0" }
-    },
-    nbformat = 4,
-    nbformat_minor = 5
-}, new JsonSerializerOptions { WriteIndented = true });
-string Canonical(string json) { using var doc = JsonDocument.Parse(json); return JsonSerializer.Serialize(doc.RootElement); }
+        cells,
+        metadata = new
+        {
+            kernelspec = new
+            {
+                display_name = "Python 3",
+                language = "python",
+                name = "python3"
+            },
+            language_info = new
+            {
+                name = "python",
+                version = "3.12.0"
+            }
+        },
+        nbformat = 4,
+        nbformat_minor = 5
+    }, new JsonSerializerOptions { WriteIndented = true });
+}
+
+string Canonical(string json)
+{
+    using var doc = JsonDocument.Parse(json);
+    return JsonSerializer.Serialize(doc.RootElement);
+}
 
 // ---------- reading notebooks ----------
 Console.WriteLine("--- reading ---");
@@ -79,7 +139,11 @@ Check("empty notebook is fine", NotebookReader.TryParse("{\"cells\":[],\"metadat
 Console.WriteLine("--- tracking in a repository ---");
 string root = Path.Combine(Path.GetTempPath(), "ventrail-nb-" + Guid.NewGuid().ToString("N")[..6]);
 Directory.CreateDirectory(root);
-string P(string rel) => Path.Combine(root, rel);
+string P(string rel)
+{
+    return Path.Combine(root, rel);
+}
+
 var rm = new RepositoryManager();
 rm.InitRepository(root);
 
@@ -200,7 +264,8 @@ Check("restoring brings back the saved notebook, outputs included", Canonical(Fi
 Check("  ...and nothing is left to save", rm.ScanWorkingDirectory().Count == 0);
 
 File.WriteAllText(P("analysis.ipynb"), Notebook(Text("# Sales analysis\nLoad the data first."), Code("print('second version')", 1, "second version")));
-rm.StageAll(); rm.Commit("Shorter notebook", "T");
+rm.StageAll();
+rm.Commit("Shorter notebook", "T");
 Check("two versions in the history", rm.GetCommitHistory().Count == 2);
 rm.RestoreFileFromCommit("analysis.ipynb", first);
 var dBack = rm.GetFileDiff("analysis.ipynb");
@@ -215,7 +280,11 @@ Check("deleted notebook: cells shown as removed",
 // Temporary repository: Git marks its object files read-only, so clear that before deleting.
 try
 {
-    foreach (string f in Directory.GetFiles(root, "*", SearchOption.AllDirectories)) File.SetAttributes(f, FileAttributes.Normal);
+    foreach (string f in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
+    {
+        File.SetAttributes(f, FileAttributes.Normal);
+    }
+
     Directory.Delete(root, true);
 }
 catch (IOException) { }

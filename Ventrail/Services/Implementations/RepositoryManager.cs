@@ -66,7 +66,9 @@ public class RepositoryManager : IRepositoryManager
     public bool InitRepository(string path)
     {
         if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+        {
             return false;
+        }
 
         string folder = Path.GetFullPath(path);
 
@@ -80,9 +82,11 @@ public class RepositoryManager : IRepositoryManager
         {
             string? reason = WhyFolderIsTooBroad(folder);
             if (reason != null)
+            {
                 throw new VentrailException(
                     $"Ventrail can't track \"{folder}\" because it is {reason}. " +
                     "Choose a project folder inside it instead (for example a folder in Documents).");
+            }
 
             gitDir = Translate(() => Repository.Init(folder), folder);
             WriteDefaultGitignore(folder);
@@ -92,9 +96,12 @@ public class RepositoryManager : IRepositoryManager
         {
             using var repo = new Repository(gitDir);
             if (repo.Info.IsBare)
+            {
                 throw new VentrailException(
                     "This folder is a Git storage folder without working files, so there is nothing to track. " +
                     "Choose the folder that contains your documents.");
+            }
+
             return repo.Info.WorkingDirectory;
         }, folder);
 
@@ -105,7 +112,9 @@ public class RepositoryManager : IRepositoryManager
 
     // ---------- Fig 3.3: staging interface ----------
 
-    public List<FileAsset> ScanWorkingDirectory() => Use(repo =>
+    public List<FileAsset> ScanWorkingDirectory()
+    {
+        return Use(repo =>
     {
         var options = new StatusOptions
         {
@@ -119,7 +128,9 @@ public class RepositoryManager : IRepositoryManager
         {
             FileStatus s = entry.State;
             if (s == FileStatus.Unaltered || s.HasFlag(FileStatus.Ignored) || IsNestedRepository(entry.FilePath))
+            {
                 continue;
+            }
 
             result.Add(new FileAsset
             {
@@ -133,70 +144,108 @@ public class RepositoryManager : IRepositoryManager
 
         return result.OrderBy(f => f.FilePath).ToList();
     });
+    }
 
     // Git's own commands read a file name as a pattern: in "report[1].docx" the [1] means "the
     // character 1", so staging, restoring or discarding that file also hit "report1.docx".
     // Ventrail therefore never passes names to those commands. It works on the exact path instead.
 
-    public void Stage(string filePath) => Use(repo =>
+    public void Stage(string filePath)
+    {
+        Use(repo =>
     {
         StageExact(repo, filePath);
         repo.Index.Write();
     }, filePath);
+    }
 
-    public void StageAll() => Use(repo =>
+    public void StageAll()
+    {
+        Use(repo =>
     {
         var options = new StatusOptions { IncludeUntracked = true, RecurseUntrackedDirs = true, IncludeIgnored = false };
         foreach (StatusEntry entry in repo.RetrieveStatus(options).ToList())
         {
             if (entry.State == FileStatus.Unaltered || entry.State.HasFlag(FileStatus.Ignored) ||
                 IsNestedRepository(entry.FilePath))
+            {
                 continue;
+            }
+
             StageExact(repo, entry.FilePath);
             // A renamed file is listed under its new name: the old name leaves the next version too.
             if (entry.IndexToWorkDirRenameDetails?.OldFilePath is { } oldPath && oldPath != entry.FilePath)
+            {
                 StageExact(repo, oldPath);
+            }
         }
         repo.Index.Write();
     });
+    }
 
     // Works even before the first commit exists.
-    public void Unstage(string filePath) => Use(repo =>
+    public void Unstage(string filePath)
+    {
+        Use(repo =>
     {
         // Back to what the last saved version has for this exact path (or nothing, for a new file).
         TreeEntry? saved = repo.Head.Tip?[filePath];
-        if (saved?.Target is Blob blob) repo.Index.Add(blob, filePath, saved.Mode);
-        else if (repo.Index[filePath] != null) repo.Index.Remove(filePath);
+        if (saved?.Target is Blob blob)
+        {
+            repo.Index.Add(blob, filePath, saved.Mode);
+        }
+        else if (repo.Index[filePath] != null)
+        {
+            repo.Index.Remove(filePath);
+        }
+
         repo.Index.Write();
     }, filePath);
+    }
 
     // Stages one exact path: the file as it is on disk, or its removal if it is gone.
     private void StageExact(Repository repo, string filePath)
     {
-        if (File.Exists(Path.Combine(RepoPath, filePath))) repo.Index.Add(filePath);
-        else if (repo.Index[filePath] != null) repo.Index.Remove(filePath);
+        if (File.Exists(Path.Combine(RepoPath, filePath)))
+        {
+            repo.Index.Add(filePath);
+        }
+        else if (repo.Index[filePath] != null)
+        {
+            repo.Index.Remove(filePath);
+        }
     }
 
     // A folder inside this one that has its own Git history (for example a project downloaded from
     // GitHub) is listed by Git as "folder/". Git can't save its files into this history, so
     // Ventrail leaves it alone instead of failing.
-    private static bool IsNestedRepository(string statusPath) => statusPath.EndsWith('/');
+    private static bool IsNestedRepository(string statusPath)
+    {
+        return statusPath.EndsWith('/');
+    }
 
     // Writes one file exactly as it is in a saved version, and stages it (like
     // "git checkout <version> -- file", but for the exact path only).
     private void WriteFromCommit(Repository repo, Commit commit, string filePath)
     {
         if (commit[filePath]?.Target is not Blob blob)
+        {
             throw new VentrailException($"\"{filePath}\" is not part of that version.");
+        }
 
         string full = Path.Combine(RepoPath, filePath);
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
         if (File.Exists(full) && File.GetAttributes(full).HasFlag(FileAttributes.ReadOnly))
+        {
             File.SetAttributes(full, FileAttributes.Normal);
+        }
 
         using (Stream content = blob.GetContentStream(new FilteringOptions(filePath)))
         using (var file = new FileStream(full, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
             content.CopyTo(file);
+        }
+
         repo.Index.Add(filePath);
     }
 
@@ -205,14 +254,18 @@ public class RepositoryManager : IRepositoryManager
     public bool Commit(string message, string author)
     {
         if (string.IsNullOrWhiteSpace(message))
+        {
             return false;
+        }
 
         bool committed = Use(repo =>
         {
             // Nothing staged -> nothing to commit. Check first instead of relying on the exception.
             bool hasStaged = repo.RetrieveStatus().Any(e => IsInIndex(e.State));
             if (!hasStaged)
+            {
                 return false;
+            }
 
             Signature signature = BuildSignature(repo, author);
             try
@@ -229,7 +282,10 @@ public class RepositoryManager : IRepositoryManager
         });
 
         if (committed)
+        {
             GetCommitHistory();
+        }
+
         return committed;
     }
 
@@ -239,7 +295,9 @@ public class RepositoryManager : IRepositoryManager
         {
             // Brand-new repository: HEAD points at a branch with no commits yet.
             if (repo.Head.Tip == null)
+            {
                 return new List<CommitNode>();
+            }
 
             var filter = new CommitFilter
             {
@@ -272,11 +330,17 @@ public class RepositoryManager : IRepositoryManager
 
     public string GetCurrentBranchName()
     {
-        if (!IsRepositoryOpen) return string.Empty;
+        if (!IsRepositoryOpen)
+        {
+            return string.Empty;
+        }
+
         return Use(repo => repo.Head.FriendlyName);   // "master" or "main" depending on the user's Git config
     }
 
-    public List<FileAsset> GetFilesInCommit(string commitHash) => Use(repo =>
+    public List<FileAsset> GetFilesInCommit(string commitHash)
+    {
+        return Use(repo =>
     {
         Commit commit = repo.Lookup<Commit>(commitHash)
             ?? throw new VentrailException($"Version {commitHash[..Math.Min(7, commitHash.Length)]} was not found.");
@@ -298,8 +362,11 @@ public class RepositoryManager : IRepositoryManager
             .OrderBy(f => f.FilePath)
             .ToList();
     });
+    }
 
-    public void RestoreFileFromCommit(string filePath, string commitHash) => Use(repo =>
+    public void RestoreFileFromCommit(string filePath, string commitHash)
+    {
+        Use(repo =>
     {
         // Same as "git checkout <commit> -- <file>": the old version replaces the file
         // on disk and is staged. Nothing in history is lost, and the user can still undo.
@@ -312,13 +379,18 @@ public class RepositoryManager : IRepositoryManager
         // "Restored" when nothing changed. (Writing or reading a locked file throws, which Use() translates.)
         if (commit[filePath]?.Target is Blob blob &&
             !FileMatchesBlob(Path.Combine(RepoPath, filePath), blob, filePath))
+        {
             throw new VentrailException(
                 $"\"{filePath}\" could not be replaced. If it is open in another program, close it and try again.");
+        }
     }, filePath);
+    }
 
     // ---------- Week 7: discard changes + diff viewer ----------
 
-    public string? DiscardChanges(string filePath) => Use(repo =>
+    public string? DiscardChanges(string filePath)
+    {
+        return Use(repo =>
     {
         StatusEntry entry = repo.RetrieveStatus(new StatusOptions { IncludeUntracked = true, RecurseUntrackedDirs = true })
             .FirstOrDefault(e => e.FilePath == filePath)
@@ -336,23 +408,32 @@ public class RepositoryManager : IRepositoryManager
         // 2. Files that were never saved are simply taken out of the staging area.
         if (head?[filePath] == null)
         {
-            if (repo.Index[filePath] != null) repo.Index.Remove(filePath);
+            if (repo.Index[filePath] != null)
+            {
+                repo.Index.Remove(filePath);
+            }
         }
 
         // 3. Files that have a saved version get it back, like "git checkout HEAD -- file".
         foreach (string path in new[] { filePath, oldPath }.Where(p => p != null && head?[p] != null).Select(p => p!).Distinct())
+        {
             WriteFromCommit(repo, head!, path);
+        }
+
         repo.Index.Write();
 
         return movedTo;
     }, filePath);
+    }
 
     // Bigger files are not compared line by line (too slow, and too long to read anyway).
     private const long MaxDiffBytes = 2 * 1024 * 1024;
     private const int MaxDiffLines = 3000;
     private const long MaxNotebookBytes = 25 * 1024 * 1024;
 
-    public FileDiff GetFileDiff(string filePath) => Use(repo =>
+    public FileDiff GetFileDiff(string filePath)
+    {
+        return Use(repo =>
     {
         var diff = new FileDiff { FilePath = filePath };
         string full = Path.Combine(RepoPath, filePath);
@@ -366,7 +447,10 @@ public class RepositoryManager : IRepositoryManager
         {
             FileDiff? notebook = NotebookDiff.Build(filePath,
                 saved?.GetContentText(), onDisk ? File.ReadAllText(full) : null, MaxDiffLines);
-            if (notebook != null) return notebook;
+            if (notebook != null)
+            {
+                return notebook;
+            }
             // Not a readable notebook (for example half-written): compare it as plain text below.
         }
 
@@ -397,7 +481,11 @@ public class RepositoryManager : IRepositoryManager
             int n = 0;
             foreach (string line in SplitLines(text))
             {
-                if (++n > MaxDiffLines) { diff.IsTruncated = true; break; }
+                if (++n > MaxDiffLines)
+                {
+                    diff.IsTruncated = true;
+                    break;
+                }
                 diff.Lines.Add(new DiffLine
                 {
                     Kind = kind,
@@ -424,11 +512,15 @@ public class RepositoryManager : IRepositoryManager
         diff.LinesAdded = diff.Lines.Count(l => l.Kind == DiffLineKind.Added);
         diff.LinesRemoved = diff.Lines.Count(l => l.Kind == DiffLineKind.Removed);
         if (diff.Lines.Count == 0)
+        {
             diff.Message = saved == null ? "This new file is empty."
                          : !onDisk ? "The deleted file was empty."
                          : "No text changes (only the file's details, such as line endings, changed).";
+        }
+
         return diff;
     }, filePath);
+    }
 
     // Turns unified-diff text ("@@ -3,4 +3,5 @@", "+added", "-removed", " same") into DiffLines.
     // Returns true if it stopped early because of MaxDiffLines.
@@ -438,7 +530,10 @@ public class RepositoryManager : IRepositoryManager
         bool inHunk = false;
         foreach (string raw in SplitLines(patch))
         {
-            if (lines.Count >= MaxDiffLines) return true;
+            if (lines.Count >= MaxDiffLines)
+            {
+                return true;
+            }
 
             if (raw.StartsWith("@@"))
             {
@@ -450,13 +545,21 @@ public class RepositoryManager : IRepositoryManager
                 lines.Add(new DiffLine { Kind = DiffLineKind.Hunk, Text = $"Around line {newNo}" });
                 continue;
             }
-            if (!inHunk || raw.StartsWith("\\")) continue;   // file header lines / "\ No newline at end of file"
+            if (!inHunk || raw.StartsWith("\\"))
+            {
+                continue;   // file header lines / "\ No newline at end of file"
+            }
 
             if (raw.StartsWith("+"))
+            {
                 lines.Add(new DiffLine { Kind = DiffLineKind.Added, Text = raw[1..], NewLineNumber = newNo++ });
+            }
             else if (raw.StartsWith("-"))
+            {
                 lines.Add(new DiffLine { Kind = DiffLineKind.Removed, Text = raw[1..], OldLineNumber = oldNo++ });
+            }
             else
+            {
                 lines.Add(new DiffLine
                 {
                     Kind = DiffLineKind.Context,
@@ -464,16 +567,24 @@ public class RepositoryManager : IRepositoryManager
                     OldLineNumber = oldNo++,
                     NewLineNumber = newNo++
                 });
+            }
         }
         return false;
     }
 
     private static IEnumerable<string> SplitLines(string text)
     {
-        if (text.Length == 0) yield break;
+        if (text.Length == 0)
+        {
+            yield break;
+        }
+
         var lines = text.Replace("\r\n", "\n").Split('\n');
         int count = text.EndsWith('\n') ? lines.Length - 1 : lines.Length;   // no empty line after the last newline
-        for (int i = 0; i < count; i++) yield return lines[i];
+        for (int i = 0; i < count; i++)
+        {
+            yield return lines[i];
+        }
     }
 
     // Same rule Git uses: a zero byte in the first 8000 bytes means "binary".
@@ -493,8 +604,9 @@ public class RepositoryManager : IRepositoryManager
     /// (a fast-forward) and there must be no unsaved changes here. Otherwise the received version
     /// is kept beside the local one (refs/remotes/&lt;computer&gt;/&lt;branch&gt;) and nothing is overwritten.
     /// </summary>
-    public ImportResult ImportVersionPackage(string packageFile, string headHash, string branch, string sourceName) =>
-        Use(repo =>
+    public ImportResult ImportVersionPackage(string packageFile, string headHash, string branch, string sourceName)
+    {
+        return Use(repo =>
         {
             VersionPackage.Unpack(packageFile, repo.Info.Path);
             var remote = VerifyReceivedHistory(repo, headHash);
@@ -505,28 +617,50 @@ public class RepositoryManager : IRepositoryManager
             bool dirty = repo.RetrieveStatus(new StatusOptions { IncludeUntracked = true }).IsDirty;
             if (local is null)   // nothing saved here yet: take the received history as it is
             {
-                if (dirty) return new ImportResult(ImportOutcome.WaitingForSave, remote.Sha, savedAs);
+                if (dirty)
+                {
+                    return new ImportResult(ImportOutcome.WaitingForSave, remote.Sha, savedAs);
+                }
+
                 repo.Refs.Add(repo.Refs.Head.TargetIdentifier, remote.Id, allowOverwrite: true);
                 repo.Reset(ResetMode.Hard, remote);
                 return new ImportResult(ImportOutcome.Updated, remote.Sha, savedAs);
             }
-            if (local.Sha == remote.Sha) return new ImportResult(ImportOutcome.AlreadyUpToDate, remote.Sha, savedAs);
+            if (local.Sha == remote.Sha)
+            {
+                return new ImportResult(ImportOutcome.AlreadyUpToDate, remote.Sha, savedAs);
+            }
 
             var mergeBase = repo.ObjectDatabase.FindMergeBase(local, remote);
-            if (mergeBase?.Sha == remote.Sha) return new ImportResult(ImportOutcome.AlreadyNewer, remote.Sha, savedAs);
-            if (mergeBase?.Sha != local.Sha) return new ImportResult(ImportOutcome.Diverged, remote.Sha, savedAs);
-            if (dirty) return new ImportResult(ImportOutcome.WaitingForSave, remote.Sha, savedAs);
+            if (mergeBase?.Sha == remote.Sha)
+            {
+                return new ImportResult(ImportOutcome.AlreadyNewer, remote.Sha, savedAs);
+            }
+
+            if (mergeBase?.Sha != local.Sha)
+            {
+                return new ImportResult(ImportOutcome.Diverged, remote.Sha, savedAs);
+            }
+
+            if (dirty)
+            {
+                return new ImportResult(ImportOutcome.WaitingForSave, remote.Sha, savedAs);
+            }
 
             repo.Reset(ResetMode.Hard, remote);   // fast-forward: the working folder was clean
             return new ImportResult(ImportOutcome.Updated, remote.Sha, savedAs);
         });
+    }
 
     /// <summary>Creates a new repository in an empty (or new) folder from a verified package and opens it.</summary>
     public bool InitFromPackage(string folder, string packageFile, string headHash, string branch)
     {
         folder = Path.GetFullPath(folder);
         if (Directory.Exists(folder) && Directory.EnumerateFileSystemEntries(folder).Any())
+        {
             throw new VentrailException($"\"{folder}\" is not empty. Choose an empty folder for the copy.");
+        }
+
         Directory.CreateDirectory(folder);
 
         Translate(() =>
@@ -558,16 +692,28 @@ public class RepositoryManager : IRepositoryManager
             var seenTrees = new HashSet<ObjectId>();
             void Walk(Tree tree)
             {
-                if (!seenTrees.Add(tree.Id)) return;
+                if (!seenTrees.Add(tree.Id))
+                {
+                    return;
+                }
+
                 foreach (var entry in tree)
                 {
-                    if (entry.TargetType == TreeEntryTargetType.Tree) Walk((Tree)entry.Target);
+                    if (entry.TargetType == TreeEntryTargetType.Tree)
+                    {
+                        Walk((Tree)entry.Target);
+                    }
                     else if (entry.TargetType == TreeEntryTargetType.Blob && repo.ObjectDatabase.RetrieveObjectMetadata(entry.Target.Id) is null)
+                    {
                         throw new VentrailException("A file in the received versions is missing, so nothing was changed.");
+                    }
                 }
             }
             foreach (var c in repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = head }))
+            {
                 Walk(c.Tree);
+            }
+
             return head;
         }
         catch (LibGit2SharpException ex)
@@ -603,8 +749,10 @@ public class RepositoryManager : IRepositoryManager
         }
     }
 
-    private void Use(Action<Repository> work, string? filePath = null) =>
+    private void Use(Action<Repository> work, string? filePath = null)
+    {
         Use(repo => { work(repo); return true; }, filePath);
+    }
 
     private static T Translate<T>(Func<T> work, string folder, string? filePath = null)
     {
@@ -644,17 +792,21 @@ public class RepositoryManager : IRepositoryManager
         }
     }
 
-    private static bool IsAccessProblem(string message) =>
-        message.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
+    private static bool IsAccessProblem(string message)
+    {
+        return message.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
         message.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
         message.Contains("being used by another process", StringComparison.OrdinalIgnoreCase) ||
         message.Contains("could not open", StringComparison.OrdinalIgnoreCase) ||
         message.Contains("failed to open", StringComparison.OrdinalIgnoreCase);
+    }
 
     private void EnsureOpen()
     {
         if (!IsRepositoryOpen)
+        {
             throw new VentrailException("No folder is open. Select a folder first.");
+        }
     }
 
     // ---------- Week 6: initialisation helpers ----------
@@ -666,7 +818,9 @@ public class RepositoryManager : IRepositoryManager
         string full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
         string? root = Path.GetPathRoot(full);
         if (root != null && string.Equals(Path.TrimEndingDirectorySeparator(root), full, StringComparison.OrdinalIgnoreCase))
+        {
             return "a whole drive";
+        }
 
         var broad = new (Environment.SpecialFolder Folder, string Reason)[]
         {
@@ -682,7 +836,9 @@ public class RepositoryManager : IRepositoryManager
             string path = Environment.GetFolderPath(special);
             if (!string.IsNullOrEmpty(path) &&
                 string.Equals(Path.TrimEndingDirectorySeparator(path), full, StringComparison.OrdinalIgnoreCase))
+            {
                 return reason;
+            }
         }
         return null;
     }
@@ -690,7 +846,11 @@ public class RepositoryManager : IRepositoryManager
     private static void WriteDefaultGitignore(string folder)
     {
         string path = Path.Combine(folder, ".gitignore");
-        if (File.Exists(path)) return;
+        if (File.Exists(path))
+        {
+            return;
+        }
+
         try
         {
             File.WriteAllText(path, DefaultGitignore);
@@ -706,14 +866,24 @@ public class RepositoryManager : IRepositoryManager
     // A file can disappear or be locked between the scan and reading its size; never fail the scan for that.
     private static long SafeFileSize(string fullPath)
     {
-        try { return File.Exists(fullPath) ? new FileInfo(fullPath).Length : 0; }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return 0; }
+        try
+        {
+            return File.Exists(fullPath) ? new FileInfo(fullPath).Length : 0;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return 0;
+        }
     }
 
     // Compares the file on disk with a stored version, after line-ending filters (what checkout writes).
     private static bool FileMatchesBlob(string fullPath, Blob blob, string filePath)
     {
-        if (!File.Exists(fullPath)) return false;
+        if (!File.Exists(fullPath))
+        {
+            return false;
+        }
+
         using var expected = blob.GetContentStream(new FilteringOptions(filePath));
         using var actual = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         var a = new byte[81920];
@@ -722,25 +892,50 @@ public class RepositoryManager : IRepositoryManager
         {
             int na = expected.ReadAtLeast(a, a.Length, throwOnEndOfStream: false);
             int nb = actual.ReadAtLeast(b, b.Length, throwOnEndOfStream: false);
-            if (na != nb || !a.AsSpan(0, na).SequenceEqual(b.AsSpan(0, nb))) return false;
-            if (na == 0) return true;
+            if (na != nb || !a.AsSpan(0, na).SequenceEqual(b.AsSpan(0, nb)))
+            {
+                return false;
+            }
+
+            if (na == 0)
+            {
+                return true;
+            }
         }
     }
 
-    private static bool IsInIndex(FileStatus s) =>
-        s.HasFlag(FileStatus.NewInIndex) ||
+    private static bool IsInIndex(FileStatus s)
+    {
+        return s.HasFlag(FileStatus.NewInIndex) ||
         s.HasFlag(FileStatus.ModifiedInIndex) ||
         s.HasFlag(FileStatus.DeletedFromIndex) ||
         s.HasFlag(FileStatus.RenamedInIndex) ||
         s.HasFlag(FileStatus.TypeChangeInIndex);
+    }
 
     // Plain-language labels for the UI (no "index", "workdir" jargon).
     private static string DescribeStatus(FileStatus s)
     {
-        if (s.HasFlag(FileStatus.Conflicted)) return "Conflict";
-        if (s.HasFlag(FileStatus.NewInWorkdir) || s.HasFlag(FileStatus.NewInIndex)) return "Added";
-        if (s.HasFlag(FileStatus.DeletedFromWorkdir) || s.HasFlag(FileStatus.DeletedFromIndex)) return "Deleted";
-        if (s.HasFlag(FileStatus.RenamedInWorkdir) || s.HasFlag(FileStatus.RenamedInIndex)) return "Renamed";
+        if (s.HasFlag(FileStatus.Conflicted))
+        {
+            return "Conflict";
+        }
+
+        if (s.HasFlag(FileStatus.NewInWorkdir) || s.HasFlag(FileStatus.NewInIndex))
+        {
+            return "Added";
+        }
+
+        if (s.HasFlag(FileStatus.DeletedFromWorkdir) || s.HasFlag(FileStatus.DeletedFromIndex))
+        {
+            return "Deleted";
+        }
+
+        if (s.HasFlag(FileStatus.RenamedInWorkdir) || s.HasFlag(FileStatus.RenamedInIndex))
+        {
+            return "Renamed";
+        }
+
         return "Modified";
     }
 

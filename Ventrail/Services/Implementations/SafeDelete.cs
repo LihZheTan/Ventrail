@@ -19,14 +19,20 @@ public static class SafeDelete
     {
         // A read-only file can still be discarded: the user asked for it, and a copy is kept.
         if (File.GetAttributes(fullPath).HasFlag(FileAttributes.ReadOnly))
+        {
             File.SetAttributes(fullPath, FileAttributes.Normal);
+        }
 
         // Fail early with the normal "being used by another process" error if another program
         // has the file open, instead of half-finishing.
-        using (new FileStream(fullPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
+        using (new FileStream(fullPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+        }
 
         if (IsFixedDrive(fullPath) && TrySendToRecycleBin(fullPath))
+        {
             return RecycleBin;
+        }
 
         string backupDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -45,7 +51,10 @@ public static class SafeDelete
             string? root = Path.GetPathRoot(fullPath);
             return root != null && !root.StartsWith(@"\\") && new DriveInfo(root).DriveType == DriveType.Fixed;
         }
-        catch (ArgumentException) { return false; }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     // ---- Shell API: SHFileOperation with FOF_ALLOWUNDO = "delete to Recycle Bin" ----

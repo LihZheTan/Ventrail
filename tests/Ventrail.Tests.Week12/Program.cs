@@ -14,12 +14,37 @@ using Ventrail.ViewModels;
 using TransferProgress = Ventrail.Models.TransferProgress;
 
 int pass = 0, fail = 0;
-void Check(string name, bool ok, string detail = "") { if (ok) pass++; else fail++; Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}"); }
+void Check(string name, bool ok, string detail = "")
+{
+    if (ok)
+    {
+        pass++;
+    }
+    else
+    {
+        fail++;
+    }
+
+    Console.WriteLine($"{(ok ? "PASS" : "FAIL")}  {name} {detail}");
+}
 T Throws<T>(string name, Action a, Func<T, bool>? ok = null) where T : Exception
 {
-    try { a(); Check(name, false, "(no exception)"); return null!; }
-    catch (T ex) { Check(name, ok?.Invoke(ex) ?? true, ex.Message); return ex; }
-    catch (Exception ex) { Check(name, false, $"{ex.GetType().Name}: {ex.Message}"); return null!; }
+    try
+    {
+        a();
+        Check(name, false, "(no exception)");
+        return null!;
+    }
+    catch (T ex)
+    {
+        Check(name, ok?.Invoke(ex) ?? true, ex.Message);
+        return ex;
+    }
+    catch (Exception ex)
+    {
+        Check(name, false, $"{ex.GetType().Name}: {ex.Message}");
+        return null!;
+    }
 }
 
 string root = Path.Combine(Path.GetTempPath(), "vw12-" + Guid.NewGuid().ToString("N")[..6]);
@@ -41,7 +66,11 @@ string Commit(string folder, string file, byte[] content, string message)
     Commands.Stage(r, file);
     return r.Commit(message, sig, sig).Sha;
 }
-byte[] Text(string s) => Encoding.UTF8.GetBytes(s);
+byte[] Text(string s)
+{
+    return Encoding.UTF8.GetBytes(s);
+}
+
 string v1 = Commit(src, "Chapter1.txt", Text("Introduction\n"), "v1");
 Commit(src, "data/scan.bin", bigBytes, "v2 big file");
 string v3 = Commit(src, "Chapter1.txt", Text("Introduction\nMore text\n"), "v3");
@@ -64,11 +93,15 @@ File.WriteAllBytes(junk, truncated);
 Throws<VentrailException>("truncated package refused", () => VersionPackage.Unpack(junk, Path.Combine(root, "x")));
 
 // ---------- two real nodes on loopback ----------
-NetworkNodeCoordinator Node(string name, int tcp, int udp) =>
-    new(IPAddress.Loopback, tcp, udp, Path.Combine(root, "node-" + name), @"C:\x\Ventrail.exe", Array.Empty<IPEndPoint>(), name);
+NetworkNodeCoordinator Node(string name, int tcp, int udp)
+{
+    return new(IPAddress.Loopback, tcp, udp, Path.Combine(root, "node-" + name), @"C:\x\Ventrail.exe", Array.Empty<IPEndPoint>(), name);
+}
+
 var S = Node("SENDER", 47101, 47102);
 var R = Node("RECEIVER", 47111, 47112);
-S.StartListening(); R.StartListening();
+S.StartListening();
+R.StartListening();
 S.ProvideRepository(repoKey, src, "Thesis");
 R.AddPeerByAddress("127.0.0.1:47102");
 
@@ -106,8 +139,20 @@ Throws<VentrailException>("non-empty folder refused", () => new RepositoryManage
 
 // Git's own check: a package with a damaged pack is refused even if its fingerprint "matched".
 var bytes = File.ReadAllBytes(pkg);
-int headerEnd = 0; for (int n = 0; n < 4; headerEnd++) if (bytes[headerEnd] == '\n') n++;
-for (int i = headerEnd + 40; i < headerEnd + 4000; i += 7) bytes[i] ^= 0x5a;
+int headerEnd = 0;
+for (int n = 0; n < 4; headerEnd++)
+{
+    if (bytes[headerEnd] == '\n')
+    {
+        n++;
+    }
+}
+
+for (int i = headerEnd + 40; i < headerEnd + 4000; i += 7)
+{
+    bytes[i] ^= 0x5a;
+}
+
 string damaged = Path.Combine(root, "damaged.vtpk");
 File.WriteAllBytes(damaged, bytes);
 Throws<VentrailException>("damaged versions fail Git's check", () => new RepositoryManager().InitFromPackage(Path.Combine(root, "Bad"), damaged, m.HeadHash, m.Branch));
@@ -119,7 +164,12 @@ Check("new version -> new manifest, old package removed from the sender's outbox
       m4.HeadHash == v4 && m4.PackageHash != m.PackageHash && !File.Exists(Path.Combine(root, "node-SENDER", "outbox", m.PackageHash + ".vtpk")));
 Throws<VentrailException>("blocks of an outdated package refused", () => R.DownloadPackage(new TransferManifest
 {
-    PeerId = m.PeerId, PackageHash = new string('1', 64), Size = m.Size, BlockSize = m.BlockSize, BlockHashes = m.BlockHashes, Name = "x"
+    PeerId = m.PeerId,
+    PackageHash = new string('1', 64),
+    Size = m.Size,
+    BlockSize = m.BlockSize,
+    BlockHashes = m.BlockHashes,
+    Name = "x"
 }, null, CancellationToken.None), ex => ex.Message.Contains("no longer offered"));
 string pkg4 = R.DownloadPackage(m4, null, CancellationToken.None);
 
@@ -128,9 +178,16 @@ var w = rm.ImportVersionPackage(pkg4, m4.HeadHash, m4.Branch, "SENDER");
 Check("unsaved changes -> files untouched, version kept aside", w.Outcome == ImportOutcome.WaitingForSave
       && File.ReadAllText(Path.Combine(copy, "Chapter1.txt")) == "my unsaved edit" && !File.Exists(Path.Combine(copy, "Chapter2.txt"))
       && w.SavedAs.StartsWith("refs/remotes/SENDER/"), w.SavedAs);
-using (var r = new Repository(copy)) Check("kept-aside version is in the repository", r.Refs[w.SavedAs]?.TargetIdentifier == v4);
+using (var r = new Repository(copy))
+{
+    Check("kept-aside version is in the repository", r.Refs[w.SavedAs]?.TargetIdentifier == v4);
+}
+
 using (var r = new Repository(copy))   // user undoes their edit (what Discard does)
+{
     r.CheckoutPaths(r.Head.Tip.Sha, new[] { "Chapter1.txt" }, new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
+}
+
 var u = rm.ImportVersionPackage(pkg4, m4.HeadHash, m4.Branch, "SENDER");
 Check("clean -> fast-forward, files updated", u.Outcome == ImportOutcome.Updated && File.Exists(Path.Combine(copy, "Chapter2.txt"))
       && rm.GetCommitHistory()[0].Hash == v4);
@@ -149,8 +206,14 @@ Check("both saved different versions -> diverged, nothing overwritten", d.Outcom
 int damagedSent = 0;
 S.TestBlockFilter = (i, data) =>
 {
-    if (i != 1 || Interlocked.Increment(ref damagedSent) > 2) return data;
-    var bad = (byte[])data.Clone(); bad[100] ^= 0xff; return bad;   // block 1 arrives damaged twice
+    if (i != 1 || Interlocked.Increment(ref damagedSent) > 2)
+    {
+        return data;
+    }
+
+    var bad = (byte[])data.Clone();
+    bad[100] ^= 0xff;
+    return bad;   // block 1 arrives damaged twice
 };
 var m5b = R.RequestVersion(S.LocalPeerId, repoKey);
 File.Delete(R.DownloadPackage(m5, null, CancellationToken.None));   // force a fresh download
@@ -171,9 +234,16 @@ Check("try again -> resumes, only missing blocks fetched", BlockHashing.FileSha2
 
 File.Delete(resumed);
 var cts = new CancellationTokenSource();
-var cancelAfterOne = new SyncProgress(p => { if (p.BlocksDone >= 1) cts.Cancel(); });
-try { R.DownloadPackage(m5b, cancelAfterOne, cts.Token); Check("cancel stops the download", false); }
-catch (OperationCanceledException) { Check("cancel stops the download", true); }
+var cancelAfterOne = new SyncProgress(p => { if (p.BlocksDone >= 1) { cts.Cancel(); } });
+try
+{
+    R.DownloadPackage(m5b, cancelAfterOne, cts.Token);
+    Check("cancel stops the download", false);
+}
+catch (OperationCanceledException)
+{
+    Check("cancel stops the download", true);
+}
 reports.Clear();
 Check("after cancel -> resumes", BlockHashing.FileSha256(R.DownloadPackage(m5b, sync, CancellationToken.None)) == m5b.PackageHash
       && reports[0].BlocksResumed >= 1, $"resumed={reports[0].BlocksResumed}");
@@ -199,9 +269,19 @@ Throws<VentrailException>("sender offline -> friendly error", () => R.RequestVer
 R.StopListening();
 
 // ---------- ViewModel (demo services) ----------
-MainDashboardViewModel NewVm(INetworkNodeCoordinator net) => new(new MockRepositoryManager(),
+MainDashboardViewModel NewVm(INetworkNodeCoordinator net)
+{
+    return new(new MockRepositoryManager(),
     new IntelligentStorageEngine(@"C:\nope.zip"), net, new SpecializedFileHandler(), new InMemoryRecentRepositoryStore(), true);
-async Task WaitFor(Func<bool> cond) { for (int i = 0; i < 100 && !cond(); i++) await Task.Delay(50); }
+}
+
+async Task WaitFor(Func<bool> cond)
+{
+    for (int i = 0; i < 100 && !cond(); i++)
+    {
+        await Task.Delay(50);
+    }
+}
 
 var mock = new MockNetworkNodeCoordinator();
 var vm = NewVm(mock);
@@ -255,11 +335,26 @@ await dl2;
 Check("Cancel -> stops with 'kept' message, nothing opened", vm2.ToastMessage.Contains("Download cancelled") && !vm2.IsTransferring
       && vm2.CurrentDirectory == @"C:\Demo\Thesis", vm2.ToastMessage);
 
-try { foreach (var f in Directory.GetFiles(root, "*", SearchOption.AllDirectories)) File.SetAttributes(f, FileAttributes.Normal); Directory.Delete(root, true); } catch (Exception) { }
+try
+{
+    foreach (var f in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
+    {
+        File.SetAttributes(f, FileAttributes.Normal);
+    }
+
+    Directory.Delete(root, true);
+}
+catch (Exception)
+{
+    // Only temporary test files: if Windows still holds one, leave it for the next clean-up.
+}
 Console.WriteLine($"\n{pass} passed, {fail} failed.");
 
 // Reports on the calling thread (Progress<T> would post to the thread pool and arrive late).
 class SyncProgress(Action<TransferProgress> report) : IProgress<TransferProgress>
 {
-    public void Report(TransferProgress value) => report(value);
+    public void Report(TransferProgress value)
+    {
+        report(value);
+    }
 }

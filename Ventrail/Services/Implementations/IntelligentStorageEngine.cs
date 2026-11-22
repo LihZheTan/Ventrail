@@ -67,20 +67,36 @@ public class IntelligentStorageEngine : IIntelligentStorageEngine
     public string GenerateRecommendation(string fileType, long fileSize)
     {
         string ext = Path.GetExtension(fileType);
-        if (ext.Length == 0) ext = "." + fileType.TrimStart('.');
-        if (!IsModelLoaded) return SuggestionWriter.StorageTip(null, fileSize);
+        if (ext.Length == 0)
+        {
+            ext = "." + fileType.TrimStart('.');
+        }
+
+        if (!IsModelLoaded)
+        {
+            return SuggestionWriter.StorageTip(null, fileSize);
+        }
+
         var verdict = Predict(FileFeatureExtractor.Estimate(ext, fileSize), ext, fileSize, estimate: true);
         return SuggestionWriter.StorageTip(verdict, fileSize);
     }
 
-    public string GetStorageTip(FileAsset file) =>
-        file.TrackStatus == "Deleted" ? string.Empty : SuggestionWriter.StorageTip(file.Classification, file.SizeInBytes);
+    public string GetStorageTip(FileAsset file)
+    {
+        return file.TrackStatus == "Deleted" ? string.Empty : SuggestionWriter.StorageTip(file.Classification, file.SizeInBytes);
+    }
 
-    public CommitSuggestion SuggestCommit(IReadOnlyList<FileAsset> stagedFiles) => SuggestionWriter.Suggest(stagedFiles);
+    public CommitSuggestion SuggestCommit(IReadOnlyList<FileAsset> stagedFiles)
+    {
+        return SuggestionWriter.Suggest(stagedFiles);
+    }
 
     public FileClassification? ClassifyFile(string fullPath, long sizeInBytes)
     {
-        if (!IsModelLoaded) return null;
+        if (!IsModelLoaded)
+        {
+            return null;
+        }
 
         string ext = Path.GetExtension(fullPath);
         FileFeatures features;
@@ -96,7 +112,9 @@ public class IntelligentStorageEngine : IIntelligentStorageEngine
                 // because Windows' antivirus checks it.)
                 if (_cache.TryGetValue(fullPath, out var hit) &&
                     hit.Size == info.Length && hit.Modified == info.LastWriteTimeUtc)
+                {
                     return hit.Result;
+                }
 
                 features = FileFeatureExtractor.FromFile(fullPath);
                 sizeInBytes = info.Length;
@@ -116,14 +134,20 @@ public class IntelligentStorageEngine : IIntelligentStorageEngine
 
         var result = Predict(features, ext, sizeInBytes, estimate);
         if (!estimate && info != null)
+        {
             _cache[fullPath] = (info.Length, info.LastWriteTimeUtc, result);
+        }
+
         return result;
     }
 
     private FileClassification Predict(FileFeatures features, string ext, long sizeInBytes, bool estimate)
     {
         HeavyPrediction prediction;
-        lock (_gate) prediction = _predictor!.Predict(features);
+        lock (_gate)
+        {
+            prediction = _predictor!.Predict(features);
+        }
 
         return new FileClassification
         {
@@ -144,7 +168,11 @@ public class IntelligentStorageEngine : IIntelligentStorageEngine
     {
         lock (_gate)
         {
-            if (_loadAttempted) return;
+            if (_loadAttempted)
+            {
+                return;
+            }
+
             _loadAttempted = true;
             try
             {
@@ -168,35 +196,41 @@ public class IntelligentStorageEngine : IIntelligentStorageEngine
         }
     }
 
-    private static bool IsCompressedFormat(string signature) => signature is
+    private static bool IsCompressedFormat(string signature)
+    {
+        return signature is
         "zip" or "png" or "jpeg" or "gif" or "mp4" or "mkv" or "gzip" or "7z" or "rar" or "mp3" or "flac" or "pdf";
+    }
 
     // Friendly names for the UI. The extension refines the header (a "zip" may be a Word file).
-    private static string FormatName(string signature, string extension) => extension.ToLowerInvariant() switch
+    private static string FormatName(string signature, string extension)
     {
-        ".docx" or ".doc" => "Word document",
-        ".xlsx" or ".xls" => "Excel spreadsheet",
-        ".pptx" or ".ppt" => "PowerPoint presentation",
-        ".svs" => "whole-slide image",
-        ".psd" => "Photoshop file",
-        _ => signature switch
+        return extension.ToLowerInvariant() switch
         {
-            "zip" => "ZIP archive",
-            "png" => "PNG picture",
-            "jpeg" => "JPEG picture",
-            "gif" => "GIF picture",
-            "pdf" => "PDF document",
-            "tiff" => "TIFF image",
-            "psd" => "Photoshop file",
-            "ole" => "Office document",
-            "exe" => "program file",
-            "gzip" or "7z" or "rar" => "compressed archive",
-            "riff" => "audio/video file",
-            "mp3" or "flac" => "audio file",
-            "mp4" or "mkv" => "video",
-            "font" => "font",
-            "text" => "text file",
-            _ => "file"
-        }
-    };
+            ".docx" or ".doc" => "Word document",
+            ".xlsx" or ".xls" => "Excel spreadsheet",
+            ".pptx" or ".ppt" => "PowerPoint presentation",
+            ".svs" => "whole-slide image",
+            ".psd" => "Photoshop file",
+            _ => signature switch
+            {
+                "zip" => "ZIP archive",
+                "png" => "PNG picture",
+                "jpeg" => "JPEG picture",
+                "gif" => "GIF picture",
+                "pdf" => "PDF document",
+                "tiff" => "TIFF image",
+                "psd" => "Photoshop file",
+                "ole" => "Office document",
+                "exe" => "program file",
+                "gzip" or "7z" or "rar" => "compressed archive",
+                "riff" => "audio/video file",
+                "mp3" or "flac" => "audio file",
+                "mp4" or "mkv" => "video",
+                "font" => "font",
+                "text" => "text file",
+                _ => "file"
+            }
+        };
+    }
 }

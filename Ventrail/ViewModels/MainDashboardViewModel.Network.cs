@@ -95,7 +95,10 @@ public partial class MainDashboardViewModel
                     .Where(a => !a.StartsWith("169.254."))   // "no network" fallback addresses
                     .Distinct().Take(2).ToArray();
             }
-            catch (System.Net.NetworkInformation.NetworkInformationException) { addresses = Array.Empty<string>(); }
+            catch (System.Net.NetworkInformation.NetworkInformationException)
+            {
+                addresses = Array.Empty<string>();
+            }
             return addresses.Length == 0 ? LocalDisplayName : $"{LocalDisplayName} ({string.Join(", ", addresses)})";
         }
     }
@@ -114,8 +117,14 @@ public partial class MainDashboardViewModel
         _uiContext = SynchronizationContext.Current;
         _network.PeersChanged += (_, _) =>
         {
-            if (_uiContext is null) RefreshPeerList();
-            else _uiContext.Post(_ => RefreshPeerList(), null);
+            if (_uiContext is null)
+            {
+                RefreshPeerList();
+            }
+            else
+            {
+                _uiContext.Post(_ => RefreshPeerList(), null);
+            }
         };
     }
 
@@ -124,6 +133,7 @@ public partial class MainDashboardViewModel
         ActivePeers.Clear();
         string? currentKey = CurrentRepositoryKey();
         if (IsSharingEnabled)
+        {
             foreach (var p in _network.GetKnownPeers())
             {
                 p.Repositories = (_offersByPeer.TryGetValue(p.PeerId, out var offers) ? offers : new())
@@ -131,6 +141,8 @@ public partial class MainDashboardViewModel
                 p.HasCurrentRepository = _providerIds.Contains(p.PeerId) || p.Repositories.Any(o => o.IsCurrentRepository);
                 ActivePeers.Add(p);
             }
+        }
+
         OnPropertyChanged(nameof(HasPeers));
         OnPropertyChanged(nameof(PeersSummary));
     }
@@ -169,15 +181,24 @@ public partial class MainDashboardViewModel
     }
 
     [RelayCommand]
-    private Task FindPeersAsync() => RunBusyAsync("Searching for other computers...", async () =>
+    private Task FindPeersAsync()
     {
-        if (!await EnsureSharingReadyAsync()) return;
+        return RunBusyAsync("Searching for other computers...", async () =>
+    {
+        if (!await EnsureSharingReadyAsync())
+        {
+            return;
+        }
+
         await SearchPeersAsync();
         StatusText = PeersSummary;
     });
+    }
 
     [RelayCommand]
-    private Task AddPeerByAddressAsync() => RunBusyAsync("Contacting that computer...", async () =>
+    private Task AddPeerByAddressAsync()
+    {
+        return RunBusyAsync("Contacting that computer...", async () =>
     {
         string address = PeerAddress.Trim();
         if (address.Length == 0)
@@ -185,7 +206,11 @@ public partial class MainDashboardViewModel
             ShowToast("Type the other computer's IP address or name first.");
             return;
         }
-        if (!await EnsureSharingReadyAsync()) return;
+        if (!await EnsureSharingReadyAsync())
+        {
+            return;
+        }
+
         var peer = await Background(() => _network.AddPeerByAddress(address));
         if (peer is null)
         {
@@ -199,10 +224,13 @@ public partial class MainDashboardViewModel
         ShowToast($"Found {peer.Title}.", ToastKind.Success);
         StatusText = PeersSummary;
     });
+    }
 
     // The Connect button: checks that the computer really answers as that peer (TCP hello).
     [RelayCommand]
-    private Task ConnectPeerAsync(PeerNode? peer) => peer is null ? Task.CompletedTask
+    private Task ConnectPeerAsync(PeerNode? peer)
+    {
+        return peer is null ? Task.CompletedTask
         : RunBusyAsync($"Connecting to {peer.Title}...", async () =>
         {
             await Background(() => _network.EstablishConnection(peer.PeerId));
@@ -211,6 +239,7 @@ public partial class MainDashboardViewModel
             ShowToast($"Connected to {peer.Title}.", ToastKind.Success);
             StatusText = $"Connected to {peer.Title}.";
         });
+    }
 
     // ---------- Week 12: receiving versions (block streaming + hash checks) ----------
 
@@ -235,11 +264,20 @@ public partial class MainDashboardViewModel
     {
         var lists = await Task.WhenAll(peers.Select(async p =>
         {
-            try { return (p.PeerId, Offers: await Background(() => _network.ListRepositories(p.PeerId))); }
-            catch (Exception) { return (p.PeerId, Offers: new List<OfferedRepository>()); }   // older Ventrail or busy: no list
+            try
+            {
+                return (p.PeerId, Offers: await Background(() => _network.ListRepositories(p.PeerId)));
+            }
+            catch (Exception)   // older Ventrail or busy: no list
+            {
+                return (p.PeerId, Offers: new List<OfferedRepository>());
+            }
         }));
         _offersByPeer.Clear();
-        foreach (var (peerId, offers) in lists) _offersByPeer[peerId] = offers;
+        foreach (var (peerId, offers) in lists)
+        {
+            _offersByPeer[peerId] = offers;
+        }
     }
 
     /// <summary>
@@ -250,13 +288,20 @@ public partial class MainDashboardViewModel
     [RelayCommand]
     private async Task DownloadOfferAsync(OfferedRepository? offer)
     {
-        if (offer is null || IsBusy) return;
+        if (offer is null || IsBusy)
+        {
+            return;
+        }
+
         bool intoCurrent = offer.IsCurrentRepository && HasRepo;
         string? newCopy = null;
         if (!intoCurrent)
         {
             string? parent = PickFolder($"Choose where to put the copy of {offer.Name}");
-            if (parent is null) return;
+            if (parent is null)
+            {
+                return;
+            }
             // The name came from the other computer: use it as one folder name only, inside the chosen folder.
             newCopy = FreeFolderName(Path.Combine(parent, OfferedRepository.SafeFolderName(offer.Name)));
         }
@@ -286,7 +331,11 @@ public partial class MainDashboardViewModel
 
             var result = await Background(() =>
                 _repo.ImportVersionPackage(package, manifest.HeadHash, manifest.Branch, offer.PeerName));
-            if (result.Outcome != ImportOutcome.WaitingForSave) DeletePackage(package);   // kept to retry instantly
+            if (result.Outcome != ImportOutcome.WaitingForSave)
+            {
+                DeletePackage(package);   // kept to retry instantly
+            }
+
             await ReloadAsync();
             var (text, kind) = DescribeImport(result, offer);
             StatusText = text;
@@ -303,7 +352,10 @@ public partial class MainDashboardViewModel
     }
 
     [RelayCommand]
-    private void CancelTransfer() => _transferCancel?.Cancel();
+    private void CancelTransfer()
+    {
+        _transferCancel?.Cancel();
+    }
 
     private async Task<string> ReceiveAsync(TransferManifest manifest, string peerName)
     {
@@ -329,7 +381,10 @@ public partial class MainDashboardViewModel
             _bytesReceived += manifest.Size;
             SessionBytesShared = _bytesReceived + _network.BytesSent;
             if (last?.BlocksRetried > 0)
+            {
                 LogActivity($"{last.BlocksRetried} block(s) from {peerName} were damaged (failed the SHA-256 check) or too slow, and were asked for again");
+            }
+
             return package;
         }
         catch (OperationCanceledException)
@@ -345,52 +400,73 @@ public partial class MainDashboardViewModel
         }
     }
 
-    private static (string, ToastKind) DescribeImport(ImportResult result, OfferedRepository offer) => result.Outcome switch
+    private static (string, ToastKind) DescribeImport(ImportResult result, OfferedRepository offer)
     {
-        ImportOutcome.Updated => ($"Your files now match {offer.PeerName}'s latest version ({result.HeadHash[..7]}).", ToastKind.Success),
-        ImportOutcome.AlreadyUpToDate => ($"You already have {offer.PeerName}'s latest version.", ToastKind.Success),
-        ImportOutcome.AlreadyNewer => ($"You already have {offer.PeerName}'s version, plus newer ones of your own.", ToastKind.Success),
-        ImportOutcome.WaitingForSave => ($"{offer.PeerName}'s newer version arrived, but you have unsaved changes, so your files " +
-                                         "were not touched. Save or discard your changes, then click Get latest again.", ToastKind.Info),
-        ImportOutcome.Diverged => ($"You and {offer.PeerName} each saved different versions. Theirs was kept separately, so " +
-                                   "nothing of yours was overwritten. Combining both isn't supported yet.", ToastKind.Info),
-        _ => ($"Received {offer.Name} from {offer.PeerName}.", ToastKind.Success)
-    };
+        return result.Outcome switch
+        {
+            ImportOutcome.Updated => ($"Your files now match {offer.PeerName}'s latest version ({result.HeadHash[..7]}).", ToastKind.Success),
+            ImportOutcome.AlreadyUpToDate => ($"You already have {offer.PeerName}'s latest version.", ToastKind.Success),
+            ImportOutcome.AlreadyNewer => ($"You already have {offer.PeerName}'s version, plus newer ones of your own.", ToastKind.Success),
+            ImportOutcome.WaitingForSave => ($"{offer.PeerName}'s newer version arrived, but you have unsaved changes, so your files " +
+                                             "were not touched. Save or discard your changes, then click Get latest again.", ToastKind.Info),
+            ImportOutcome.Diverged => ($"You and {offer.PeerName} each saved different versions. Theirs was kept separately, so " +
+                                       "nothing of yours was overwritten. Combining both isn't supported yet.", ToastKind.Info),
+            _ => ($"Received {offer.Name} from {offer.PeerName}.", ToastKind.Success)
+        };
+    }
 
     // "Thesis", or "Thesis (2)" if a non-empty "Thesis" folder is already there.
     private static string FreeFolderName(string path)
     {
         string candidate = path;
         for (int n = 2; Directory.Exists(candidate) && Directory.EnumerateFileSystemEntries(candidate).Any(); n++)
+        {
             candidate = $"{path} ({n})";
+        }
+
         return candidate;
     }
 
     // The package was only a carrier: its versions are now inside the repository.
     private static void DeletePackage(string package)
     {
-        try { File.Delete(package); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        try
+        {
+            File.Delete(package);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
-    private static string FormatDuration(TimeSpan t) =>
-        t.TotalSeconds < 60 ? $"{Math.Max(1, (int)Math.Ceiling(t.TotalSeconds))} s"
+    private static string FormatDuration(TimeSpan t)
+    {
+        return t.TotalSeconds < 60 ? $"{Math.Max(1, (int)Math.Ceiling(t.TotalSeconds))} s"
         : t.TotalMinutes < 60 ? $"{(int)Math.Ceiling(t.TotalMinutes)} min"
         : $"{t.TotalHours:F1} h";
+    }
 
-    private static string FormatBytes(long bytes) => bytes switch
+    private static string FormatBytes(long bytes)
     {
-        < 1024 * 1024 => $"{bytes / 1024.0:F0} KB",
-        < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
-        _ => $"{bytes / (1024.0 * 1024 * 1024):F2} GB"
-    };
+        return bytes switch
+        {
+            < 1024 * 1024 => $"{bytes / 1024.0:F0} KB",
+            < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
+            _ => $"{bytes / (1024.0 * 1024 * 1024):F2} GB"
+        };
+    }
 
     // Class diagram: ShareRepository(String peerId). Week 10 made the firewall part real; Week 11
     // announces the repository in the DHT and finds who else already has a copy; Week 12 lets them
     // download its versions (served by NetworkNodeCoordinator.Transfer).
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
-    private Task ShareRepositoryAsync() => RunBusyAsync("Checking network permissions...", async () =>
+    private Task ShareRepositoryAsync()
     {
-        if (!await EnsureSharingReadyAsync()) return;
+        return RunBusyAsync("Checking network permissions...", async () =>
+    {
+        if (!await EnsureSharingReadyAsync())
+        {
+            return;
+        }
+
         string? key = CurrentRepositoryKey();
         if (key is null)
         {
@@ -405,7 +481,11 @@ public partial class MainDashboardViewModel
         await SearchPeersAsync();
         var providers = await Background(() => _network.FindProviders(key));
         _providerIds.Clear();
-        foreach (var p in providers) _providerIds.Add(p.PeerId);
+        foreach (var p in providers)
+        {
+            _providerIds.Add(p.PeerId);
+        }
+
         RefreshPeerList();
 
         LogActivity($"Shared {RepoName} on the network (key {key}); {providers.Count} other computer(s) have a copy");
@@ -414,6 +494,7 @@ public partial class MainDashboardViewModel
             : $"{RepoName} is shared. {providers.Count} computer(s) already have a copy.";
         ShowToast($"{RepoName} is now offered to computers on your network.", ToastKind.Success);
     });
+    }
 
     // The "Enable P2P Sharing" switch (its IsChecked has already flipped through the binding).
     [RelayCommand]
@@ -428,7 +509,11 @@ public partial class MainDashboardViewModel
         }
         return RunBusyAsync("Checking network permissions...", async () =>
         {
-            if (!await EnsureSharingReadyAsync()) return;
+            if (!await EnsureSharingReadyAsync())
+            {
+                return;
+            }
+
             ShowToast("Sharing is on. Other computers on your network can now reach Ventrail.", ToastKind.Success);
             await SearchPeersAsync();
             StatusText = PeersSummary;
@@ -436,14 +521,18 @@ public partial class MainDashboardViewModel
     }
 
     [RelayCommand]
-    private Task RemoveFirewallPermissionAsync() => RunBusyAsync("Removing firewall permission...", async () =>
+    private Task RemoveFirewallPermissionAsync()
+    {
+        return RunBusyAsync("Removing firewall permission...", async () =>
     {
         if (!await AskAsync(
                 "Remove firewall permission?",
                 "Ventrail stops sharing and its two Windows Firewall rules are deleted. Windows will ask you to " +
                 "confirm. You can allow sharing again at any time.",
                 "Remove", "Cancel", ""))
+        {
             return;
+        }
 
         _network.StopListening();
         IsSharingEnabled = false;
@@ -456,6 +545,7 @@ public partial class MainDashboardViewModel
         LogActivity("Firewall permission removed");
         ShowToast("Firewall permission removed. Sharing is off.", ToastKind.Success);
     });
+    }
 
     /// <summary>
     /// Fig 3.5: audit the firewall, ask the user if anything is missing, and only then open the
@@ -468,12 +558,16 @@ public partial class MainDashboardViewModel
         if (!status.AllAllowed)
         {
             if (!await AskAsync("Allow peer-to-peer sharing?", PermissionMessage(status), "Allow", "Not now", ""))
+            {
                 return Abort("Sharing cancelled. Ventrail needs firewall permission to share.",
                              "Sharing cancelled: firewall permission not given");
+            }
 
             if (!await Background(() => _network.RequestFirewallPermission(status.IsPublicNetwork)))
+            {
                 return Abort("Sharing cancelled: Windows' permission prompt was closed without allowing it.",
                              "Sharing cancelled: Windows admin prompt declined");
+            }
 
             status = Firewall = await Background(_network.CheckFirewall);
             if (!status.AllAllowed)
@@ -521,13 +615,21 @@ public partial class MainDashboardViewModel
                       "Only computers on the same local network can connect, and nothing is uploaded to the cloud. " +
                       "Windows will ask you to confirm (admin prompt), and you can remove the permission at any time.";
         if (status.IsPublicNetwork)
+        {
             text += "\n\nThis network is set to Public (for example café or campus Wi-Fi). Allowing makes Ventrail " +
                     "reachable by other devices on this same network. On a network you trust, you can set it to " +
                     "Private in Windows Settings > Network & internet.";
+        }
+
         if (status.Ports.Any(p => p.BlockedByOwnRule))
+        {
             text += "\n\nAn earlier \"block\" rule for Ventrail will be replaced.";
+        }
         else if (status.Ports.Any(p => p.Access == PortAccess.Blocked))
+        {
             text += "\n\nNote: another firewall setting is blocking these ports, so sharing may still not work.";
+        }
+
         return text;
     }
 }

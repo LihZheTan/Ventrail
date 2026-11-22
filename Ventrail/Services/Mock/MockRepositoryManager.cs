@@ -53,21 +53,40 @@ public class MockRepositoryManager : IRepositoryManager
         return true;
     }
 
-    public List<FileAsset> ScanWorkingDirectory() => _workingChanges.Select(Clone).ToList();
+    public List<FileAsset> ScanWorkingDirectory()
+    {
+        return _workingChanges.Select(Clone).ToList();
+    }
 
-    public void Stage(string filePath) => SetStaged(filePath, true);
-    public void Unstage(string filePath) => SetStaged(filePath, false);
-    public void StageAll() => _workingChanges.ForEach(f => f.IsStaged = true);
+    public void Stage(string filePath)
+    {
+        SetStaged(filePath, true);
+    }
+
+    public void Unstage(string filePath)
+    {
+        SetStaged(filePath, false);
+    }
+
+    public void StageAll()
+    {
+        _workingChanges.ForEach(f => f.IsStaged = true);
+    }
 
     public bool Commit(string message, string author)
     {
         // Demo-only test hook: a message starting with "!fail" simulates a disk error,
         // so the error state (red toast + activity log) can be shown in a presentation.
         if (message.TrimStart().StartsWith("!fail", StringComparison.OrdinalIgnoreCase))
+        {
             throw new System.IO.IOException("Simulated disk error (demo mode)");
+        }
 
         var staged = _workingChanges.Where(f => f.IsStaged).ToList();
-        if (staged.Count == 0 || string.IsNullOrWhiteSpace(message)) return false;
+        if (staged.Count == 0 || string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
 
         AddCommit(message.Trim(), string.IsNullOrWhiteSpace(author) ? "Demo User" : author, DateTime.Now,
             staged.Select(Clone).ToArray());
@@ -79,7 +98,10 @@ public class MockRepositoryManager : IRepositoryManager
     public ImportResult ImportVersionPackage(string packageFile, string headHash, string branch, string sourceName)
     {
         if (CommitHistory.Count > 0 && CommitHistory[0].Hash == headHash)
+        {
             return new ImportResult(ImportOutcome.AlreadyUpToDate, headHash, $"refs/remotes/{sourceName}/{branch}");
+        }
+
         AddCommit($"Update figures and Chapter 4 draft (from {sourceName})", "Lab partner", DateTime.Now.AddMinutes(-5),
             File("Chapter4_Results.docx", "Added", 512_000), File("figures/chart_age.png", "Modified", 214_000));
         CommitHistory[0].Hash = headHash;
@@ -94,17 +116,34 @@ public class MockRepositoryManager : IRepositoryManager
         return true;
     }
 
-    public List<CommitNode> GetCommitHistory() => CommitHistory.ToList();
-    public string GetCurrentBranchName() => "main";
+    public List<CommitNode> GetCommitHistory()
+    {
+        return CommitHistory.ToList();
+    }
 
-    public List<FileAsset> GetFilesInCommit(string commitHash) =>
-        _filesByCommit.TryGetValue(commitHash, out var files) ? files.Select(Clone).ToList() : new();
+    public string GetCurrentBranchName()
+    {
+        return "main";
+    }
+
+    public List<FileAsset> GetFilesInCommit(string commitHash)
+    {
+        return _filesByCommit.TryGetValue(commitHash, out var files) ? files.Select(Clone).ToList() : new();
+    }
 
     public void RestoreFileFromCommit(string filePath, string commitHash)
     {
-        if (_workingChanges.Any(f => f.FilePath == filePath)) return;
+        if (_workingChanges.Any(f => f.FilePath == filePath))
+        {
+            return;
+        }
+
         var original = GetFilesInCommit(commitHash).FirstOrDefault(f => f.FilePath == filePath);
-        if (original is null) return;
+        if (original is null)
+        {
+            return;
+        }
+
         original.TrackStatus = "Modified";
         original.IsStaged = true;
         _workingChanges.Add(original);
@@ -113,7 +152,11 @@ public class MockRepositoryManager : IRepositoryManager
     public string? DiscardChanges(string filePath)
     {
         var file = _workingChanges.FirstOrDefault(f => f.FilePath == filePath);
-        if (file is null) return null;
+        if (file is null)
+        {
+            return null;
+        }
+
         _workingChanges.Remove(file);
         return file.TrackStatus == "Deleted" ? null : "the Recycle Bin";
     }
@@ -164,21 +207,33 @@ public class MockRepositoryManager : IRepositoryManager
     private void SetStaged(string filePath, bool staged)
     {
         var file = _workingChanges.FirstOrDefault(f => f.FilePath == filePath);
-        if (file != null) file.IsStaged = staged;
+        if (file != null)
+        {
+            file.IsStaged = staged;
+        }
     }
 
-    private static FileAsset File(string path, string status, long size) => new()
+    private static FileAsset File(string path, string status, long size)
     {
-        FilePath = path,
-        FileName = System.IO.Path.GetFileName(path),
-        TrackStatus = status,
-        SizeInBytes = size
-    };
+        return new()
+        {
+            FilePath = path,
+            FileName = System.IO.Path.GetFileName(path),
+            TrackStatus = status,
+            SizeInBytes = size
+        };
+    }
 
     // Hand out copies so the ViewModel can't change the "repository" without calling Stage/Unstage.
-    private static FileAsset Clone(FileAsset f) => new()
+    private static FileAsset Clone(FileAsset f)
     {
-        FilePath = f.FilePath, FileName = f.FileName, TrackStatus = f.TrackStatus,
-        SizeInBytes = f.SizeInBytes, IsStaged = f.IsStaged
-    };
+        return new()
+        {
+            FilePath = f.FilePath,
+            FileName = f.FileName,
+            TrackStatus = f.TrackStatus,
+            SizeInBytes = f.SizeInBytes,
+            IsStaged = f.IsStaged
+        };
+    }
 }
