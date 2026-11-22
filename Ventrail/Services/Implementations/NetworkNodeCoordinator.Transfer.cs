@@ -17,8 +17,8 @@ using Ventrail.Services.Implementations.Transfer;
 namespace Ventrail.Services.Implementations;
 
 /// <summary>
-/// Week 12: sending versions between computers over TCP 4001 (proposal: sockets, block streaming,
-/// hash verification). After the hello line the receiving computer sends one request per line:
+/// Sends versions between computers over TCP 4001, in blocks checked by their hash. After the
+/// hello line the receiving computer sends one request per line:
 ///
 ///   LIST                     → REPOS n, then n lines "key head branch name"
 ///   MANIFEST &lt;repo key&gt;      → MANIFEST hash size blockSize blockCount head branch name,
@@ -35,7 +35,7 @@ public partial class NetworkNodeCoordinator
 {
     private const long MaxPackageBytes = 16L * 1024 * 1024 * 1024;
     private const int MaxBlockAttempts = 3;
-    // Week 13: each line and block has its own adaptive wait (PeerLink); these are only outer limits.
+    // Each line and block has its own adaptive wait (PeerLink); these are only outer limits.
     private static readonly TimeSpan IdleTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan MaxRequestTime = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan ManifestWait = TimeSpan.FromMinutes(15);   // a huge repository takes a while to pack
@@ -154,7 +154,7 @@ public partial class NetworkNodeCoordinator
     });
     }
 
-    /// <summary>Class diagram: TransferData(peerId, dataHash): downloads a package described earlier by RequestVersion.</summary>
+    /// <summary>Downloads a package described earlier by RequestVersion.</summary>
     public bool TransferData(string peerId, string dataHash)
     {
         TransferManifest? manifest;
@@ -231,7 +231,7 @@ public partial class NetworkNodeCoordinator
                             try
                             {
                                 session ??= await OpenSessionAsync(manifest.PeerId, cancel);
-                                // Week 13: the wait follows this peer's measured speed, doubled on every retry.
+                                // The wait follows this peer's measured speed, doubled on every retry.
                                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
                                 waited = link.BlockTimeout(length) * (1 << (attempt - 1));
                                 timeout.CancelAfter(waited);
@@ -346,7 +346,7 @@ public partial class NetworkNodeCoordinator
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
-            timeout.CancelAfter(link.ConnectTimeout);   // Week 13: from this peer's round-trip time
+            timeout.CancelAfter(link.ConnectTimeout);   // from this peer's round-trip time
             var clock = System.Diagnostics.Stopwatch.StartNew();
             await client.ConnectAsync(IPAddress.Parse(peer.IPAddress), peer.Port, timeout.Token);
             session.Start();
@@ -385,7 +385,7 @@ public partial class NetworkNodeCoordinator
     }
 
     /// <summary>
-    /// Week 13: reads one answer line, waiting as long as this peer's round-trip time suggests. A busy
+    /// Reads one answer line, waiting as long as this peer's round-trip time suggests. A busy
     /// sender says "WAIT" every 2 s (e.g. while packing a big repository), which restarts the wait, so
     /// a slow sender is given time but a frozen one is noticed within seconds.
     /// </summary>
@@ -525,7 +525,7 @@ public partial class NetworkNodeCoordinator
         CachedPackage package;
         try
         {
-            // Week 13: say "WAIT" every 2 s while packing, so the receiver knows we are alive.
+            // Say "WAIT" every 2 s while packing, so the receiver knows we are alive.
             var prepare = PreparePackageAsync(key, offer, stop);
             while (await Task.WhenAny(prepare, Task.Delay(KeepAliveEvery, stop)) != prepare)
             {

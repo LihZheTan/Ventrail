@@ -16,7 +16,7 @@ public record FirewallRuleInfo(string Name, bool Enabled, bool Inbound, bool All
                                string? Service = null, string? UserOwner = null);
 
 /// <summary>
-/// Week 10: firewall audit and permission (proposal Fig 3.5).
+/// Checks whether Windows Firewall lets other computers reach Ventrail, and asks for permission.
 ///
 /// Reading: uses Windows Firewall's own COM API (HNetCfg.FwPolicy2), which works without admin
 /// rights and in any Windows language (unlike parsing netsh output).

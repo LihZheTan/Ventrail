@@ -9,10 +9,9 @@
              d:DesignHeight="640" d:DesignWidth="1100">
 
     <!--
-        Peer-to-peer page (proposal Fig: P2P network screen).
-        Week 10: real firewall audit + permission (Fig 3.5) and local listening.
-        Week 11: peer discovery (LAN broadcast + DHT), "Has a copy" badges, Connect (hello check).
-        Week 12: what each peer shares, Get latest / Download a copy, transfer progress.
+        Network page: firewall check and permission, sharing on/off, computers found on the
+        local network with "Has a copy" badges, what each one shares, Get latest / Download a
+        copy, and transfer progress.
     -->
     <UserControl.Resources>
         <!-- Pill for one port: green = allowed, amber = needs permission, red = blocked -->
@@ -74,7 +73,7 @@
         </DockPanel>
 
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <!-- Responsive (Week 4): two columns normally, one column when the window is narrow -->
+        <!-- Two columns normally, one column when the window is narrow -->
         <UniformGrid VerticalAlignment="Top">
             <UniformGrid.Style>
                 <Style TargetType="UniformGrid">
@@ -116,7 +115,7 @@
                         <TextBlock Text="{Binding FirewallSummary}" Style="{StaticResource SubtleText}" FontSize="12"
                                    Margin="18,0,18,12"/>
 
-                        <!-- Week 10: live audit result per port (hover a pill for the reason) -->
+                        <!-- Firewall result per port (hover a pill for the reason) -->
                         <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="18,12">
                             <DockPanel>
                                 <Border DockPanel.Dock="Right" Style="{StaticResource PortPill}" DataContext="{Binding TcpCheck}">
@@ -184,7 +183,7 @@
                         </Style.Triggers>
                     </Style>
                 </DockPanel.Style>
-                <!-- Week 11: LAN broadcast + DHT discovery -->
+                <!-- Finding computers: LAN broadcast + DHT -->
                 <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
                     <Button DockPanel.Dock="Right" Command="{Binding FindPeersCommand}" Padding="10,4"
                             ToolTip="Search the local network for other computers running Ventrail">
@@ -199,7 +198,7 @@
                 <TextBlock DockPanel.Dock="Top" Style="{StaticResource SubtleText}" FontSize="12" TextWrapping="Wrap"
                            Text="{Binding PeersSummary}" Margin="0,0,0,10"/>
 
-                <!-- Week 12: download progress (every block is checked with SHA-256 as it arrives) -->
+                <!-- Download progress (every block is checked with SHA-256 as it arrives) -->
                 <Border DockPanel.Dock="Top" Style="{StaticResource GlowCard}" Margin="0,0,0,12"
                         Visibility="{Binding IsTransferring, Converter={StaticResource BoolToVis}}">
                     <StackPanel>
@@ -274,7 +273,7 @@
                                     </StackPanel>
                                 </DockPanel>
 
-                                <!-- Week 12: what this computer shares; download or update from it -->
+                                <!-- What this computer shares; download or update from it -->
                                 <ItemsControl ItemsSource="{Binding Repositories}" Margin="18,8,0,0"
                                               Visibility="{Binding HasRepositories, Converter={StaticResource BoolToVis}}">
                                     <ItemsControl.ItemTemplate>

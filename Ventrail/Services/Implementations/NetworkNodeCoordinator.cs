@@ -17,12 +17,11 @@ using Ventrail.Services.Implementations.Transfer;
 namespace Ventrail.Services.Implementations;
 
 /// <summary>
-/// P2P node (Fig 3.8).
-/// Week 10: firewall audit + permission (FirewallAuditor) and local listening:
-///  - TCP 4001 accepts connections and answers with a hello line ("VENTRAIL/1 &lt;peer id&gt;");
-///    Week 12 adds requests after it (see NetworkNodeCoordinator.Transfer.cs).
-///  - UDP 4002 answers discovery and DHT messages (see DiscoveryMessage).
-/// Week 11: peer discovery, in the two steps libp2p uses on a local network:
+/// The peer-to-peer node: firewall check and permission (FirewallAuditor), and listening on:
+///  - TCP 4001, which answers with a hello line ("VENTRAIL/1 &lt;peer id&gt;") and then serves
+///    version transfers (see NetworkNodeCoordinator.Transfer.cs);
+///  - UDP 4002, which answers discovery and DHT messages (see DiscoveryMessage).
+/// Peers are found in the two steps libp2p uses on a local network:
 ///  1. a LAN broadcast ("is any Ventrail here?") finds the first peers, like libp2p's mDNS;
 ///  2. a Kademlia DHT lookup asks those peers who they know, so peers that miss the broadcast are
 ///     still found, and "provider records" tell which peers hold a copy of a repository.
@@ -40,7 +39,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
     // Kademlia's "alpha": how many peers a lookup asks at the same time.
     private const int Alpha = 3;
     private const int MaxLookupRounds = 6;
-    // Week 13: waits adapt per peer (PeerLink). These are only the limits for the broadcast, where
+    // Waits adapt per peer (PeerLink). These are only the limits for the broadcast, where
     // nobody is known yet, and for asking an address typed by the user.
     private static readonly TimeSpan BroadcastWait = TimeSpan.FromMilliseconds(1500);
     private static readonly TimeSpan MaxBroadcastWait = TimeSpan.FromSeconds(8);
@@ -108,7 +107,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
 
     private IReadOnlyList<(int Port, string Protocol)> Ports => new[] { (LocalPort, "TCP"), (DiscoveryPort, "UDP") };
 
-    // ---------- Week 10: firewall ----------
+    // ---------- firewall ----------
 
     public FirewallStatus CheckFirewall()
     {
@@ -129,7 +128,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
         return FirewallAuditor.RunElevatedHelper(FirewallAuditor.HelperArguments(allow: false, Ports), ExePath);
     }
 
-    // ---------- Week 10: listening ----------
+    // ---------- listening ----------
 
     public bool IsListening
     {
@@ -209,7 +208,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
             while (!stop.IsCancellationRequested)
             {
                 var client = await listener.AcceptTcpClientAsync(stop);
-                _ = Task.Run(() => ServeAsync(client, stop), stop);   // Week 12: hello, then requests
+                _ = Task.Run(() => ServeAsync(client, stop), stop);   // hello, then requests
             }
         }
         catch (Exception) when (stop.IsCancellationRequested) { }   // StopListening
@@ -319,7 +318,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
         }
     }
 
-    // ---------- Week 11: discovery ----------
+    // ---------- discovery ----------
 
     public List<PeerNode> GetKnownPeers()
     {
@@ -416,7 +415,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
 
     /// <summary>
     /// Announces in the DHT that this computer has a copy of the repository (provider record), and
-    /// (Week 12) lets other computers download its versions over TCP.
+    /// lets other computers download its versions over TCP.
     /// </summary>
     public void ProvideRepository(string repositoryKey, string repositoryPath, string name)
     {
@@ -544,7 +543,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
                 if (replies[i] is not { } reply)
                 {
                     candidates.Remove(batch[i].PeerId);
-                    // Week 13: only drop a peer after several lookups in a row got no answer, so a link that
+                    // Only drop a peer after several lookups in a row got no answer, so a link that
                     // suddenly got slower keeps its peer while the waits adapt.
                     if (Link(batch[i].PeerId).MissedLookup() >= PeerLink.DropAfterMisses && _table.Remove(batch[i].PeerId))
                     {
@@ -587,7 +586,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
 
     // One question to one peer, asked twice before giving up (a single UDP packet can get lost).
     // The answer only counts if it comes from the peer id we asked.
-    // Week 13: the wait is that peer's learnt round-trip timeout, doubled after each miss.
+    // The wait is that peer's learnt round-trip timeout, doubled after each miss.
     private async Task<DiscoveryMessage?> QueryAsync(PeerNode peer, string message, string expectVerb)
     {
         var target = new IPEndPoint(IPAddress.Parse(peer.IPAddress), peer.DiscoveryPort);
@@ -637,7 +636,7 @@ public partial class NetworkNodeCoordinator : INetworkNodeCoordinator, IDisposab
                     continue;
                 }
 
-                Link(sender.PeerId).Rtt.Observe(clock.Elapsed);   // Week 13: every answer teaches the round-trip time
+                Link(sender.PeerId).Rtt.Observe(clock.Elapsed);   // every answer updates the round-trip time
                 sender.IPAddress = packet.RemoteEndPoint.Address.MapToIPv4().ToString();
                 Learn(sender, packet.RemoteEndPoint.Address);
                 replies.Add(msg);

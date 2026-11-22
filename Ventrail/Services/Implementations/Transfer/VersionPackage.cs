@@ -13,7 +13,7 @@ namespace Ventrail.Services.Implementations.Transfer;
 public record PackageInfo(string FilePath, string Sha256, long Size, string HeadHash, string Branch);
 
 /// <summary>
-/// Week 12: a "version package" is what travels between computers: a Git pack file (every saved
+/// A "version package" is what travels between computers: a Git pack file (every saved
 /// version, compressed, as Git itself stores them) plus its index, in one file:
 ///
 ///   VTPK1\n pack-&lt;sha1&gt;\n &lt;pack length&gt;\n &lt;index length&gt;\n [pack bytes][index bytes]
@@ -164,7 +164,7 @@ public static class VersionPackage
 /// <summary>SHA-256 fingerprints for whole files and for each 1 MB block.</summary>
 public static class BlockHashing
 {
-    public const int BlockSize = 1024 * 1024;   // same as SuggestionWriter.ShareBlockBytes (Week 9)
+    public const int BlockSize = 1024 * 1024;   // same as SuggestionWriter.ShareBlockBytes
 
     public static string Sha256(ReadOnlySpan<byte> data)
     {

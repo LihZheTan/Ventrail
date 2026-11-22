@@ -4,7 +4,7 @@ namespace Ventrail.Models;
 
 /// <summary>
 /// One changed file, as reported by a working-directory scan.
-/// Observable since Week 8: the storage advisor's verdict arrives a moment after the scan.
+/// Observable because the storage advisor's verdict arrives a moment after the scan.
 /// </summary>
 public partial class FileAsset : ObservableObject
 {
@@ -19,14 +19,13 @@ public partial class FileAsset : ObservableObject
     // True when the change is in the staging index and will go into the next commit.
     public bool IsStaged { get; set; }
 
-    // Week 6: files at or above this size get a "Large" badge and a warning before saving,
-    // because every version keeps a full copy (the storage-bloat problem in the proposal).
-    // Weeks 8-9 replace this fixed rule with the ML.NET heavy/light classifier.
+    // Files at or above this size get a "Large" badge and a warning before saving, because every
+    // version keeps a full copy. Used only when the AI advisor isn't available.
     public const long LargeFileBytes = 50L * 1024 * 1024;
 
     public bool IsLarge => SizeInBytes >= LargeFileBytes;
 
-    // Friendly type for the File Inspector, e.g. "DOCX file".
+    // Friendly type name, e.g. "DOCX file".
     public string FileType
     {
         get
@@ -61,7 +60,7 @@ public partial class FileAsset : ObservableObject
         };
     }
 
-    // Week 8: the ML.NET storage advisor's verdict (null = not classified yet, a deleted file,
+    // The storage advisor's verdict (null = not classified yet, a deleted file,
     // or the model could not be loaded). Filled in after the scan, so the list updates live.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsHeavy), nameof(StorageBadge), nameof(HasStorageBadge), nameof(StorageBadgeTip))]
@@ -69,8 +68,8 @@ public partial class FileAsset : ObservableObject
 
     public bool IsHeavy => Classification?.IsHeavy == true;
 
-    // Badge in the staging list: the model's "Heavy" verdict, or the Week 6 size rule if the
-    // model isn't available.
+    // Badge in the changes list: the model's "Heavy" verdict, or the size rule if the model
+    // isn't available.
     public string? StorageBadge => IsHeavy ? "Heavy" : Classification is null && IsLarge ? "Large" : null;
     public bool HasStorageBadge => StorageBadge is not null;
     public string StorageBadgeTip => Classification?.Summary

@@ -14,9 +14,8 @@ using Ventrail.Services.Implementations.Dht;
 namespace Ventrail.ViewModels;
 
 /// <summary>
-/// Week 10: the Peer-to-Peer page — firewall audit, permission prompt and local listening
-/// (proposal Fig 3.5: check the firewall; if the user denies permission, abort; if allowed, open
-/// the ports and continue). Discovery (Week 11) and transfers (Week 12) build on this.
+/// The Network page: firewall check, permission prompt, sharing on/off, finding other computers
+/// and downloading versions from them.
 /// </summary>
 public partial class MainDashboardViewModel
 {
@@ -63,7 +62,7 @@ public partial class MainDashboardViewModel
         }
     }
 
-    // ---------- Week 11: peer discovery ----------
+    // ---------- peer discovery ----------
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PeersSummary))]
@@ -78,7 +77,7 @@ public partial class MainDashboardViewModel
 
     public string LocalDisplayName => _network.DisplayName;
 
-    // Week 14: "THIS-PC (192.168.1.20)", so the other person can type it into "Add".
+    // "THIS-PC (192.168.1.20)", so the other person can type it into "Add".
     public string LocalComputerText
     {
         get
@@ -241,7 +240,7 @@ public partial class MainDashboardViewModel
         });
     }
 
-    // ---------- Week 12: receiving versions (block streaming + hash checks) ----------
+    // ---------- receiving versions (block streaming + hash checks) ----------
 
     // What each peer shares (its "LIST" answer), refreshed after every search.
     private readonly Dictionary<string, List<OfferedRepository>> _offersByPeer = new();
@@ -282,7 +281,7 @@ public partial class MainDashboardViewModel
 
     /// <summary>
     /// "Get latest" (same repository as the one open here) or "Download a copy" (a new folder).
-    /// Fig 3.8 TransferData: ask for the manifest, stream every block with its SHA-256 check, then let
+    /// Asks for the manifest, streams every block with its SHA-256 check, then lets
     /// Git check every version before anything on disk changes.
     /// </summary>
     [RelayCommand]
@@ -454,9 +453,8 @@ public partial class MainDashboardViewModel
         };
     }
 
-    // Class diagram: ShareRepository(String peerId). Week 10 made the firewall part real; Week 11
-    // announces the repository in the DHT and finds who else already has a copy; Week 12 lets them
-    // download its versions (served by NetworkNodeCoordinator.Transfer).
+    // Shares the open repository: checks the firewall, announces the repository in the DHT, finds
+    // who else already has a copy, and lets them download its versions.
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
     private Task ShareRepositoryAsync()
     {
@@ -548,7 +546,7 @@ public partial class MainDashboardViewModel
     }
 
     /// <summary>
-    /// Fig 3.5: audit the firewall, ask the user if anything is missing, and only then open the
+    /// Checks the firewall, asks the user if anything is missing, and only then opens the
     /// ports. Returns false (and leaves sharing off) whenever permission is not given.
     /// </summary>
     private async Task<bool> EnsureSharingReadyAsync()

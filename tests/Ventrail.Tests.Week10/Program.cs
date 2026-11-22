@@ -167,7 +167,7 @@ catch (SocketException)
 Check("after stop, nobody listens", refused);
 Directory.Delete(dataDir, true);
 
-// ---- ViewModel flow (Fig 3.5) ----
+// ---- ViewModel flow: check, ask, then open the ports ----
 MainDashboardViewModel NewVm(INetworkNodeCoordinator net)
 {
     return new(new MockRepositoryManager(),
@@ -202,7 +202,7 @@ await WaitFor(() => vm.IsDialogOpen);
 vm.ConfirmDialogCommand.Execute(null);
 await share;
 Check("allowed -> rules added, listening, online", vm.IsSharingEnabled && mock.IsListening && vm.Firewall!.AllAllowed && vm.NetworkStateText == "Online");
-Check("share works after permission (Week 11 now finds peers)", vm.StatusText.Contains("shared"), vm.StatusText);
+Check("share works after permission", vm.StatusText.Contains("shared"), vm.StatusText);
 
 vm.IsSharingEnabled = false;   // the switch flips through its binding, then runs the command
 await vm.ToggleSharingCommand.ExecuteAsync(null);

@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Width="40" Height="40">
 
-    <!-- Loading spinner (Week 5): a blue arc turning around a faint ring. -->
+    <!-- Loading spinner: a blue arc turning around a faint ring. -->
     <Grid>
         <Ellipse Stroke="{DynamicResource LineBrush}" StrokeThickness="4"/>
         <Path Stroke="{DynamicResource AccentBrush}" StrokeThickness="4"

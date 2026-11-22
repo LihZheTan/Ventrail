@@ -10,7 +10,7 @@
              d:DesignHeight="640" d:DesignWidth="1100">
 
     <!--
-        Welcome screen (proposal Fig: launch screen), redesigned launcher-style: a hero banner, then
+        Home page: a hero banner, then
         the ways to begin on the left and recent repositories on the right.
     -->
     <UserControl.Resources>
@@ -133,7 +133,7 @@
                                        HorizontalAlignment="Center"/>
                         </StackPanel>
 
-                        <!-- Each recent folder is a row: one click reopens it (Week 4) -->
+                        <!-- Each recent folder is a row: one click reopens it -->
                         <ItemsControl ItemsSource="{Binding RecentRepositories}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>

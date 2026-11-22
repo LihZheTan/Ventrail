@@ -49,7 +49,7 @@ public class InverseBoolToVisibilityConverter : IValueConverter
 
 /// <summary>
 /// True when a width (e.g. a page's ActualWidth) is below the number in ConverterParameter.
-/// Used by DataTriggers to make layouts responsive to the window size (Week 4).
+/// Used by DataTriggers to make layouts respond to the window size.
 /// </summary>
 public class WidthBelowConverter : IValueConverter
 {

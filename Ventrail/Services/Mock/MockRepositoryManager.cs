@@ -7,14 +7,8 @@ using Ventrail.Services.Contracts;
 namespace Ventrail.Services.Mock;
 
 /// <summary>
-/// In-memory fake of IRepositoryManager filled with dummy data (CP2 Week 2: "dummy models").
-///
-/// Why it exists:
-///  - The UI can be built, tested and demoed without touching a real folder or Git.
-///  - It proves the MVVM separation: the ViewModel cannot tell this apart from the real
-///    RepositoryManager because it only ever talks to the IRepositoryManager interface.
-///
-/// Run the app with the "--demo" argument (the "Ventrail (Demo data)" launch profile) to use it.
+/// In-memory stand-in for RepositoryManager, filled with made-up data, so the app can be shown
+/// without touching a real folder. Used when Ventrail is started with "--demo".
 /// </summary>
 public class MockRepositoryManager : IRepositoryManager
 {
@@ -34,7 +28,7 @@ public class MockRepositoryManager : IRepositoryManager
             File("figures/flowchart_v2.png", "Added", 1_250_000),
             File("data/survey_results.xlsx", "Modified", 96_500),
             File("notes/old_ideas.txt", "Deleted", 0),
-            File("notes/todo.md", "Modified", 412),   // text file, so the Week 7 diff viewer has lines to show
+            File("notes/todo.md", "Modified", 412),   // text file, so the comparison has lines to show
             File("slides/scan_sample.svs", "Added", 2_400_000_000), // large specialised file for AI demo later
         };
 
@@ -94,7 +88,7 @@ public class MockRepositoryManager : IRepositoryManager
         return true;
     }
 
-    // Week 12 (demo): a "received" version appears on top of the history.
+    // A "received" version appears on top of the history.
     public ImportResult ImportVersionPackage(string packageFile, string headHash, string branch, string sourceName)
     {
         if (CommitHistory.Count > 0 && CommitHistory[0].Hash == headHash)

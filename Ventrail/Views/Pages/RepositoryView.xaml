@@ -12,8 +12,8 @@
         The repository screen (Changes and History pages, chosen in the app sidebar):
           TOP   = page header: title, repository and branch, Scan for changes, Show in Explorer.
           LEFT  = the list for the current page.
-                  Changes: changed files with tick boxes, AI suggestion and the commit box (Figs 3.3/3.4).
-                  History: saved versions, newest first, joined by a timeline (the DAG, Week 4).
+                  Changes: changed files with tick boxes, AI suggestion and the commit box.
+                  History: saved versions, newest first, joined by a timeline.
           RIGHT = what is selected: a changed file (its diff + the AI advisor's verdict) or a version
                   (its files + Restore).
         CurrentPage (Staging or History) decides which list and which right-hand panel are shown.
@@ -115,7 +115,7 @@
                 <!-- Commit area (bottom) -->
                 <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="12">
                     <StackPanel>
-                        <!-- Week 9: AI suggestion for the ticked files -->
+                        <!-- AI suggestion for the ticked files -->
                         <Border Style="{StaticResource GlowCard}" Padding="12,10" Margin="0,0,0,10"
                                 Visibility="{Binding IsSuggestionVisible, Converter={StaticResource BoolToVis}}">
                             <StackPanel>
@@ -245,7 +245,7 @@
                                             ToolTip="{Binding TrackStatus}">
                                         <TextBlock Style="{StaticResource StatusGlyph}"/>
                                     </Border>
-                                    <!-- Week 8: ML.NET "Heavy" verdict -->
+                                    <!-- AI "Heavy" verdict -->
                                     <Border DockPanel.Dock="Right" Style="{StaticResource Pill}" Padding="6,0" Margin="6,0,0,0"
                                             Background="{DynamicResource ModifiedTintBrush}" BorderThickness="0"
                                             Visibility="{Binding HasStorageBadge, Converter={StaticResource BoolToVis}}"
@@ -269,7 +269,7 @@
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            Visibility="{Binding HasHistory, Converter={StaticResource InverseBoolToVis}}"/>
 
-                <!-- Each version on the timeline (Week 4): a line joins the versions like Git's DAG. -->
+                <!-- Each version on the timeline: a line joins the versions, newest at the top. -->
                 <ListBox ItemsSource="{Binding History}" SelectedItem="{Binding SelectedCommit}"
                          ItemContainerStyle="{StaticResource TimelineItem}">
                     <ListBox.ItemTemplate>
@@ -359,7 +359,7 @@
         <!-- ===================== RIGHT: Changes ===================== -->
         <Grid Grid.Column="2" Style="{StaticResource OnChangesTab}">
 
-            <!-- Nothing selected, nothing changed: GitHub Desktop's "No local changes" screen -->
+            <!-- Nothing selected, nothing changed: "No local changes" with suggested next steps -->
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ScrollViewer.Style>
                     <Style TargetType="ScrollViewer">
@@ -501,7 +501,7 @@
                     </DockPanel>
                 </Border>
 
-                <!-- Week 8-9: the storage advisor's verdict for this file -->
+                <!-- The storage advisor's verdict for this file -->
                 <Border DockPanel.Dock="Top" Style="{StaticResource GlowCard}" Margin="14,12,14,4" Padding="12,9">
                     <DockPanel>
                         <TextBlock Style="{StaticResource Icon}" Text="&#xE945;" FontSize="13" VerticalAlignment="Top" Margin="0,2,10,0"

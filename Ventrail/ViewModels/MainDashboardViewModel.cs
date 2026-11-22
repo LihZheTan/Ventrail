@@ -14,22 +14,21 @@ using Ventrail.Services.Implementations;
 namespace Ventrail.ViewModels;
 
 /// <summary>
-/// Central controller from the class diagram (Fig 3.8). It turns UI actions into service calls
+/// The main ViewModel. It turns UI actions into service calls
 /// and exposes the data the window binds to. It never touches UI controls directly (MVVM).
 ///
 /// Every dependency is an interface handed in through the constructor, so App.xaml.cs decides
 /// whether the real services or the demo/mock ones are used. The ViewModel can't tell the difference.
 ///
-/// Git work runs inside Task.Run so the window never freezes (proposal section 3.3.1).
+/// Git work runs on a background thread so the window never freezes.
 /// </summary>
 public partial class MainDashboardViewModel : ObservableObject
 {
-    // The four arrows leaving MainDashboardViewModel in Fig 3.8.
-    private readonly IRepositoryManager _repo;             // "Manages Git Core"
-    private readonly IIntelligentStorageEngine _ai;        // "Calls ML.NET"
-    private readonly INetworkNodeCoordinator _network;     // "Manages P2P Network"
-    private readonly ISpecializedFileHandler _fileHandler; // "Interfaces with external libraries"
-    private readonly IRecentRepositoryStore _recent;       // Welcome page "Recent Repositories" (Week 4)
+    private readonly IRepositoryManager _repo;             // Git: changes, versions, restore
+    private readonly IIntelligentStorageEngine _ai;        // ML.NET storage advisor
+    private readonly INetworkNodeCoordinator _network;     // peer-to-peer sharing
+    private readonly ISpecializedFileHandler _fileHandler; // special file formats (not built yet)
+    private readonly IRecentRepositoryStore _recent;       // recently opened folders
 
     public MainDashboardViewModel(
         IRepositoryManager repositoryManager,
@@ -65,12 +64,12 @@ public partial class MainDashboardViewModel : ObservableObject
         }
     }
 
-    // Class diagram: List<FileAsset> StagedFiles -> all changes, each with an IsStaged flag.
+    // Every changed file, each with an IsStaged (ticked) flag.
     public ObservableCollection<FileAsset> Changes { get; } = new();
     public ObservableCollection<CommitNode> History { get; } = new();
     public ObservableCollection<FileAsset> CommitFiles { get; } = new();   // files in the selected version
 
-    // Class diagram: List<PeerNode> ActivePeers (filled in Weeks 10-12).
+    // Computers found on the local network.
     public ObservableCollection<PeerNode> ActivePeers { get; } = new();
 
     // Recently opened folders, newest first (Welcome page).
@@ -80,10 +79,10 @@ public partial class MainDashboardViewModel : ObservableObject
     // Folder tree for the left pane of the Staging page.
     public ObservableCollection<FolderNode> WorkspaceTree { get; } = new();
 
-    // Which page the navigation rail is showing (Week 3).
+    // Which page the sidebar is showing.
     [ObservableProperty] private AppPage _currentPage = AppPage.Welcome;
 
-    // Class diagram: String CurrentDirectory.
+    // The open folder (empty when none is open).
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRepo), nameof(RepoName))]
     [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(StageAllCommand),
@@ -101,13 +100,13 @@ public partial class MainDashboardViewModel : ObservableObject
     [ObservableProperty] private string _statusText = "Select a folder to start tracking.";
     [ObservableProperty] private string _recommendationText = "Select a changed file to see suggestions.";
 
-    // Week 9: storage + sharing tip under the verdict in the File Inspector.
+    // Storage and sharing tip under the verdict for the selected file.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRecommendationTip))]
     private string _recommendationTip = string.Empty;
     public bool HasRecommendationTip => !string.IsNullOrEmpty(RecommendationTip);
 
-    // Week 9: the AI suggestion card above the commit box (null when nothing is ticked).
+    // The AI suggestion card above the commit box (null when nothing is ticked).
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSuggestionVisible))]
     private CommitSuggestion? _suggestion;
@@ -130,7 +129,7 @@ public partial class MainDashboardViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(DiscardSelectedFileCommand), nameof(ViewChangesCommand))]
     private FileAsset? _selectedFile;
 
-    // Week 7: diff viewer overlay.
+    // Full-size comparison overlay.
     [ObservableProperty] private bool _isDiffOpen;
     [ObservableProperty] private FileDiff? _currentDiff;
     [ObservableProperty]
@@ -160,7 +159,7 @@ public partial class MainDashboardViewModel : ObservableObject
     {
         if (value != null)
             CheckFileRecommendation(value.FilePath);
-        _ = LoadInlineDiffAsync(value);   // Redesign: the diff shows next to the list, like GitHub Desktop
+        _ = LoadInlineDiffAsync(value);   // the comparison shows next to the list
     }
 
     partial void OnSelectedCommitChanged(CommitNode? value)
@@ -180,12 +179,12 @@ public partial class MainDashboardViewModel : ObservableObject
         }
     }
 
-    // ---------- class diagram operations ----------
+    // ---------- opening a folder and checking files ----------
 
-    /// <summary>Class diagram: InitializeDashboard(). Opens/creates the repository and loads everything.</summary>
+    /// <summary>Opens (or starts tracking) a folder and loads its changes and history.</summary>
     public async Task InitializeDashboardAsync(string folderPath)
     {
-        IsLoadingRepository = true;   // spinner overlay (Week 5)
+        IsLoadingRepository = true;   // spinner overlay
         try
         {
             await RunBusyAsync("Opening folder...", async () =>
@@ -221,9 +220,8 @@ public partial class MainDashboardViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Class diagram: CheckFileRecommendation(String filePath).
-    /// Week 8: shows the ML.NET heavy/light verdict (worked out in the background after each scan).
-    /// Week 9: adds a tip on when to save the file and how it is sent in blocks when shared.
+    /// Shows the advisor's heavy/light verdict for a file (worked out in the background after each
+    /// scan), plus a tip on when to save it and how it is sent in blocks when shared.
     /// </summary>
     public void CheckFileRecommendation(string filePath)
     {
@@ -310,7 +308,7 @@ public partial class MainDashboardViewModel : ObservableObject
         CurrentPage = AppPage.History;
     }
 
-    // Week 14: also reachable with no folder open, to download a copy from a peer.
+    // Also reachable with no folder open, to download a copy from a peer.
     [RelayCommand]
     private void NavigateToNetwork()
     {
@@ -328,7 +326,7 @@ public partial class MainDashboardViewModel : ObservableObject
     });
     }
 
-    // Class diagram: StageSelectedFile(String filePath). Bound to each file's checkbox.
+    // Ticks or unticks one file. Bound to each file's checkbox.
     [RelayCommand]
     private Task ToggleStageAsync(FileAsset? file)
     {
@@ -354,8 +352,7 @@ public partial class MainDashboardViewModel : ObservableObject
         return CanUseRepo() && !string.IsNullOrWhiteSpace(CommitMessage);
     }
 
-    // Class diagram: CommitStagedFiles(String message).
-    // Week 5: shows the "Committing Changes..." progress screen from the proposal mockup.
+    // Saves the ticked files as a new version, with a progress screen.
     [RelayCommand(CanExecute = nameof(CanCommit))]
     private Task CommitAsync()
     {
@@ -368,7 +365,7 @@ public partial class MainDashboardViewModel : ObservableObject
             return;
         }
 
-        // Week 6: every version keeps a full copy of each file, so warn before large files go in.
+        // Every version keeps a full copy of each file, so warn before large files go in.
         var large = staged.Where(f => f.IsLarge).ToList();
         if (large.Count > 0)
         {
@@ -392,7 +389,7 @@ public partial class MainDashboardViewModel : ObservableObject
             }
         }
 
-        // Redesign: a one-line summary plus an optional description, joined the way Git expects.
+        // A one-line summary plus an optional description, joined the way Git expects.
         string message = string.IsNullOrWhiteSpace(CommitDescription)
             ? CommitMessage.Trim()
             : $"{CommitMessage.Trim()}\n\n{CommitDescription.Trim()}";
@@ -401,8 +398,7 @@ public partial class MainDashboardViewModel : ObservableObject
         IsCommitting = true;
         try
         {
-            // Fig 3.4: metadata scan of every staged file before the snapshot is written.
-            // (Weeks 8-9 plug the ML.NET advisor into this loop.)
+            // Check every ticked file (and show its verdict) before the version is written.
             for (int i = 0; i < staged.Count; i++)
             {
                 var file = staged[i];
@@ -453,7 +449,7 @@ public partial class MainDashboardViewModel : ObservableObject
     });
     }
 
-    // ShareRepository (class diagram) and the Week 10 firewall flow live in MainDashboardViewModel.Network.cs.
+    // Sharing and the firewall steps are in MainDashboardViewModel.Network.cs.
 
     private bool CanRestore()
     {
@@ -484,7 +480,7 @@ public partial class MainDashboardViewModel : ObservableObject
     });
     }
 
-    // Week 7: "Discard changes" in the File Inspector. Always asks first, and the current copy
+    // "Discard" for the selected file. Always asks first, and the current copy
     // goes to the Recycle Bin, so a mis-click never loses work for good.
     [RelayCommand(CanExecute = nameof(HasSelectedFile))]
     private Task DiscardSelectedFileAsync()
@@ -527,7 +523,7 @@ public partial class MainDashboardViewModel : ObservableObject
     });
     }
 
-    // Week 7: line-by-line comparison with the last saved version (double-click a file or "View changes").
+    // Full-size comparison with the last saved version (double-click a file or "Expand").
     [RelayCommand(CanExecute = nameof(HasSelectedFile))]
     private Task ViewChangesAsync()
     {
@@ -545,7 +541,7 @@ public partial class MainDashboardViewModel : ObservableObject
         IsDiffOpen = false;
     }
 
-    // Week 9: "Accept AI Suggestions" uses the suggested message and unticks the files the
+    // "Use suggestion" fills in the suggested message and unticks the files the
     // advisor suggests leaving out (very large heavy files), as long as something stays ticked.
     [RelayCommand(CanExecute = nameof(CanUseRepo))]
     private Task AcceptSuggestionAsync()
@@ -588,7 +584,7 @@ public partial class MainDashboardViewModel : ObservableObject
     });
     }
 
-    // Week 9: "Edit Manually" puts the suggestion in the box as a starting point (only if the box
+    // "Write my own" puts the suggestion in the box as a starting point (only if the box
     // is empty) and leaves the ticked files alone. The view moves the keyboard focus to the box.
     [RelayCommand]
     private void EditSuggestionManually()
@@ -614,7 +610,7 @@ public partial class MainDashboardViewModel : ObservableObject
         string? selectedHash = SelectedCommit?.Hash;
         string? selectedCommitFile = SelectedCommitFile?.FilePath;
 
-        // Week 8: keep the advisor's verdicts for files that didn't change, so badges don't flicker.
+        // Keep the advisor's verdicts for files that didn't change, so badges don't flicker.
         var previous = Changes.GroupBy(c => c.FilePath).ToDictionary(g => g.Key, g => g.First());
         foreach (var f in files)
         {
@@ -659,11 +655,11 @@ public partial class MainDashboardViewModel : ObservableObject
         LastScanText = $"Last scanned at {DateTime.Now:HH:mm}";
 
         UpdateSuggestion();
-        RefreshPeerList();   // Week 12: "Get latest" vs "Download a copy" depends on this history
+        RefreshPeerList();   // "Get latest" vs "Download a copy" depends on this history
         _ = ClassifyChangesAsync(files, root);
     }
 
-    // ---------- Week 9: AI suggestions ----------
+    // ---------- AI suggestions ----------
 
     private string _suggestionKey = string.Empty;
 
@@ -689,7 +685,7 @@ public partial class MainDashboardViewModel : ObservableObject
         }
     }
 
-    // ---------- Week 8: storage advisor ----------
+    // ---------- storage advisor ----------
 
     private int _classifyRun;
     private bool? _advisorAvailable;   // null = not known yet
@@ -818,8 +814,8 @@ public partial class MainDashboardViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            // Week 5: errors become a red toast + a log entry instead of a crash or silent failure.
-            // Week 6: VentrailException messages are already plain language, so show them as-is.
+            // Errors become a red toast and a log entry instead of a crash or a silent failure.
+            // VentrailException messages are already plain language, so they are shown as they are.
             string text = ex is VentrailException ? ex.Message : $"Something went wrong: {ex.Message}";
             StatusText = text;
             ShowToast(text, ToastKind.Error);

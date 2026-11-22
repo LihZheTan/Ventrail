@@ -6,14 +6,13 @@ using Ventrail.Models;
 namespace Ventrail.Services.AI;
 
 /// <summary>
-/// Week 9: turns the classifier's verdicts into advice a non-technical user can act on:
-/// a suggested commit message, storage tips for heavy files, and how a file is split into blocks
-/// when it is shared with peers (Week 12). Rule-based and offline: the same files always get the
-/// same advice, and nothing leaves the PC.
+/// Turns the classifier's verdicts into advice a non-technical user can act on: a suggested
+/// commit message, storage tips for heavy files, and how a file is split into blocks when it is
+/// shared. Rule-based and offline: the same files always get the same advice.
 /// </summary>
 public static class SuggestionWriter
 {
-    // Peer-to-peer transfers (Week 12) send files in blocks of this size, each checked by its hash.
+    // Peer-to-peer transfers send files in blocks of this size, each checked by its hash.
     public const int ShareBlockBytes = 1024 * 1024;
 
     // Git tools cut a message's first line after about 72 characters.
@@ -141,7 +140,7 @@ public static class SuggestionWriter
     private static StorageAdvice? Advise(FileAsset file)
     {
         var verdict = file.Classification;
-        bool needsAdvice = verdict?.IsHeavy ?? file.IsLarge;   // no model: fall back to the Week 6 size rule
+        bool needsAdvice = verdict?.IsHeavy ?? file.IsLarge;   // no model: fall back to the 50 MB size rule
         if (!needsAdvice)
         {
             return null;
@@ -167,7 +166,7 @@ public static class SuggestionWriter
     }
 
     /// <summary>
-    /// Longer tip for the File Inspector: when to save the file, and how it is sent in blocks
+    /// Longer tip for the selected file: when to save it, and how it is sent in blocks
     /// when the folder is shared. Empty when there is nothing useful to say.
     /// </summary>
     public static string StorageTip(FileClassification? verdict, long sizeInBytes)

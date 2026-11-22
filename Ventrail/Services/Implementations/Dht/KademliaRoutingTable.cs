@@ -8,7 +8,7 @@ using Ventrail.Models;
 namespace Ventrail.Services.Implementations.Dht;
 
 /// <summary>
-/// Ids in Ventrail's DHT: peers are "vt-" + 12 hex digits (Week 10) and repositories are
+/// Ids in Ventrail's DHT: peers are "vt-" + 12 hex digits and repositories are
 /// "rp-" + 12 hex digits, so both live in the same 48-bit space and can be compared by XOR
 /// distance, as in Kademlia (the DHT used by libp2p and IPFS).
 /// </summary>

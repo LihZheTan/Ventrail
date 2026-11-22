@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Week 8: offline trainer for Ventrail's heavy/light file classifier.
+    Offline trainer for Ventrail's heavy/light file classifier.
     Builds a dataset from real files, trains an ML.NET FastTree model, evaluates it and writes
     ../Ventrail/MLModels/ventrail_classifier.zip, which the app ships with. Not part of the app.
   -->

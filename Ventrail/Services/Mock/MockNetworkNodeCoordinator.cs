@@ -8,11 +8,10 @@ using Ventrail.Services.Contracts;
 namespace Ventrail.Services.Mock;
 
 /// <summary>
-/// Week 10: demo-mode network node. The firewall starts as "Needs permission" and "Allow" succeeds
-/// straight away, so the permission flow (Fig 3.5) can be shown without an admin prompt and
-/// without changing the PC's real firewall or opening real ports.
-/// Week 11: discovery "finds" two made-up computers; the first already has a copy of any
-/// repository that is shared, so the "Has a copy" badge can be shown.
+/// Demo-mode network node. The firewall starts as "Needs permission" and "Allow" succeeds
+/// straight away, so the permission screens can be shown without an admin prompt, without
+/// changing the real firewall and without opening real ports. Discovery "finds" two made-up
+/// computers; the first already has a copy of any repository that is shared.
 /// </summary>
 public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
 {
@@ -139,7 +138,7 @@ public class MockNetworkNodeCoordinator : INetworkNodeCoordinator
         return true;
     }
 
-    // ---------- Week 12 (demo): LAB-PC-02 has a newer version of whatever is shared here, and
+    // ---------- transfers: LAB-PC-02 has a newer version of whatever is shared here, and
     // both computers offer a "Group-Report" repository that can be downloaded as a new copy. ----------
 
     public const string GroupReportKey = "rp-00000000beef";

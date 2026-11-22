@@ -28,19 +28,19 @@ public partial class App : Application
             return;
         }
 
-        // "--demo" (the "Ventrail (Demo data)" launch profile) uses fake data: handy for
-        // building the UI, testing, and showing the supervisor without a real repository.
+        // "--demo" (the "Ventrail (Demo data)" launch profile) uses made-up data instead of a real
+        // folder, the real firewall and the real network.
         bool demoMode = e.Args.Contains("--demo");
 
         IRepositoryManager repository = demoMode ? new MockRepositoryManager() : new RepositoryManager();
-        IIntelligentStorageEngine storageEngine = new IntelligentStorageEngine();   // ML.NET advisor (Week 8)
+        IIntelligentStorageEngine storageEngine = new IntelligentStorageEngine();   // ML.NET advisor
 
-        // Week 8: loading ML.NET and the model takes a few seconds the first time, so start it in
+        // Loading ML.NET and the model takes a few seconds the first time, so start it in
         // the background now. By the time a folder is opened the advisor is ready. Never throws.
         _ = System.Threading.Tasks.Task.Run(() => storageEngine.IsModelLoaded);
         INetworkNodeCoordinator network = demoMode
             ? new MockNetworkNodeCoordinator()                                        // demo: never touches the firewall
-            : new NetworkNodeCoordinator();                                           // Week 10: firewall + listening
+            : new NetworkNodeCoordinator();                                           // firewall, discovery, transfers
         ISpecializedFileHandler fileHandler = new SpecializedFileHandler();         // optional feature
         IRecentRepositoryStore recentStore = demoMode
             ? new InMemoryRecentRepositoryStore()                                    // demo: never touches disk
@@ -48,15 +48,15 @@ public partial class App : Application
 
         var viewModel = new MainDashboardViewModel(repository, storageEngine, network, fileHandler, recentStore, demoMode);
 
-        // Redesign: menus and drop-downs open left-aligned under their header (like GitHub Desktop),
-        // even on PCs where Windows' "handedness" setting would open them to the left.
+        // Menus and drop-downs open left-aligned under their header, even on PCs where Windows'
+        // "handedness" setting would open them to the left.
         // (Read it once first: WPF fills its cache on the first read, which would undo the change.)
         _ = SystemParameters.MenuDropAlignment;
         typeof(SystemParameters).GetField("_menuDropAlignment",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)?
             .SetValue(null, false);
 
-        // Redesign: light / dark theme, remembered between sessions (View > Theme in the menu).
+        // Light or dark theme, remembered between sessions.
         viewModel.CurrentTheme = ThemeManager.Load();
         ThemeManager.Apply(viewModel.CurrentTheme, save: false);
         viewModel.PropertyChanged += (_, args) =>

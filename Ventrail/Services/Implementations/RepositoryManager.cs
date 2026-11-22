@@ -17,8 +17,8 @@ namespace Ventrail.Services.Implementations;
 /// That means a background thread (Task.Run in the ViewModel) can call any method
 /// safely, and the .git folder is never left locked.
 ///
-/// Week 6: every operation goes through Use(...), which turns low-level Git and
-/// Windows errors into plain-language VentrailExceptions.
+/// Every operation goes through Use(...), which turns low-level Git and Windows errors into
+/// plain-language VentrailExceptions.
 /// </summary>
 public class RepositoryManager : IRepositoryManager
 {
@@ -61,7 +61,7 @@ public class RepositoryManager : IRepositoryManager
         GlobalSettings.SetOwnerValidation(false);
     }
 
-    // ---------- Fig 3.2: directory selection + repository initialisation ----------
+    // ---------- opening a folder ----------
 
     public bool InitRepository(string path)
     {
@@ -110,7 +110,7 @@ public class RepositoryManager : IRepositoryManager
         return true;
     }
 
-    // ---------- Fig 3.3: staging interface ----------
+    // ---------- finding and ticking changes ----------
 
     public List<FileAsset> ScanWorkingDirectory()
     {
@@ -249,7 +249,7 @@ public class RepositoryManager : IRepositoryManager
         repo.Index.Add(filePath);
     }
 
-    // ---------- Fig 3.4: commit execution + DAG history ----------
+    // ---------- saving versions and reading the history ----------
 
     public bool Commit(string message, string author)
     {
@@ -375,8 +375,8 @@ public class RepositoryManager : IRepositoryManager
         WriteFromCommit(repo, commit, filePath);
         repo.Index.Write();
 
-        // Week 6: check the file on disk really matches the old version so the user is never told
-        // "Restored" when nothing changed. (Writing or reading a locked file throws, which Use() translates.)
+        // Make sure the file on disk really matches the old version, so the user is never told
+        // "Restored" when nothing changed.
         if (commit[filePath]?.Target is Blob blob &&
             !FileMatchesBlob(Path.Combine(RepoPath, filePath), blob, filePath))
         {
@@ -386,7 +386,7 @@ public class RepositoryManager : IRepositoryManager
     }, filePath);
     }
 
-    // ---------- Week 7: discard changes + diff viewer ----------
+    // ---------- discarding changes and comparing files ----------
 
     public string? DiscardChanges(string filePath)
     {
@@ -596,7 +596,7 @@ public class RepositoryManager : IRepositoryManager
         return Array.IndexOf(buffer, (byte)0, 0, n) >= 0;
     }
 
-    // ---------- Week 12: receiving versions from another computer ----------
+    // ---------- receiving versions from another computer ----------
 
     /// <summary>
     /// Adds the versions in a verified package to this repository. The files on disk only change
@@ -729,7 +729,7 @@ public class RepositoryManager : IRepositoryManager
         return clean.Length == 0 ? "peer" : clean;
     }
 
-    // ---------- Week 6: error handling ----------
+    // ---------- error handling ----------
 
     // Opens the repository for one operation and translates errors into plain language.
     // One operation at a time: two at once (for example ticking two files quickly) would fight over
@@ -809,7 +809,7 @@ public class RepositoryManager : IRepositoryManager
         }
     }
 
-    // ---------- Week 6: initialisation helpers ----------
+    // ---------- helpers for opening a folder ----------
 
     // Tracking a whole drive, Windows or the user's profile would scan (and copy into history)
     // hundreds of thousands of files, so Ventrail refuses to create a repository there.

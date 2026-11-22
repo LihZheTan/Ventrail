@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
 
-    <!-- Week 14: release information (shown on the Welcome page and in the file's Properties) -->
+    <!-- Release information (shown in the app and in the file's Properties) -->
     <Version>1.0.0</Version>
     <Product>Ventrail</Product>
     <Title>Ventrail</Title>
@@ -25,13 +25,13 @@
     <PackageReference Include="Microsoft.ML.FastTree" Version="4.0.2" />
   </ItemGroup>
 
-  <!-- Week 14: app icon (window + taskbar) -->
+  <!-- App icon (window + taskbar) -->
   <ItemGroup>
     <Resource Include="Assets/Ventrail.ico" />
     <Resource Include="Assets/Ventrail.png" />
   </ItemGroup>
 
-  <!-- Week 8: trained heavy/light classifier (made by Ventrail.ModelTrainer), shipped next to the exe. -->
+  <!-- Trained heavy/light classifier (made by Ventrail.ModelTrainer), shipped next to the exe. -->
   <ItemGroup>
     <None Update="MLModels\ventrail_classifier.zip" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

@@ -260,7 +260,7 @@
         </Border>
     </Grid>
 
-    <!-- Commit progress (proposal Fig 3.4) -->
+    <!-- Progress screen while a version is saved -->
     <Grid Background="{DynamicResource BackdropBrush}"
           Visibility="{Binding IsCommitting, Converter={StaticResource BoolToVis}}">
         <Border Style="{StaticResource Card}" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="26,22">

@@ -96,7 +96,7 @@ string header = DiscoveryMessage.Header(DiscoveryMessage.Find, "vt-0123456789ab"
 var parsed = DiscoveryMessage.Parse(header + " rp-aaaaaaaaaaaa");
 Check("header round trip", parsed is { Verb: DiscoveryMessage.Find } && parsed.Sender!.PeerId == "vt-0123456789ab" && parsed.Sender.Port == 4001
       && parsed.Sender.DiscoveryPort == 4002 && parsed.Sender.DisplayName == "Lab_PC_2" && parsed.Args.SequenceEqual(new[] { "rp-aaaaaaaaaaaa" }), header);
-Check("bare Week 10 question still understood", DiscoveryMessage.Parse("VENTRAIL?") is { Verb: "VENTRAIL?", Sender: null });
+Check("bare question still understood", DiscoveryMessage.Parse("VENTRAIL?") is { Verb: "VENTRAIL?", Sender: null });
 Check("malformed messages ignored", new[] { "", "HELLO", "VENTRAIL-FIND", "VENTRAIL-FIND vt-0123456789ab 4001 4002",
       "VENTRAIL? vt-0123 4001 4002 x", "VENTRAIL? vt-0123456789ab 0 4002 x", "VENTRAIL? vt-0123456789ab 4001 70000 x",
       "VENTRAIL? rp-0123456789ab 4001 4002 x" }.All(s => DiscoveryMessage.Parse(s) is null));
@@ -161,7 +161,7 @@ C.StartListening();
 int bChanged = 0;
 B.PeersChanged += (_, _) => Interlocked.Increment(ref bChanged);
 
-// Week 10 compatibility: the bare question still gets an answer starting "VENTRAIL! <id> <tcp>".
+// The bare question still gets an answer starting "VENTRAIL! <id> <tcp>".
 using (var u = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0)))
 {
     await u.SendAsync(Encoding.UTF8.GetBytes("garbage \u0001\u0002"), Ep(46102));
@@ -318,7 +318,7 @@ impostor.StopListening();
 B.StopListening();
 for (int i = 0; i < 3; i++)
 {
-    C.DiscoverPeers();   // Week 13: dropped after 3 silent lookups, not 1
+    C.DiscoverPeers();   // a peer is dropped after 3 silent lookups, not 1
 }
 
 Check("peer that stopped answering is dropped (after 3 lookups)", C.GetKnownPeers().All(p => p.PeerId != B.LocalPeerId),
@@ -376,7 +376,7 @@ await vm.ToggleSharingCommand.ExecuteAsync(null);
 Check("switch on again -> peers back, nobody connected", vm.ActivePeers.Count == 3 && vm.ActivePeers.All(p => !p.IsConnected));
 
 await vm.InitializeDashboardAsync(@"C:\Demo\Other");
-Check("same history in another folder -> still recognised as the same repository (Week 12)", vm.ActivePeers.Single(p => p.Title == "LAB-PC-02").HasCurrentRepository);
+Check("same history in another folder -> still recognised as the same repository", vm.ActivePeers.Single(p => p.Title == "LAB-PC-02").HasCurrentRepository);
 
 Console.WriteLine($"\n{pass} passed, {fail} failed.");
 

@@ -7,7 +7,7 @@ using Microsoft.ML.Data;
 using Ventrail.Services.AI;
 
 // =====================================================================================
-// Ventrail model trainer (CP2 Week 8)
+// Ventrail model trainer: trains the heavy/light file classifier used by the storage advisor.
 //
 //   dotnet run --project Ventrail.ModelTrainer                    (system folders only)
 //   dotnet run --project Ventrail.ModelTrainer -- --include "D:\MyFiles" --max-files 8000
@@ -196,7 +196,7 @@ var testRows = ml.Data.CreateEnumerable<FileFeatures>(split.TestSet, reuseRowObj
     double rc = tp + fn == 0 ? 0 : (double)tp / (tp + fn);
     return ((double)ok / testRows.Count, p, rc, p + rc == 0 ? 0 : 2 * p * rc / (p + rc));
 }
-var rule50Mb = SizeRule(50.0 * 1024 * 1024);   // Week 6 "Large" badge
+var rule50Mb = SizeRule(50.0 * 1024 * 1024);   // the app's "Large" badge rule
 var rule1Mb = SizeRule(1024 * 1024);           // "big file = heavy"
 string RuleRow(string name, (double Acc, double P, double R, double F1) m)
 {
@@ -237,7 +237,7 @@ var report = new StringBuilder()
     .AppendLine("## Baselines (same test set)")
     .AppendLine("| Rule | Accuracy | Precision (heavy) | Recall (heavy) | F1 (heavy) |")
     .AppendLine("|---|---|---|---|---|")
-    .AppendLine(RuleRow("Size >= 50 MB (Week 6 'Large' badge)", rule50Mb))
+    .AppendLine(RuleRow("Size >= 50 MB ('Large' badge)", rule50Mb))
     .AppendLine(RuleRow("Size >= 1 MB", rule1Mb))
     .AppendLine(RuleRow("ML.NET model", (metrics.Accuracy, metrics.PositivePrecision, metrics.PositiveRecall, metrics.F1Score)))
     .AppendLine()

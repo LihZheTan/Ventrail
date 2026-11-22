@@ -12,7 +12,7 @@ public partial class RepositoryView : UserControl
         InitializeComponent();
     }
 
-    // Week 9: "Write my own" moves the keyboard focus into the summary box. Focus is a view-only
+    // "Write my own" moves the keyboard focus into the summary box. Focus is a view-only
     // concern, so it lives here; the command (run right after this) fills in the text.
     private void EditManually_Click(object sender, RoutedEventArgs e)
     {

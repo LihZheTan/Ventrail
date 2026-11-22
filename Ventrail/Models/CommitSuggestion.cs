@@ -8,7 +8,7 @@ public enum AdviceLevel
     Info, Warning
 }
 
-/// <summary>Week 9: one storage tip about a staged file, shown on the AI suggestion card.</summary>
+/// <summary>One storage tip about a ticked file, shown on the AI suggestion card.</summary>
 public class StorageAdvice
 {
     public string FilePath { get; set; } = string.Empty;
@@ -24,8 +24,8 @@ public class StorageAdvice
 }
 
 /// <summary>
-/// Week 9: what the advisor suggests for the next version: a commit message written from the
-/// ticked files, plus storage advice for the heavy ones.
+/// The advisor's suggestion for the next version: a commit message written from the ticked
+/// files, plus storage advice for the heavy ones.
 /// </summary>
 public class CommitSuggestion
 {

@@ -122,7 +122,7 @@ Check("download: whole package matches its SHA-256", BlockHashing.FileSha256(pkg
 Check("progress reported block by block up to 100%", reports.Count >= m.BlockCount && reports[^1].Percent == 100 && reports[^1].BytesDone == m.Size);
 Check("sender counts bytes sent", S.BytesSent >= m.Size, $"{S.BytesSent}");
 Check("already downloaded -> instant", R.DownloadPackage(m, null, CancellationToken.None) == pkg);
-Check("TransferData (class diagram) works for a requested package", R.TransferData(S.LocalPeerId, m.PackageHash));
+Check("TransferData works for a requested package", R.TransferData(S.LocalPeerId, m.PackageHash));
 Throws<VentrailException>("TransferData for an unknown hash refused", () => R.TransferData(S.LocalPeerId, new string('0', 64)));
 
 // ---------- download a copy ----------

@@ -10,8 +10,8 @@ using Ventrail.Services.Mock;
 using Ventrail.Themes;
 using Ventrail.ViewModels;
 
-// Redesign (launcher-style sidebar shell, light/dark themes): the ViewModel parts behind it, and a
-// static check that both colour themes are complete.
+// The sidebar layout and light/dark themes: the ViewModel parts behind them, and a check that
+// both colour themes are complete.
 
 int pass = 0, fail = 0;
 void Check(string name, bool ok, string detail = "")

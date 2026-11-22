@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 namespace Ventrail.Services.Implementations;
 
 /// <summary>
-/// Week 7: moves a file out of the way without destroying it, before "Discard changes"
+/// Moves a file out of the way without destroying it, before "Discard changes"
 /// overwrites or removes it. On normal (fixed) drives it goes to the Windows Recycle Bin.
 /// USB sticks and network drives have no Recycle Bin (Windows would delete for good), so
 /// there the file is copied to %LocalAppData%\Ventrail\Discarded\... first.

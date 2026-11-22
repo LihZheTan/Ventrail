@@ -5,7 +5,7 @@ using Microsoft.ML.Data;
 namespace Ventrail.Services.AI;
 
 /// <summary>
-/// Week 8: the cheap facts about a file that the heavy/light classifier looks at.
+/// The cheap facts about a file that the heavy/light classifier looks at.
 /// Only the size and the first 4 KB ("header") are read, so classifying is fast even for
 /// multi-gigabyte files.
 ///

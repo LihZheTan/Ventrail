@@ -9,7 +9,7 @@ using Ventrail.Models;
 namespace Ventrail.Services.Implementations.Dht;
 
 /// <summary>
-/// Week 11: the UDP messages on port 4002. One line of plain text per packet, so they are easy to
+/// The UDP messages on port 4002. One line of plain text per packet, so they are easy to
 /// read in a packet capture and in tests. Every message starts with the sender's details, so the
 /// receiver can add the sender to its routing table (as Kademlia does):
 ///
@@ -20,7 +20,7 @@ namespace Ventrail.Services.Implementations.Dht;
 ///   VENTRAIL-PROVIDE    repo key: "I have a copy of this repository" (no answer)
 ///   VENTRAIL-GETPROV    repo key: "who has it?"                   → VENTRAIL-PROVIDERS key providers closer
 ///
-/// Entries are "id@ip:tcp:udp:name" separated by commas, or "-" for none. The bare Week 10 question
+/// Entries are "id@ip:tcp:udp:name" separated by commas, or "-" for none. The bare question
 /// "VENTRAIL?" is still understood, and the answer still begins "VENTRAIL! &lt;id&gt; &lt;tcp port&gt;".
 /// Anything malformed is ignored (Parse returns null).
 /// </summary>
@@ -39,7 +39,7 @@ public sealed class DiscoveryMessage
     private static readonly string[] Verbs = { Hello, HelloAnswer, Find, Peers, Provide, GetProviders, Providers };
 
     public string Verb { get; init; } = string.Empty;
-    public PeerNode? Sender { get; init; }                  // null only for the bare Week 10 "VENTRAIL?"
+    public PeerNode? Sender { get; init; }                  // null only for the bare "VENTRAIL?" question
     public string[] Args { get; init; } = Array.Empty<string>();
 
     // ---------- writing ----------

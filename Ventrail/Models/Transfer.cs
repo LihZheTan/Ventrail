@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Ventrail.Models;
 
-/// <summary>Week 12: a repository another computer offers ("LIST" answer).</summary>
+/// <summary>A repository another computer offers for download.</summary>
 public class OfferedRepository
 {
     public string PeerId { get; set; } = string.Empty;
@@ -45,7 +45,7 @@ public class OfferedRepository
 }
 
 /// <summary>
-/// Week 12: what the sending computer promises before any data moves: the package's size, its
+/// What the sending computer promises before any data moves: the package's size, its
 /// SHA-256 fingerprint and the fingerprint of every 1 MB block. Each block is checked on arrival,
 /// then the whole package, then Git checks every version inside it.
 /// </summary>
@@ -72,7 +72,7 @@ public class TransferProgress
     public long TotalBytes { get; init; }
     public int BlocksResumed { get; init; }   // already on disk from an interrupted download
     public int BlocksRetried { get; init; }   // arrived damaged and were asked for again
-    public double BytesPerSecond { get; init; }   // Week 13: measured speed of this download (0 = not yet known)
+    public double BytesPerSecond { get; init; }   // measured speed of this download (0 = not yet known)
 
     public TimeSpan? TimeLeft => BytesPerSecond > 0 ? TimeSpan.FromSeconds((TotalBytes - BytesDone) / BytesPerSecond) : null;
 

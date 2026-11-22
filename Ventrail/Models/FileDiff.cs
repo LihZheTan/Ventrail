@@ -7,7 +7,7 @@ public enum DiffLineKind
     Context, Added, Removed, Hunk
 }
 
-/// <summary>One line of a text comparison (Week 7 diff viewer).</summary>
+/// <summary>One line of a text comparison.</summary>
 public class DiffLine
 {
     public DiffLineKind Kind { get; set; }

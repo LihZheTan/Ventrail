@@ -32,7 +32,7 @@ void Section(string title)
 // ================= 1. adaptive timeouts (pure logic) =================
 Section("adaptive timeouts");
 var est = new RttEstimator(TimeSpan.FromMilliseconds(800), TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(8));
-Check("starts at the Week 11 value (0.8 s)", est.Timeout == TimeSpan.FromMilliseconds(800) && est.Smoothed is null);
+Check("starts at 0.8 s", est.Timeout == TimeSpan.FromMilliseconds(800) && est.Smoothed is null);
 for (int i = 0; i < 20; i++)
 {
     est.Observe(TimeSpan.FromMilliseconds(5));
@@ -65,7 +65,7 @@ est.Observe(TimeSpan.FromMilliseconds(5));
 Check("a real answer brings it back down", est.Timeout < TimeSpan.FromSeconds(8), $"{est.Timeout.TotalMilliseconds:F0} ms");
 
 var link = new PeerLink();
-Check("block wait before any speed is known = 30 s (Week 12 value)", link.BlockTimeout(1 << 20) == TimeSpan.FromSeconds(30));
+Check("block wait before any speed is known = 30 s", link.BlockTimeout(1 << 20) == TimeSpan.FromSeconds(30));
 link.Throughput.Observe(1 << 20, TimeSpan.FromMilliseconds(10));   // 100 MB/s LAN
 Check("fast link -> a stuck block is noticed in 2 s", link.BlockTimeout(1 << 20) == TimeSpan.FromSeconds(2));
 var slowLink = new PeerLink();
@@ -245,7 +245,7 @@ catch (VentrailException ex)
     frozenMessage = ex.Message;
 }
 sw.Stop();
-Check("frozen peer noticed quickly (Week 12: 30 s per try, 90 s+)", frozenMessage != null && sw.Elapsed < TimeSpan.FromSeconds(15),
+Check("frozen peer noticed within 15 s", frozenMessage != null && sw.Elapsed < TimeSpan.FromSeconds(15),
       $"{sw.Elapsed.TotalSeconds:F1} s: {frozenMessage}");
 nodeA.TestConditions = null;
 var resumeReports = new List<TransferProgress>();

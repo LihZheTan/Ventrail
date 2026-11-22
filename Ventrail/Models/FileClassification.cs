@@ -3,7 +3,7 @@ using System;
 namespace Ventrail.Models;
 
 /// <summary>
-/// Week 8: the storage advisor's verdict for one file. "Heavy" means saving one new version
+/// The storage advisor's verdict for one file. "Heavy" means saving one new version
 /// adds at least 1 MB to the history after Git's compression (see Ventrail.ModelTrainer).
 /// </summary>
 public class FileClassification

@@ -10,8 +10,8 @@ using Ventrail.Themes;
 namespace Ventrail.ViewModels;
 
 /// <summary>
-/// Redesign (GitHub Desktop-style shell): menu bar and toolbar commands, the light/dark theme
-/// choice, the summary + description commit fields and the diff shown beside the changed files.
+/// Sidebar and page commands, the light/dark theme choice, the summary + description commit
+/// fields and the comparison shown beside the changed files.
 /// Still UI-free: App.xaml.cs applies the theme when CurrentTheme changes.
 /// </summary>
 public partial class MainDashboardViewModel

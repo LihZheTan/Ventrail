@@ -74,7 +74,7 @@ var s = SuggestionWriter.Suggest(new[]
     F("notes.txt", "Modified", 2000, heavy: false),
     F("scan.svs", "Added", 2_400_000_000, heavy: true),
     F("gone.mp4", "Deleted", 0, heavy: true),
-    F("raw.bin", "Added", 80_000_000, heavy: null)   // no verdict: Week 6 size rule
+    F("raw.bin", "Added", 80_000_000, heavy: null)   // no verdict: the 50 MB size rule
 });
 foreach (var a in s.Advice)
 {

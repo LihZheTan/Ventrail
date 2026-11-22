@@ -9,11 +9,11 @@ using Ventrail.Models;
 namespace Ventrail.ViewModels;
 
 /// <summary>
-/// Week 5: everything that tells the user what is happening.
+/// Everything that tells the user what is happening.
 ///  - Toast notifications (success / error / info), auto-hiding.
 ///  - A reusable in-app confirm dialog (firewall permission, restore, exit).
 ///  - Progress for long operations (opening a folder, the commit progress screen).
-///  - Session statistics + activity log for the Session Summary page (Fig 3.7).
+///  - Session statistics and the activity log for the Session Summary page.
 /// Kept in its own file (partial class) so the main ViewModel stays focused on version control.
 /// </summary>
 public partial class MainDashboardViewModel
@@ -90,7 +90,7 @@ public partial class MainDashboardViewModel
         CloseDialog(true);
     }
 
-    // Also bound to Esc, which closes the diff viewer (Week 7) when no dialog is open.
+    // Also bound to Esc, which closes the full-size comparison when no dialog is open.
     [RelayCommand]
     private void CancelDialog()
     {
@@ -115,7 +115,7 @@ public partial class MainDashboardViewModel
     // Spinner overlay while a folder is being opened and scanned.
     [ObservableProperty] private bool _isLoadingRepository;
 
-    // Full-screen "Committing Changes..." screen (proposal mockup, Fig 3.4).
+    // Full-screen "Committing Changes..." progress screen.
     [ObservableProperty] private bool _isCommitting;
     [ObservableProperty] private double _commitProgress;           // 0-100
     [ObservableProperty] private string _commitProgressText = string.Empty;
@@ -138,7 +138,7 @@ public partial class MainDashboardViewModel
 
     partial void OnSessionBytesSharedChanged(long value) => OnPropertyChanged(nameof(SessionSharedDisplay));
 
-    // Oldest first, like the mockup's "Session Activity Log".
+    // Oldest first, so the log reads top to bottom.
     private void LogActivity(string text)
     {
         ActivityLog.Add(new ActivityEntry { Text = text });
@@ -147,14 +147,14 @@ public partial class MainDashboardViewModel
 
     public bool HasActivity => ActivityLog.Count > 0;
 
-    /// <summary>Left-rail Exit: show the Session Summary first (Fig 3.7) instead of closing straight away.</summary>
+    /// <summary>Exit button: show the Session Summary first instead of closing straight away.</summary>
     [RelayCommand]
     private void ShowSessionSummary()
     {
         CurrentPage = AppPage.Summary;
     }
 
-    /// <summary>"Continue Workflow" on the summary loops back to the start (Fig 3.7).</summary>
+    /// <summary>"Continue Workflow" on the summary goes back to the start.</summary>
     [RelayCommand]
     private void ContinueWorkflow()
     {

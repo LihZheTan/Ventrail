@@ -4,7 +4,7 @@ using System.Threading;
 namespace Ventrail.Services.Implementations.Transfer;
 
 /// <summary>
-/// Week 13: how long to wait for an answer, learnt from how long answers actually take.
+/// How long to wait for an answer, learnt from how long answers actually take.
 /// Same method TCP itself uses (Jacobson/Karels, RFC 6298): keep a smoothed round-trip time (SRTT)
 /// and how much it varies (RTTVAR); wait SRTT + 4 x RTTVAR. When a wait runs out, the next wait is
 /// doubled (back-off), so a slow link gets more patience and a fast one gives up on a dead peer quickly.
@@ -88,7 +88,7 @@ public class RttEstimator
 }
 
 /// <summary>
-/// Week 13: how fast blocks arrive from one peer (bytes per second, smoothed), used to decide how long
+/// How fast blocks arrive from one peer (bytes per second, smoothed), used to decide how long
 /// one 1 MB block may take before the connection is treated as stuck.
 /// </summary>
 public class ThroughputEstimator
@@ -156,7 +156,7 @@ public class ThroughputEstimator
 /// <summary>What Ventrail has learnt about the connection to one peer.</summary>
 public class PeerLink
 {
-    // UDP questions: start at 0.8 s (the Week 11 value), never below 0.25 s (a busy PC needs a
+    // UDP questions: start at 0.8 s, never below 0.25 s (a busy PC needs a
     // moment to answer even on a fast network) or above 8 s.
     public RttEstimator Rtt { get; } = new(TimeSpan.FromMilliseconds(800), TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(8));
     public ThroughputEstimator Throughput { get; } = new();
@@ -180,7 +180,7 @@ public class PeerLink
     // Waiting for one line (LIST answer, manifest line): the sender says "WAIT" every 2 s while busy.
     public TimeSpan LineTimeout => Clamp(TimeSpan.FromSeconds(2) + Rtt.Timeout * 4, TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(40));
 
-    // One 1 MB block: 30 s (the Week 12 value) until the speed is known, then 2-120 s.
+    // One 1 MB block: 30 s until the speed is known, then 2-120 s.
     public TimeSpan BlockTimeout(long bytes)
     {
         return Throughput.TimeoutFor(bytes, Rtt.Timeout, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(120), TimeSpan.FromSeconds(30));
@@ -193,7 +193,7 @@ public class PeerLink
 }
 
 /// <summary>
-/// Week 13, tests only: makes a node behave like one on a poor network, to check the adaptive waits
+/// Tests only: makes a node behave like one on a poor network, to check the adaptive waits
 /// end to end. Applied by the answering side.
 /// </summary>
 public class NetworkConditions

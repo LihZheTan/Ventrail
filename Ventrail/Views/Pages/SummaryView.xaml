@@ -8,7 +8,7 @@
              d:DataContext="{d:DesignInstance Type=vm:MainDashboardViewModel}"
              d:DesignHeight="640" d:DesignWidth="1100">
 
-    <!-- Session Summary (proposal Fig 3.7 + mockup): shown from the Exit button. -->
+    <!-- Session Summary: shown from the Exit button. -->
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel HorizontalAlignment="Center" Margin="24,30,24,24" MaxWidth="760">
 

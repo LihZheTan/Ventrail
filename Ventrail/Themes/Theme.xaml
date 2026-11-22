@@ -651,7 +651,7 @@
         <Setter Property="Background" Value="{DynamicResource LineBrush}"/>
     </Style>
 
-    <!-- ===================== Diff (Week 7) ===================== -->
+    <!-- ===================== Diff ===================== -->
     <!-- Line-by-line comparison, used beside the changed files and in the full-size viewer. -->
     <DataTemplate x:Key="DiffTemplate">
         <Grid>

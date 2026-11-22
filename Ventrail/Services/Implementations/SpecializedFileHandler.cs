@@ -6,11 +6,11 @@ namespace Ventrail.Services.Implementations;
 
 /// <summary>
 /// Loads external C-based libraries (e.g. OpenSlide) for specialised formats.
-/// Stub created in Week 1 from the class diagram (Fig 3.8). Lower priority: implement only if time allows.
+/// Not built yet: every method throws NotImplementedException.
 /// </summary>
 public class SpecializedFileHandler : ISpecializedFileHandler
 {
-    // From the class diagram: -Dictionary<String, Object> activeLibraries
+    // Libraries loaded so far, by file type.
     private readonly Dictionary<string, object> _activeLibraries = new();
 
     public bool LoadLibraryForType(string fileExtension)

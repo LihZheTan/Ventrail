@@ -2,7 +2,7 @@ using System;
 
 namespace Ventrail.Models;
 
-/// <summary>One line in the Session Summary activity log (Fig 3.7).</summary>
+/// <summary>One line in the session's activity log.</summary>
 public class ActivityEntry
 {
     public DateTime Time { get; init; } = DateTime.Now;

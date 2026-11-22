@@ -11,13 +11,13 @@ using Ventrail.Services.Contracts;
 namespace Ventrail.Services.Implementations;
 
 /// <summary>
-/// Offline ML.NET pre-commit advisor (Fig 3.8).
+/// Offline ML.NET advisor that checks files before they are saved.
 ///
-/// Week 8: classifies files as heavy or light with a FastTree model trained offline by
+/// Classifies files as heavy or light with a FastTree model trained offline by
 /// Ventrail.ModelTrainer (shipped as MLModels/ventrail_classifier.zip). Everything runs on the
 /// user's PC: no file content ever leaves the machine. Only the size and first 4 KB of each
 /// file are read, so it is fast even for multi-gigabyte files.
-/// Week 9: turns the verdicts into advice (commit message, storage and sharing tips) through
+/// The verdicts are turned into advice (commit message, storage and sharing tips) by
 /// SuggestionWriter.
 /// </summary>
 public class IntelligentStorageEngine : IIntelligentStorageEngine
@@ -63,7 +63,7 @@ public class IntelligentStorageEngine : IIntelligentStorageEngine
         return FormatName(signature, ext);
     }
 
-    // Week 9: advice for a kind of file without opening it (extension + size estimate).
+    // Advice for a kind of file without opening it (extension + size estimate).
     public string GenerateRecommendation(string fileType, long fileSize)
     {
         string ext = Path.GetExtension(fileType);

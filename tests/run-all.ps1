@@ -18,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $suites = Get-ChildItem $here -Directory -Filter 'Ventrail.Tests.*' |
     Where-Object { $_.Name -notlike '*Benchmark*' } |
-    Sort-Object { $_.Name -notlike '*Week*' }, Name   # weeks in order, then Redesign
+    Sort-Object { $_.Name -notlike '*Week*' }, Name   # week suites in order, then the others
 if ($weeks.Count -gt 0) {
     $suites = @($suites | Where-Object { $weeks -contains [int]($_.Name -replace '\D', '') })
 }
@@ -48,7 +48,7 @@ foreach ($suite in $suites) {
 }
 
 if ($Benchmark) {
-    Write-Host "`n=== Classifier speed (Week 8) ===" -ForegroundColor Cyan
+    Write-Host "`n=== Classifier speed ===" -ForegroundColor Cyan
     & dotnet run --project (Join-Path $here 'Ventrail.Tests.Benchmark.ClassifierSpeed') -c Release -v q --nologo
 }
 

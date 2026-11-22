@@ -8,7 +8,7 @@ public enum PortAccess
     Unknown, Allowed, NeedsPermission, Blocked
 }
 
-/// <summary>Week 10: whether other computers can reach one of Ventrail's ports.</summary>
+/// <summary>Whether other computers can reach one of Ventrail's ports.</summary>
 public class PortCheck
 {
     public int Port { get; set; }
@@ -32,7 +32,7 @@ public class PortCheck
 }
 
 /// <summary>
-/// Week 10: result of the firewall audit (Fig 3.5) — one PortCheck per port, plus the network
+/// Result of the firewall check: one PortCheck per port, plus the network
 /// type, which decides which Windows Firewall rules apply.
 /// </summary>
 public class FirewallStatus
